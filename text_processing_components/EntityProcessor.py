@@ -41,7 +41,7 @@ class EntityProcessor:
         ne_query = """
             UNWIND $nes as item
             MERGE (ne:NamedEntity {id: toString($documentId) + "_" + toString(item.start_index)+ "_" + toString(item.end_index)+ "_" + toString(item.type)})
-            SET ne.type = item.type, ne.value = item.value, ne.index = item.start_index,
+            SET ne.type = item.type, ne.value = item.value, ne.index = item.start_index, ne.end_index = item.end_index,
             ne.kb_id = item.kb_id, ne.url_wikidata = item.url_wikidata, ne.score = item.score, ne.normal_term = item.normal_term, 
             ne.description = item.description
             WITH ne, item as neIndex

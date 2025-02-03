@@ -14,12 +14,11 @@ from spacy.util import compile_infix_regex
 from neo4j import GraphDatabase
 from TextProcessor import Neo4jRepository
 from text_processing_components.DocumentImporter import MeantimeXMLImporter
-# from spacy.util import load_config
+from spacy.util import load_config
 
-# from spacy_llm.util import assemble
-# from spacy_llm.registry import registry
-# from text_processing_components.llm.registry import openai_llama_3_1_8b
-# from spacy import util
+from spacy_llm.util import assemble
+from spacy_llm.registry import registry
+from text_processing_components.llm.registry import openai_llama_3_1_8b
 
 # Class representing a graph-based NLP model
 class GraphBasedNLP(GraphDBBase):
@@ -28,13 +27,13 @@ class GraphBasedNLP(GraphDBBase):
         # Calls the parent class's constructor
         super().__init__(command=__file__, argv=argv)
         
-        # self.config_path="/home/neo/environments/text2graphs/textgraphx/config.cfg"  # Default value provided for config_path argument
-        # self.examples_path="/home/neo/environments/text2graphs/textgraphx/examples.json" 
+        self.config_path="/home/neo/environments/text2graphs/textgraphx/config.cfg"  # Default value provided for config_path argument
+        self.examples_path="/home/neo/environments/text2graphs/textgraphx/examples.json" 
 
         # Prefer GPU for processing
         spacy.prefer_gpu()
         
-        #registry.llm_models.register(openai_llama_3_1_8b)
+        registry.llm_models.register(openai_llama_3_1_8b)
         # Load the English language model
         self.nlp = spacy.load('en_core_web_trf')
 
@@ -46,14 +45,11 @@ class GraphBasedNLP(GraphDBBase):
         #     if component not in self.nlp.pipe_names:
         #         self.nlp.add_pipe(component, config=config["components"][component])
         
-        
-        
         #self.nlp = assemble(config_path=self.config_path, overrides={"paths.examples": str(self.examples_path)})
-        #self.nlp = assemble(config_path=self.config_path)
-        print("config: ", self.nlp.config.to_str())
-        #llm_component = self.nlp.add_pipe("llm", config=llm_config["components"]["llm"], last=True)
+        
 
 
+        
         print("PIPELINE:  ", self.nlp.pipeline)
         # Configure the tokenizer
         self._configure_tokenizer()

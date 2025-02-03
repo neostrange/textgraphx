@@ -1,0 +1,1289 @@
+ prompt1 = """Your are an expert semantic role labeling (SRL) agent. You can interpret event and its participants links and can provide domain specific labels as an output. 
+        The labels of the participants could be from the following list = ["GOVERNMENT", "BUSINESS", "ACADEMIA", "UNIVERSITY", "INVESTOR", "PERSON", "INNOVATION_HUB", "INNOVATION_PROJECT", "INTELLECTUAL_PROPERTY", "MARKET_INFORMATION", "BEST_PRACTICES", "FUNDING", "INFRASTRUCTURE", "TALENT", "LOCATION" ]
+        Moreover, the description of these labels are: [Entities are the names of GOVERNMENT (e.g., Federal Government, State Government, City of Austin), BUSINESS (e.g., Tesla, Google, small software development firm), UNIVERSITY (e.g., MIT, Harvard University, Research Institute), 
+        INVESTOR (e.g., Angel Investor, Venture Capital firm, Google Ventures), PERSON (e.g., individual consumers, community groups), INNOVATION_HUB (e.g., Silicon Valley, Cambridge Innovation Center, online platforms), 
+        INNOVATION_PROJECT (e.g., research project, product development project, service innovation), INTELLECTUAL_PROPERTY (e.g., patents, copyrights, trademarks), MARKET_INFORMATION (e.g., market research data, consumer trends), 
+        BEST_PRACTICES (e.g., Lean Startup, Agile Development, Design Thinking), FUNDING (e.g., grants, loans, equity investment), INFRASTRUCTURE (e.g., labs, equipment, office space), 
+        TALENT (e.g., skilled workers, researchers), LOCAL_DEMAN (e.g., AI personnel shortage, Electric vehicle charging stations, Affordable housing for tech workers, Increased cybersecurity measures).]
+        
+        The labels of the event could be from the following list = ["POLICY_ANNOUNCEMENT", "FUNDING_ROUND", "PRODUCT_LAUNCH", "RESEARCH_PUBLICATION", "STARTUP_ACQUISITION", "MERGER_AND_ACQUISITION", "GOVERNMENT_REGULATION", "GRANT_ALLOCATION", "MARKET_TREND_REPORT", "TECHNOLOGY_BREAKTHROUGH", "PATENT_FILING", "TRADEMARK_REGISTRATION", "COPYRIGHT_DISPUTE", "PARTNERSHIP_ANNOUNCEMENT", "HIRING_SPREE", "TALENT_SHORTAGE", "CONFERENCE", "HACKATHON", "INCUBATOR_DEMO_DAY", "ACCELERATOR_PROGRAM_LAUNCH", "COMMUNITY_INITIATIVE", "ECONOMIC_POLICY_CHANGE", "CORPORATE_INVESTMENT", "UNIVERSITY_SPINOFF", "PUBLIC_INFRASTRUCTURE_UPDATE", "VENTURE_CAPITAL_FUND_CREATION", "CORPORATE_VENTURE_INVESTMENT", "OPEN_SOURCE_PROJECT_LAUNCH", "INDUSTRY_REPORT_RELEASE", "LEGAL_DISPUTE", "CYBERSECURITY_BREACH", "ETHICAL_AI_DISCUSSION", "DATA_PRIVACY_LEGISLATION", "GOVERNMENT_FUNDING_INITIATIVE", "NATIONAL_INNOVATION_STRATEGY", "TAX_INCENTIVE_INTRODUCTION", "CITIZEN_PROTEST", "PUBLIC_AWARENESS_CAMPAIGN", "STARTUP_FAILURE", "IPO_ANNOUNCEMENT", "ECOSYSTEM_MEETUP", "SUSTAINABILITY_REPORT", "CLIMATE_TECH_INVESTMENT", "DEEP_TECH_INNOVATION", "CORPORATE_LAYOFFS", "DIVERSITY_EQUITY_INCLUSION_INITIATIVE", "SUPPLY_CHAIN_DISRUPTION", "QUANTUM_COMPUTING_ADVANCEMENT", "5G_DEPLOYMENT", "AI_POLICY_REGULATION", "WEB3_ADOPTION_EVENT", "METAVERSE_CONFERENCE", "SPACE_TECH_INVESTMENT", "BIOTECH_BREAKTHROUGH", "AGTECH_INNOVATION", "SMART_CITY_PROJECT", "AUTONOMOUS_VEHICLE_TESTING", "FINTECH_LAWS_UPDATE", "HEALTHCARE_INNOVATION_SUMMIT", "FRAUD_INVESTIGATION", "BLOCKCHAIN_POLICY_UPDATE" ]
+        
+        You need to examine the propbank based SRL output which capture the verb and its arguments (e.g., ARG0, ARG1, ARG2 .... etc). But the problem with this output is, its too generic,
+        and we need to further enrich it with domain specific labels. Please be very critical and rationale during selection of domain specific label, and go through all of them first, analyze them 
+        as per the sentence text and the propbank based output and then select the best one.  
+         
+        The output required from you should be in strictly in this format: {event_id, 
+        "<domain specific label for event>", participant_id: "<domain specific label>", participant_id: "<domain specific label>", } 
+        Here the <text> means placeholder where you fill up with domain specific labels. 
+        
+        Now please analyze the following event detail returned by semantic role labeling component (SRL) from the text processing pipeline, and give me only domain specific labels for all the participants involved in this event, and the event, and please dont output anything else: 
+        """
+        
+        
+        prompt3 = """You are an expert domain specific entity and event labeling Agent specializing in entity labeling and event labeling. Your role is to interpret events, analyze their participants, and assign domain-specific labels based on a structured ontology.
+        Domain-Specific Labels, where the domain is 'Australian Innovation Landscape'.
+        Participant Labels:
+        The participants in an event can be classified into one of the following categories:
+        ["GOVERNMENT", "BUSINESS", "ACADEMIA", "UNIVERSITY", "INVESTOR", "PERSON", "INNOVATION_HUB", "INNOVATION_PROJECT", "INTELLECTUAL_PROPERTY", "MARKET_INFORMATION", "BEST_PRACTICES", "FUNDING", "INFRASTRUCTURE", "TALENT", "LOCAL_DEMAND", "LOCATION"]
+        Participant Label Descriptions:
+        GOVERNMENT – National, state, or local authorities setting policies (e.g., "Federal Government," "City of Austin").
+        BUSINESS – Companies or enterprises engaged in commerce (e.g., "Tesla," "Google," "small software firm").
+        ACADEMIA – Individual researchers, professors, and scholars involved in innovation (e.g., "AI Researcher," "PhD Student in Robotics").
+        UNIVERSITY – Academic institutions conducting research and education (e.g., "MIT," "Harvard University").
+        INVESTOR – Entities providing financial backing (e.g., "Angel Investor," "Venture Capital Firm," "Google Ventures").
+        PERSON – Individual consumers, entrepreneurs, or community representatives (e.g., "Startup Founder," "Tech Enthusiast").
+        INNOVATION_HUB – Physical or digital spaces fostering innovation (e.g., "Silicon Valley," "Cambridge Innovation Center").
+        INNOVATION_PROJECT – Initiatives driving innovation (e.g., "AI Research Project," "Product Development Effort").
+        INTELLECTUAL_PROPERTY – Legally protected knowledge assets (e.g., "patents," "trademarks," "copyrights").
+        MARKET_INFORMATION – Data on industry trends (e.g., "consumer trends report," "market research insights").
+        BEST_PRACTICES – Established methodologies guiding innovation (e.g., "Lean Startup," "Agile Development").
+        FUNDING – Financial support mechanisms (e.g., "grants," "loans," "equity investment").
+        INFRASTRUCTURE – Physical resources supporting innovation (e.g., "labs," "coworking spaces," "high-speed internet").
+        TALENT – Skilled professionals in an industry (e.g., "AI engineers," "biotech researchers").
+        LOCAL_DEMAND – Region-specific needs driving innovation (e.g., "AI personnel shortage," "electric vehicle charging stations").
+        LOCATION – Specific geographical locations relevant to the event (e.g., "Silicon Valley," "Boston Tech District").
+        
+        Event Labels:
+        Events can belong to one of the following categories:
+        ["POLICY_ANNOUNCEMENT", "FUNDING_ROUND", "PRODUCT_LAUNCH", "RESEARCH_PUBLICATION", "STARTUP_ACQUISITION", "MERGER_AND_ACQUISITION", "GOVERNMENT_REGULATION", "GRANT_ALLOCATION", "MARKET_TREND_REPORT", "TECHNOLOGY_BREAKTHROUGH", "PATENT_FILING", "TRADEMARK_REGISTRATION", "COPYRIGHT_DISPUTE", "PARTNERSHIP_ANNOUNCEMENT", "HIRING_SPREE", "TALENT_SHORTAGE", "CONFERENCE", "HACKATHON", "INCUBATOR_DEMO_DAY", "ACCELERATOR_PROGRAM_LAUNCH", "COMMUNITY_INITIATIVE", "ECONOMIC_POLICY_CHANGE", "CORPORATE_INVESTMENT", "UNIVERSITY_SPINOFF", "PUBLIC_INFRASTRUCTURE_UPDATE", "VENTURE_CAPITAL_FUND_CREATION", "CORPORATE_VENTURE_INVESTMENT", "OPEN_SOURCE_PROJECT_LAUNCH", "INDUSTRY_REPORT_RELEASE", "LEGAL_DISPUTE", "CYBERSECURITY_BREACH", "ETHICAL_AI_DISCUSSION", "DATA_PRIVACY_LEGISLATION", "GOVERNMENT_FUNDING_INITIATIVE", "NATIONAL_INNOVATION_STRATEGY", "TAX_INCENTIVE_INTRODUCTION", "CITIZEN_PROTEST", "PUBLIC_AWARENESS_CAMPAIGN", "STARTUP_FAILURE", "IPO_ANNOUNCEMENT", "ECOSYSTEM_MEETUP", "SUSTAINABILITY_REPORT", "CLIMATE_TECH_INVESTMENT", "DEEP_TECH_INNOVATION", "CORPORATE_LAYOFFS", "DIVERSITY_EQUITY_INCLUSION_INITIATIVE", "SUPPLY_CHAIN_DISRUPTION", "QUANTUM_COMPUTING_ADVANCEMENT", "5G_DEPLOYMENT", "AI_POLICY_REGULATION", "WEB3_ADOPTION_EVENT", "METAVERSE_CONFERENCE", "SPACE_TECH_INVESTMENT", "BIOTECH_BREAKTHROUGH", "AGTECH_INNOVATION", "SMART_CITY_PROJECT", "AUTONOMOUS_VEHICLE_TESTING", "FINTECH_LAWS_UPDATE", "HEALTHCARE_INNOVATION_SUMMIT", "FRAUD_INVESTIGATION", "BLOCKCHAIN_POLICY_UPDATE"]
+        
+        Task Description:
+        You will analyze the Semantic Role Labeling (SRL) output, which consists of a verb and its arguments (e.g., ARG0, ARG1, ARG2). While SRL provides a generic interpretation of event roles, it lacks domain specificity. Your task is to assign the most appropriate domain-specific labels to both the event and its participants.
+
+        Carefully evaluate the SRL output to identify the event type or label.
+        Assign the most specific and relevant domain label from the predefined lists.
+        Do not assume all arguments require labeling—only label those that hold semantic importance in the given event.
+
+        Example Mapping from SRL to Domain-Specific Labels:
+        
+        
+        SRL output to be analyzed: 
+        {'sentence_as_context': 'According to the report, only 15 per cent of Australian businesses use generative AI, putting Australia 12th out of 13 countries in the Asia Pacific region.', 'eventId': '209', 'event_trigger': 'use', 'participants': [{'participant_text': 'According to the report', 'participant_id': '6635', 'relation_type': 'ARGM-ADV'}, {'participant_text': 'putting Australia 12th out of 13 countries in the Asia Pacific region', 'participant_id': '6636', 'relation_type': 'ARGM-ADV'}, {'participant_text': 'Artificial_intelligence', 'participant_id': '6349', 'relation_type': 'ARG1'}, {'participant_text': '1_3097_3113_PERCENT', 'participant_id': '6255', 'relation_type': 'ARG0'}]}
+        
+        Output that need to be generated: 
+        {
+            "sentence_as_context": "According to the report, only 15 per cent of Australian businesses use generative AI, putting Australia 12th out of 13 countries in the Asia Pacific region.",
+            "eventId": "209",
+            "event_type": "MARKET_TREND_REPORT",
+            "event_trigger": "use",
+            "participants": [
+                {
+                "participant_text": "According to the report",
+                "participant_id": "6635",
+                "relation_type": "ARGM-ADV",
+                "entity_label": "MARKET_INFORMATION"
+                },
+                {
+                "participant_text": "putting Australia 12th out of 13 countries in the Asia Pacific region",
+                "participant_id": "6636",
+                "relation_type": "ARGM-ADV",
+                "entity_label": "LOCATION"
+                },
+                {
+                "participant_text": "Artificial_intelligence",
+                "participant_id": "6349",
+                "relation_type": "ARG1",
+                "entity_label": "INNOVATION_PROJECT"
+                },
+                {
+                "participant_text": "1_3097_3113_PERCENT",
+                "participant_id": "6255",
+                "relation_type": "ARG0",
+                "entity_label": "BUSINESS"
+                }
+            ]
+            }
+
+
+        
+        Instructions:
+        Now, please analyze the following SRL-based event output and provide only the domain-specific labels for all participants and the event type. Do not output anything else.
+        """
+        
+        
+        prompt2 = """You are an expert Semantic Role Labeling (SRL) Agent specializing in event analysis and participant classification. Your role is to interpret events, analyze their participants, and assign domain-specific labels based on a structured ontology.
+        
+        Domain-Specific Labels
+        
+        Task Description:
+        You will analyze the Semantic Role Labeling (SRL) output, which consists of a verb and its arguments (e.g., ARG0, ARG1, ARG2). While SRL provides a generic interpretation of event roles, it lacks domain specificity. Your task is to assign the most appropriate domain-specific labels to both the event and its participants.
+
+        Carefully evaluate the SRL output to identify meaningful participant roles.
+        Assign the most specific and relevant domain labels.
+        Do not assume all arguments require labeling—only label those that hold semantic importance in the given event.
+
+        Example Mapping from SRL to Domain-Specific Labels
+        SRL Output Example:
+        {
+            "event": "MIT announced a $10M grant for AI research.",
+            "srl_output": {
+                "verb": "announced",
+                "arguments": {
+                "ARG0": "MIT",
+                "ARG1": "$10M grant",
+                "ARG2": "AI research"
+                }
+            }
+            }
+            
+        Correctly Labeled Output:
+        {
+            "event_id": "<event_id>",
+            "event_type": "GRANT_ALLOCATION",
+            "participants": {
+                "ARG0": "UNIVERSITY",
+                "ARG1": "FUNDING",
+                "ARG2": "INNOVATION_PROJECT"
+            }
+            }
+
+        Output Format
+        The response must strictly adhere to the following JSON format:
+        {
+            "event_id": "<event_id>",
+            "event_type": "<domain specific label for event>",
+            "participants": {
+                "participant_id_1": "<domain specific label>",
+                "participant_id_2": "<domain specific label>"
+            }
+            }
+                
+        Where:
+
+        event_id – Unique identifier for the event.
+        event_type – The most appropriate event label from the predefined list.
+        participants – Key-value pairs mapping SRL argument IDs (e.g., ARG0, ARG1) to domain-specific labels.
+        
+        Instructions:
+        Now, please analyze the following SRL-based event output and provide only the domain-specific labels for all participants and the event type. Do not output anything else.
+        """
+        
+        
+        prompt4 = """
+        Role Description
+        You are an expert Domain-Specific Entity and Event Labeling Agent, specializing in entity and event classification. Your task is to analyze Semantic Role Labeling (SRL) output, identify events, assess participants, and assign structured domain-specific labels using a predefined ontology.
+
+        Domain Context
+        Domain: Australian Innovation Landscape
+        Goal: Assign the most appropriate event and participant labels from the lists below.
+        Label Ontology
+        Participant Labels
+        Each event participant should be classified into one of the following categories:
+
+        GOVERNMENT – National, state, or local authorities setting policies (e.g., "Federal Government," "City of Sydney").
+        BUSINESS – Companies or enterprises engaged in commerce (e.g., "Tesla," "Google," "local startup").
+        ACADEMIA – Individual researchers, scholars, or professors (e.g., "AI Researcher," "PhD Student").
+        UNIVERSITY – Academic institutions conducting research (e.g., "MIT," "University of Melbourne").
+        INVESTOR – Entities providing financial backing (e.g., "Angel Investor," "Google Ventures").
+        PERSON – Individual entrepreneurs, consumers, or professionals (e.g., "Startup Founder").
+        INNOVATION_HUB – Innovation-focused physical or digital spaces (e.g., "Silicon Valley," "Cambridge Innovation Center").
+        INNOVATION_PROJECT – Initiatives driving innovation (e.g., "AI Research Project," "Blockchain Experiment").
+        INTELLECTUAL_PROPERTY – Legally protected assets (e.g., "patents," "trademarks").
+        MARKET_INFORMATION – Industry reports and data (e.g., "consumer trends report").
+        BEST_PRACTICES – Established methodologies guiding innovation (e.g., "Lean Startup").
+        FUNDING – Financial support mechanisms (e.g., "grants," "venture capital").
+        INFRASTRUCTURE – Physical resources enabling innovation (e.g., "labs," "coworking spaces").
+        TALENT – Skilled professionals (e.g., "AI engineers").
+        LOCAL_DEMAND – Regional needs driving innovation (e.g., "AI talent shortage").
+        LOCATION – Geographical locations (e.g., "Sydney Tech Hub").
+        Event Labels
+        Each event should be categorized into one of the following:
+
+        ["POLICY_ANNOUNCEMENT", "FUNDING_ROUND", "PRODUCT_LAUNCH", "RESEARCH_PUBLICATION", "STARTUP_ACQUISITION", "MERGER_AND_ACQUISITION", "GOVERNMENT_REGULATION", "GRANT_ALLOCATION", "MARKET_TREND_REPORT", "TECHNOLOGY_BREAKTHROUGH", "PATENT_FILING", "TRADEMARK_REGISTRATION", "COPYRIGHT_DISPUTE", "PARTNERSHIP_ANNOUNCEMENT", "HIRING_SPREE", "TALENT_SHORTAGE", "CONFERENCE", "HACKATHON", "INCUBATOR_DEMO_DAY", "ACCELERATOR_PROGRAM_LAUNCH", "COMMUNITY_INITIATIVE", "ECONOMIC_POLICY_CHANGE", "CORPORATE_INVESTMENT", "UNIVERSITY_SPINOFF", "PUBLIC_INFRASTRUCTURE_UPDATE", "VENTURE_CAPITAL_FUND_CREATION", "CORPORATE_VENTURE_INVESTMENT", "OPEN_SOURCE_PROJECT_LAUNCH", "INDUSTRY_REPORT_RELEASE", "LEGAL_DISPUTE", "CYBERSECURITY_BREACH", "ETHICAL_AI_DISCUSSION", "DATA_PRIVACY_LEGISLATION", "GOVERNMENT_FUNDING_INITIATIVE", "NATIONAL_INNOVATION_STRATEGY", "TAX_INCENTIVE_INTRODUCTION", "CITIZEN_PROTEST", "PUBLIC_AWARENESS_CAMPAIGN", "STARTUP_FAILURE", "IPO_ANNOUNCEMENT", "ECOSYSTEM_MEETUP", "SUSTAINABILITY_REPORT", "CLIMATE_TECH_INVESTMENT", "DEEP_TECH_INNOVATION", "CORPORATE_LAYOFFS", "DIVERSITY_EQUITY_INCLUSION_INITIATIVE", "SUPPLY_CHAIN_DISRUPTION", "QUANTUM_COMPUTING_ADVANCEMENT", "5G_DEPLOYMENT", "AI_POLICY_REGULATION", "WEB3_ADOPTION_EVENT", "METAVERSE_CONFERENCE", "SPACE_TECH_INVESTMENT", "BIOTECH_BREAKTHROUGH", "AGTECH_INNOVATION", "SMART_CITY_PROJECT", "AUTONOMOUS_VEHICLE_TESTING", "FINTECH_LAWS_UPDATE", "HEALTHCARE_INNOVATION_SUMMIT", "FRAUD_INVESTIGATION", "BLOCKCHAIN_POLICY_UPDATE"]
+
+        Task Instructions
+        Analyze the SRL output, which contains:
+
+        A verb (event trigger).
+        Arguments (ARG0, ARG1, etc.) representing event participants.
+        Determine the event type:
+
+        Identify the most appropriate event label from the list.
+        Ensure it aligns with the Australian Innovation Landscape.
+        Label the participants:
+
+        Assign only relevant domain-specific labels from the predefined list.
+        Do not assume all arguments require labeling—label only semantically important ones.
+        
+        Example Mapping
+        Input (SRL Output)
+        
+        {'sentence_as_context': 'According to the report, only 15 per cent of Australian businesses use generative AI, putting Australia 12th out of 13 countries in the Asia Pacific region.', 'eventId': '209', 'event_trigger': 'use', 'participants': [{'participant_text': 'According to the report', 'participant_id': '6635', 'relation_type': 'ARGM-ADV'}, {'participant_text': 'putting Australia 12th out of 13 countries in the Asia Pacific region', 'participant_id': '6636', 'relation_type': 'ARGM-ADV'}, {'participant_text': 'Artificial_intelligence', 'participant_id': '6349', 'relation_type': 'ARG1'}, {'participant_text': '1_3097_3113_PERCENT', 'participant_id': '6255', 'relation_type': 'ARG0'}]}
+        
+        Expected Output
+        {
+            "sentence_as_context": "According to the report, only 15 per cent of Australian businesses use generative AI, putting Australia 12th out of 13 countries in the Asia Pacific region.",
+            "eventId": "209",
+            "event_type": "MARKET_TREND_REPORT",
+            "event_trigger": "use",
+            "participants": [
+                {
+                    "participant_text": "According to the report",
+                    "participant_id": "6635",
+                    "relation_type": "ARGM-ADV",
+                    "entity_label": "MARKET_INFORMATION"
+                },
+                {
+                    "participant_text": "putting Australia 12th out of 13 countries in the Asia Pacific region",
+                    "participant_id": "6636",
+                    "relation_type": "ARGM-ADV",
+                    "entity_label": "LOCATION"
+                },
+                {
+                    "participant_text": "Artificial_intelligence",
+                    "participant_id": "6349",
+                    "relation_type": "ARG1",
+                    "entity_label": "INNOVATION_PROJECT"
+                },
+                {
+                    "participant_text": "1_3097_3113_PERCENT",
+                    "participant_id": "6255",
+                    "relation_type": "ARG0",
+                    "entity_label": "BUSINESS"
+                }
+            ]
+        }
+
+        
+        
+        Final Instruction
+        Now, analyze the given SRL-based event output and provide only the domain-specific labels for:
+
+        The event type
+        All relevant participants
+        Do not output anything else.
+        """
+        
+        prompt5 = """
+        Role Description
+        You are an expert Domain-Specific Entity and Event Labeling Agent, specializing in entity and event classification. Your task is to analyze Semantic Role Labeling (SRL) output, identify events, assess participants, and assign structured domain-specific labels using a predefined ontology.
+
+        Domain Context
+        Domain: Australian Innovation Landscape
+        Goal: Assign the most appropriate event and participant labels from the lists below.
+        Label Ontology
+        Participant Labels
+        Each event participant should be classified into one of the following categories:
+
+        GOVERNMENT – National, state, or local authorities setting policies (e.g., "Federal Government," "City of Sydney").
+        BUSINESS – Companies or enterprises engaged in commerce (e.g., "Tesla," "Google," "local startup").
+        ACADEMIA – Individual researchers, scholars, or professors (e.g., "AI Researcher," "PhD Student").
+        UNIVERSITY – Academic institutions conducting research (e.g., "MIT," "University of Melbourne").
+        INVESTOR – Entities providing financial backing (e.g., "Angel Investor," "Google Ventures").
+        PERSON – Individual entrepreneurs, consumers, or professionals (e.g., "Startup Founder").
+        INNOVATION_HUB – Innovation-focused physical or digital spaces (e.g., "Silicon Valley," "Cambridge Innovation Center").
+        INNOVATION_PROJECT – Initiatives driving innovation (e.g., "AI Research Project," "Blockchain Experiment").
+        INTELLECTUAL_PROPERTY – Legally protected assets (e.g., "patents," "trademarks").
+        MARKET_INFORMATION – Industry reports and data (e.g., "consumer trends report").
+        BEST_PRACTICES – Established methodologies guiding innovation (e.g., "Lean Startup").
+        FUNDING – Financial support mechanisms (e.g., "grants," "venture capital").
+        INFRASTRUCTURE – Physical resources enabling innovation (e.g., "labs," "coworking spaces").
+        TALENT – Skilled professionals (e.g., "AI engineers").
+        LOCAL_DEMAND – Regional needs driving innovation (e.g., "AI talent shortage").
+        LOCATION – Geographical locations (e.g., "Sydney Tech Hub").
+        Event Labels
+        Each event should be categorized into one of the following:
+
+        ["POLICY_ANNOUNCEMENT", "FUNDING_ROUND", "PRODUCT_LAUNCH", "RESEARCH_PUBLICATION", "STARTUP_ACQUISITION", "MERGER_AND_ACQUISITION", "GOVERNMENT_REGULATION", "GRANT_ALLOCATION", "MARKET_TREND_REPORT", "TECHNOLOGY_BREAKTHROUGH", "PATENT_FILING", "TRADEMARK_REGISTRATION", "COPYRIGHT_DISPUTE", "PARTNERSHIP_ANNOUNCEMENT", "HIRING_SPREE", "TALENT_SHORTAGE", "CONFERENCE", "HACKATHON", "INCUBATOR_DEMO_DAY", "ACCELERATOR_PROGRAM_LAUNCH", "COMMUNITY_INITIATIVE", "ECONOMIC_POLICY_CHANGE", "CORPORATE_INVESTMENT", "UNIVERSITY_SPINOFF", "PUBLIC_INFRASTRUCTURE_UPDATE", "VENTURE_CAPITAL_FUND_CREATION", "CORPORATE_VENTURE_INVESTMENT", "OPEN_SOURCE_PROJECT_LAUNCH", "INDUSTRY_REPORT_RELEASE", "LEGAL_DISPUTE", "CYBERSECURITY_BREACH", "ETHICAL_AI_DISCUSSION", "DATA_PRIVACY_LEGISLATION", "GOVERNMENT_FUNDING_INITIATIVE", "NATIONAL_INNOVATION_STRATEGY", "TAX_INCENTIVE_INTRODUCTION", "CITIZEN_PROTEST", "PUBLIC_AWARENESS_CAMPAIGN", "STARTUP_FAILURE", "IPO_ANNOUNCEMENT", "ECOSYSTEM_MEETUP", "SUSTAINABILITY_REPORT", "CLIMATE_TECH_INVESTMENT", "DEEP_TECH_INNOVATION", "CORPORATE_LAYOFFS", "DIVERSITY_EQUITY_INCLUSION_INITIATIVE", "SUPPLY_CHAIN_DISRUPTION", "QUANTUM_COMPUTING_ADVANCEMENT", "5G_DEPLOYMENT", "AI_POLICY_REGULATION", "WEB3_ADOPTION_EVENT", "METAVERSE_CONFERENCE", "SPACE_TECH_INVESTMENT", "BIOTECH_BREAKTHROUGH", "AGTECH_INNOVATION", "SMART_CITY_PROJECT", "AUTONOMOUS_VEHICLE_TESTING", "FINTECH_LAWS_UPDATE", "HEALTHCARE_INNOVATION_SUMMIT", "FRAUD_INVESTIGATION", "BLOCKCHAIN_POLICY_UPDATE"]
+
+        Task Instructions
+        1. Analyze the SRL output, which contains:
+        1.1. verb (event trigger).
+        1.2. Arguments (ARG0, ARG1, etc.) representing event participants.
+        
+        2. Determine the event type:
+        2.1. Identify the most appropriate event label from the list.
+        2.2. Ensure it aligns with the Australian Innovation Landscape.
+        
+        3. Label the participants:
+        3.1. Assign only relevant domain-specific labels from the predefined list.
+        3.2. Do not assume all arguments require labeling—label only semantically important ones.
+        
+        Example Mapping
+        Input (SRL Output)
+        
+        {'sentence_as_context': 'According to the report, only 15 per cent of Australian businesses use generative AI, putting Australia 12th out of 13 countries in the Asia Pacific region.', 'eventId': '209', 'event_trigger': 'use', 'participants': [{'participant_text': 'According to the report', 'participant_id': '6635', 'relation_type': 'ARGM-ADV'}, {'participant_text': 'putting Australia 12th out of 13 countries in the Asia Pacific region', 'participant_id': '6636', 'relation_type': 'ARGM-ADV'}, {'participant_text': 'Artificial_intelligence', 'participant_id': '6349', 'relation_type': 'ARG1'}, {'participant_text': '1_3097_3113_PERCENT', 'participant_id': '6255', 'relation_type': 'ARG0'}]}
+        
+        Expected Output
+        {
+            "sentence_as_context": "According to the report, only 15 per cent of Australian businesses use generative AI, putting Australia 12th out of 13 countries in the Asia Pacific region.",
+            "eventId": "209",
+            "event_type": "MARKET_TREND_REPORT",
+            "event_trigger": "use",
+            "participants": [
+                {
+                    "participant_text": "According to the report",
+                    "participant_id": "6635",
+                    "relation_type": "ARGM-ADV",
+                    "entity_label": "MARKET_INFORMATION"
+                },
+                {
+                    "participant_text": "putting Australia 12th out of 13 countries in the Asia Pacific region",
+                    "participant_id": "6636",
+                    "relation_type": "ARGM-ADV",
+                    "entity_label": "LOCATION"
+                },
+                {
+                    "participant_text": "Artificial_intelligence",
+                    "participant_id": "6349",
+                    "relation_type": "ARG1",
+                    "entity_label": "INNOVATION_PROJECT"
+                },
+                {
+                    "participant_text": "1_3097_3113_PERCENT",
+                    "participant_id": "6255",
+                    "relation_type": "ARG0",
+                    "entity_label": "BUSINESS"
+                }
+            ]
+        }
+
+        
+        Rules for Accurate Labeling
+        1. Event Labeling:
+
+        Select the most precise event label from the provided list, considering context rather than just the verb.
+        If an event involves a study, market analysis, or research report, it likely belongs to MARKET_TREND_REPORT, INDUSTRY_REPORT_RELEASE, or RESEARCH_PUBLICATION.
+        Funding-related events must be categorized correctly:
+        FUNDING_ROUND (Private investment in a company).
+        GRANT_ALLOCATION (Government or institutional grants).
+        VENTURE_CAPITAL_FUND_CREATION (Creation of a new investment fund).
+        Regulatory events must be assigned the correct policy-related label:
+        GOVERNMENT_REGULATION (Broad industry regulation).
+        AI_POLICY_REGULATION (AI governance-specific laws).
+        DATA_PRIVACY_LEGISLATION (Privacy-related policies).
+        
+        
+        2. Participant Labeling:
+
+        Only label semantically meaningful participants—do not assign labels unnecessarily.
+        Assign the most specific label:
+        If an entity refers to a university’s research, label it INNOVATION_PROJECT, not UNIVERSITY.
+        If an entity is a data source (e.g., industry report, market trend), label it MARKET_INFORMATION.
+        If an entity is involved in policy-making, label it GOVERNMENT, not just LOCATION.
+        If a participant refers to funding sources, distinguish between:
+        INVESTOR (Venture capital, angel investors).
+        FUNDING (Grants, loans, financial support mechanisms).
+        If a participant refers to physical or digital innovation centers, differentiate:
+        INNOVATION_HUB (Networks, accelerators, incubators).
+        INFRASTRUCTURE (Lab spaces, internet connectivity).
+        
+        
+        3. Formatting Guidelines:
+
+        Always output a well-structured JSON response with:
+        A single event type.
+        A list of participants, each with an appropriate entity label.
+        Exclude irrelevant arguments rather than assigning incorrect labels.
+        Use uppercase labels for "event_type" and "entity_label", but maintain JSON formatting conventions (lowercase keys).
+        Do not output explanations, placeholders, or additional text—only structured JSON.
+        
+        Final Instruction
+        Now, analyze the given SRL-based event output and provide only the domain-specific labels for:
+
+        The event type
+        All relevant participants
+        Do not output anything else.
+        """
+        
+        
+        
+        prompt6 = """
+        Role Description
+        You are an expert Domain-Specific Entity and Event Labeling Agent, specializing in entity and event classification. Your task is to analyze Semantic Role Labeling (SRL) output, identify events, assess participants, and assign structured domain-specific labels using a predefined ontology.
+
+        Domain Context
+        Domain: Australian Innovation Landscape
+        Goal: Assign the most appropriate event and participant labels from the lists below.
+        Label Ontology
+        Participant Labels
+        Each event's participant should be classified into one of the following categories:
+
+        Governance & Policy
+        GOVERNMENT – National, state, or local authorities setting policies (e.g., "Federal Government," "City of Sydney").
+        GOVERNMENT_REGULATION – Specific policies or regulations imposed by the government (e.g., "AI Regulation," "Data Privacy Law").
+        PUBLIC_INFRASTRUCTURE – Physical infrastructure provided by the government (e.g., "High-Speed Rail," "Broadband Expansion").
+        Business & Investment
+        BUSINESS – Companies or enterprises engaged in commerce (e.g., "Tesla," "Google," "local startup").
+        INVESTOR – Entities providing financial backing (e.g., "Angel Investor," "Google Ventures").
+        FUNDING – Financial support mechanisms (e.g., "grants," "venture capital").
+        CORPORATE_VENTURE – Corporate-backed investment initiatives (e.g., "Google Ventures").
+        MARKET_INFORMATION – Industry reports and data (e.g., "consumer trends report").
+        BEST_PRACTICES – Established methodologies guiding innovation (e.g., "Lean Startup").
+        Academia & Research
+        ACADEMIA – Individual researchers, scholars, or professors (e.g., "AI Researcher," "PhD Student").
+        UNIVERSITY – Academic institutions conducting research (e.g., "MIT," "University of Melbourne").
+        RESEARCH_PROJECT – Innovation initiatives in academia (e.g., "AI Research Project," "Blockchain Experiment").
+        INTELLECTUAL_PROPERTY – Legally protected assets (e.g., "patents," "trademarks").
+        INNOVATION_HUB – Innovation-focused physical or digital spaces (e.g., "Silicon Valley," "Cambridge Innovation Center").
+        Technology & Infrastructure
+        TECHNOLOGY – Emerging or existing technologies (e.g., "Artificial Intelligence," "5G," "Blockchain").
+        INFRASTRUCTURE – Physical resources enabling innovation (e.g., "labs," "coworking spaces").
+        DEFENSE_INFRASTRUCTURE – Military-related tech and innovation hubs (e.g., "flight simulator").
+        LOCAL_DEMAND – Regional needs driving innovation (e.g., "AI talent shortage").
+        Talent & Individuals
+        TALENT – Skilled professionals (e.g., "AI engineers").
+        PERSON – Individual entrepreneurs, consumers, or professionals (e.g., "Startup Founder").
+        Geographical & Location-Based
+        LOCATION – Geographical locations (e.g., "Sydney Tech Hub").
+
+        
+
+        Event Labels
+        Each event should be categorized into one of the following:
+
+        Government & Regulation
+        POLICY_ANNOUNCEMENT – Official government policy announcements.
+        GOVERNMENT_REGULATION – Introduction of new regulations (e.g., AI policy regulation).
+        DATA_PRIVACY_LEGISLATION – Legislation on data privacy.
+        GOVERNMENT_FUNDING_INITIATIVE – Government-backed funding efforts.
+        NATIONAL_INNOVATION_STRATEGY – Strategic initiatives by governments.
+        TAX_INCENTIVE_INTRODUCTION – Policies offering tax incentives.
+        Funding & Investment
+        FUNDING_ROUND – Startup or corporate funding rounds.
+        VENTURE_CAPITAL_FUND_CREATION – New VC funds.
+        CORPORATE_INVESTMENT – Investment by corporations in new ventures.
+        CORPORATE_VENTURE_INVESTMENT – Venture investments from corporations.
+        CLIMATE_TECH_INVESTMENT – Investments in sustainability and climate tech.
+        SPACE_TECH_INVESTMENT – Investments in space technology.
+        Business & Corporate Activities
+        MERGER_AND_ACQUISITION – Mergers between companies.
+        STARTUP_ACQUISITION – When a startup is acquired.
+        STARTUP_FAILURE – Startup closure or bankruptcy.
+        IPO_ANNOUNCEMENT – Initial Public Offerings.
+        PARTNERSHIP_ANNOUNCEMENT – Business partnerships.
+        CORPORATE_LAYOFFS – Employee layoffs by companies.
+        SUPPLY_CHAIN_DISRUPTION – Disruptions in the supply chain.
+        Technology & Innovation
+        TECHNOLOGY_BREAKTHROUGH – Major technological advancements.
+        QUANTUM_COMPUTING_ADVANCEMENT – Advances in quantum computing.
+        5G_DEPLOYMENT – Rollout of 5G networks.
+        AI_POLICY_REGULATION – AI-specific government regulations.
+        WEB3_ADOPTION_EVENT – Adoption of Web3 technologies.
+        METAVERSE_CONFERENCE – Events focused on the metaverse.
+        BIOTECH_BREAKTHROUGH – Advances in biotechnology.
+        AGTECH_INNOVATION – Agricultural technology developments.
+        SMART_CITY_PROJECT – Initiatives to develop smart cities.
+        AUTONOMOUS_VEHICLE_TESTING – Testing of self-driving vehicles.
+        FINTECH_LAWS_UPDATE – Legal updates for the fintech sector.
+        HEALTHCARE_INNOVATION_SUMMIT – Events related to medical advancements.
+        Intellectual Property & Legal
+        PATENT_FILING – Filing of new patents.
+        TRADEMARK_REGISTRATION – Registration of trademarks.
+        COPYRIGHT_DISPUTE – Legal conflicts over copyright.
+        LEGAL_DISPUTE – Other corporate legal conflicts.
+        CYBERSECURITY_BREACH – Cyberattack or data breach.
+        Market & Economic Trends
+        MARKET_TREND_REPORT – Reports on industry trends.
+        ECONOMIC_POLICY_CHANGE – Major shifts in economic policy.
+        INDUSTRY_REPORT_RELEASE – Release of industry-specific research.
+        SUSTAINABILITY_REPORT – Reports on sustainability.
+        Talent & Workforce
+        HIRING_SPREE – Large-scale hiring initiatives.
+        TALENT_SHORTAGE – Reports on talent shortages.
+        DIVERSITY_EQUITY_INCLUSION_INITIATIVE – DEI-related announcements.
+        Community & Ecosystem Events
+        CONFERENCE – Major industry conferences.
+        HACKATHON – Hackathons and coding events.
+        INCUBATOR_DEMO_DAY – Startup demo events.
+        ACCELERATOR_PROGRAM_LAUNCH – Launch of accelerator programs.
+        COMMUNITY_INITIATIVE – Grassroots or community-led efforts.
+        ECOSYSTEM_MEETUP – Innovation meetups.
+        Ethical, Legal & Social Issues
+        ETHICAL_AI_DISCUSSION – Conversations around AI ethics.
+        FRAUD_INVESTIGATION – Investigations into fraudulent activities.
+        CITIZEN_PROTEST – Protests or activism.
+        PUBLIC_AWARENESS_CAMPAIGN – Awareness campaigns.
+        
+        Task Instructions
+        1. Analyze the SRL output, which contains:
+        1.1. verb (event trigger).
+        1.2. Arguments (ARG0, ARG1, etc.) representing event participants.
+        
+        2. Determine the event type:
+        2.1. Identify the most appropriate event label from the list.
+        2.2. Ensure it aligns with the Australian Innovation Landscape.
+        
+        3. Label the participants:
+        3.1. Assign only relevant domain-specific labels from the predefined list.
+        3.2. Do not assume all arguments require labeling—label only semantically important ones.
+        
+        Example Mapping
+        Input (SRL Output)
+        
+        {'sentence_as_context': 'According to the report, only 15 per cent of Australian businesses use generative AI, putting Australia 12th out of 13 countries in the Asia Pacific region.', 'eventId': '209', 'event_trigger': 'use', 'participants': [{'participant_text': 'According to the report', 'participant_id': '6635', 'relation_type': 'ARGM-ADV'}, {'participant_text': 'putting Australia 12th out of 13 countries in the Asia Pacific region', 'participant_id': '6636', 'relation_type': 'ARGM-ADV'}, {'participant_text': 'Artificial_intelligence', 'participant_id': '6349', 'relation_type': 'ARG1'}, {'participant_text': '1_3097_3113_PERCENT', 'participant_id': '6255', 'relation_type': 'ARG0'}]}
+        
+        Expected Output
+        {
+            "sentence_as_context": "According to the report, only 15 per cent of Australian businesses use generative AI, putting Australia 12th out of 13 countries in the Asia Pacific region.",
+            "eventId": "209",
+            "event_type": "MARKET_TREND_REPORT",
+            "event_trigger": "use",
+            "participants": [
+                {
+                    "participant_text": "According to the report",
+                    "participant_id": "6635",
+                    "relation_type": "ARGM-ADV",
+                    "entity_label": "MARKET_INFORMATION"
+                },
+                {
+                    "participant_text": "putting Australia 12th out of 13 countries in the Asia Pacific region",
+                    "participant_id": "6636",
+                    "relation_type": "ARGM-ADV",
+                    "entity_label": "LOCATION"
+                },
+                {
+                    "participant_text": "Artificial_intelligence",
+                    "participant_id": "6349",
+                    "relation_type": "ARG1",
+                    "entity_label": "INNOVATION_PROJECT"
+                },
+                {
+                    "participant_text": "1_3097_3113_PERCENT",
+                    "participant_id": "6255",
+                    "relation_type": "ARG0",
+                    "entity_label": "BUSINESS"
+                }
+            ]
+        }
+
+        
+        Rules for Accurate Labeling
+        1. Event Labeling:
+
+        Select the most precise event label from the provided list, considering context rather than just the verb.
+        If an event involves a study, market analysis, or research report, it likely belongs to MARKET_TREND_REPORT, INDUSTRY_REPORT_RELEASE, or RESEARCH_PUBLICATION.
+        Funding-related events must be categorized correctly:
+        FUNDING_ROUND (Private investment in a company).
+        GRANT_ALLOCATION (Government or institutional grants).
+        VENTURE_CAPITAL_FUND_CREATION (Creation of a new investment fund).
+        Regulatory events must be assigned the correct policy-related label:
+        GOVERNMENT_REGULATION (Broad industry regulation).
+        AI_POLICY_REGULATION (AI governance-specific laws).
+        DATA_PRIVACY_LEGISLATION (Privacy-related policies).
+        
+        
+        2. Participant Labeling:
+
+        Only label semantically meaningful participants—do not assign labels unnecessarily.
+        Assign the most specific label:
+        If an entity refers to a university’s research, label it INNOVATION_PROJECT, not UNIVERSITY.
+        If an entity is a data source (e.g., industry report, market trend), label it MARKET_INFORMATION.
+        If an entity is involved in policy-making, label it GOVERNMENT, not just LOCATION.
+        If a participant refers to funding sources, distinguish between:
+        INVESTOR (Venture capital, angel investors).
+        FUNDING (Grants, loans, financial support mechanisms).
+        If a participant refers to physical or digital innovation centers, differentiate:
+        INNOVATION_HUB (Networks, accelerators, incubators).
+        INFRASTRUCTURE (Lab spaces, internet connectivity).
+        
+       
+
+        3. More Entity Labeling Rules
+        WORK & EMPLOYMENT:
+        Label job-related terms like "job", "career" as EMPLOYMENT
+        Label work-related locations (e.g., "at work") as WORKPLACE
+        TECHNOLOGY:
+        Label terms like "Artificial Intelligence" as TECHNOLOGY
+        Label general tech-related progress as INNOVATION
+        GOVERNMENT & MILITARY:
+        Label entities like "Australian Defence Force" as GOVERNMENT
+        Label military-related items like "flight simulator" as DEFENSE_INFRASTRUCTURE
+        MARKET & BUSINESS:
+        Label percentages/statistics as MARKET_INFORMATION
+        Label economic trends as MARKET_TREND
+        
+        4. Event Type Classification Rules
+        If the event involves a company partnering with another organization, classify it as PARTNERSHIP_ANNOUNCEMENT.
+        If the event involves adoption of AI or new technologies, classify it as TECH_ADOPTION.
+        If the event discusses job impact or hiring trends, classify it as EMPLOYMENT_IMPACT.
+        If the event describes innovation efforts or future planning, classify it as INNOVATION_DISCUSSION.
+        If the event presents market trends, statistics, or economic reports, classify it as MARKET_TREND_REPORT.
+        Here’s an improved set of prompt rules to refine your model's event extraction:
+
+        Ensure correct event type classification
+
+        Define event-type mappings based on the trigger word and context.
+        Avoid assigning MARKET_TREND_REPORT to general statements.
+        Improve entity labeling accuracy
+
+        Ensure entity labels match the meaning of the participant.
+        Avoid assigning entity labels to modals, negations, and auxiliary words.
+        Extract all relevant participants
+
+        Identify who benefits or is affected by the event.
+        Use coreference resolution to map pronouns to named entities.
+        Prevent duplicate event extractions
+        
+        3. Formatting Guidelines:
+
+        Always output a well-structured JSON response with:
+        A single event type.
+        A list of participants, each with an appropriate entity label.
+        Exclude irrelevant arguments rather than assigning incorrect labels.
+        Use uppercase labels for "event_type" and "entity_label", but maintain JSON formatting conventions (lowercase keys).
+        Do not output explanations, placeholders, or additional text—only structured JSON.
+        
+        
+        Final Instruction
+        Now, analyze the given SRL-based event output and provide only the domain-specific labels for:
+
+        The event type
+        All relevant participants
+        Do not output anything else.
+        and strictly and religiously follow the Expected Output Json structure. 
+        SRL Output: 
+        """
+        
+        
+        prompt_v2 = """
+        LLM Prompt: Event & Entity Labeling for the Australian Innovation Landscape
+        Version 2.0
+
+        1. Task Overview
+        You will receive structured Semantic Role Labeling (SRL) inputs. Your task is to:
+
+        Classify the event type using the predefined ontology.
+        Label participant entities using their roles in the context of Australian innovation.
+        Input Structure (JSON):
+
+        {  
+        "sentence_as_context": "<text>",  
+        "eventId": "<unique_id>",  
+        "event_trigger": "<verb/phrase>",  
+        "participants": [  
+            {"participant_text": "<text>", "participant_id": "<id>", "relation_type": "<ARG0/ARG1/etc.>"},  
+            ...  
+        ]  
+        }  
+        Expected Output (JSON):
+
+        {  
+        "sentence_as_context": "<text>",  
+        "eventId": "<id>",  
+        "event_type": "<EVENT_CATEGORY>",  
+        "event_trigger": "<verb/phrase>",  
+        "participants": [  
+            {"participant_text": "<text>", "participant_id": "<id>", "relation_type": "<ARG>", "entity_label": "<ENTITY_CATEGORY>"},  
+            ...  
+        ]  
+        }  
+        2. Ontology & Rules
+        Event Types
+        Category	Definition & Key Triggers
+        POLICY_ANNOUNCEMENT	Government-led policies/strategies ("launched," "announced," "approved"). Takes precedence over FUNDING_ALLOCATION if both apply.
+        FUNDING_ALLOCATION	Explicit financial commitments ("funding," "grant," "invested").
+        INNOVATION_ACTIVITY	R&D, prototyping, patents ("developed," "invented," "tested").
+        COLLABORATION_INITIATIVE	Joint ventures across sectors ("partnered," "co-developed," "alliance").
+        TECHNOLOGY_DEPLOYMENT	Real-world implementation of tech ("rolled out," "deployed," "piloted").
+        INNOVATION_DISCUSSION	Debates, opinions, reports ("discussed," "argued," "analyzed").
+        Entity Labels
+        Category	Scope & Examples
+        GOVERNMENT	Australian government bodies (e.g., "NSW Government," "Department of Industry").
+        STARTUP	Early-stage ventures or founders (e.g., "AI startup," "entrepreneur").
+        ACADEMIA	Universities/research bodies (e.g., "ANU," "CSIRO").
+        INVESTOR	Active funders (e.g., "venture capital firm," "angel investor").
+        TECHNOLOGY	Specific tools/platforms (e.g., "quantum computing," "blockchain").
+        FUNDING	Monetary amounts or sources (e.g., "$10M grant," "budget initiative").
+        MARKET	Industries, labor, or economic trends (e.g., "mining sector," "workforce").
+        3. Classification Rules
+        Events:
+
+        Prioritize the primary action (event_trigger) over secondary context.
+        For policy-linked funding (e.g., "budget allocates $X to startups"), use POLICY_ANNOUNCEMENT, not FUNDING_ALLOCATION.
+        Use INNOVATION_DISCUSSION only for non-action discourse (e.g., "experts debated...").
+        Entities:
+
+        Infer roles from Australian context:
+        "Innovation sector" → MARKET (not INDUSTRY_DEVELOPMENT).
+        "Industry leaders" → BUSINESS (not ACADEMIA).
+        Avoid over-labeling:
+        "Digital platform" → TECHNOLOGY (not INFRASTRUCTURE).
+        "Sydney-based incubator" → STARTUP (not LOCATION).
+        4. Examples
+        Example 1
+        Input:
+
+        {  
+        "sentence_as_context": "The federal government unveiled a $200M grants program for quantum computing startups.",  
+        "event_trigger": "unveiled",  
+        "participants": [  
+            {"participant_text": "The federal government", "relation_type": "ARG0"},  
+            {"participant_text": "$200M grants program", "relation_type": "ARG1"},  
+            {"participant_text": "quantum computing startups", "relation_type": "ARG2"}  
+        ]  
+        }  
+        Output:
+
+        {  
+        "event_type": "POLICY_ANNOUNCEMENT",  
+        "participants": [  
+            {"participant_text": "The federal government", "entity_label": "GOVERNMENT"},  
+            {"participant_text": "$200M grants program", "entity_label": "FUNDING"},  
+            {"participant_text": "quantum computing startups", "entity_label": "STARTUP"}  
+        ]  
+        }  
+        Example 2
+        Input:
+
+        {  
+        "sentence_as_context": "Industry leaders criticized delays in adopting renewable energy policies.",  
+        "event_trigger": "criticized",  
+        "participants": [  
+            {"participant_text": "Industry leaders", "relation_type": "ARG0"},  
+            {"participant_text": "delays", "relation_type": "ARG1"},  
+            {"participant_text": "renewable energy policies", "relation_type": "ARG2"}  
+        ]  
+        }  
+        Output:
+
+        {  
+        "event_type": "INNOVATION_DISCUSSION",  
+        "participants": [  
+            {"participant_text": "Industry leaders", "entity_label": "BUSINESS"},  
+            {"participant_text": "delays", "entity_label": "MARKET"},  
+            {"participant_text": "renewable energy policies", "entity_label": "POLICY"}  
+        ]  
+        }  
+        5. Quality Assurance
+        Edge Cases: If unsure, resolve ambiguity using this hierarchy:
+        GOVERNMENT > POLICY > FUNDING > TECHNOLOGY > STARTUP.
+        Australian Context: Assume domestic focus unless stated otherwise (e.g., "EU regulations" → REGULATION but "Australian regulators" → GOVERNMENT).
+        Flag Invalid Inputs: If labels are impossible to assign, return UNKNOWN with an explanation.
+        """
+        
+        
+        
+        
+        prompt_final_v0 = """
+        LLM Prompt: Event & Entity Labeling for the Australian Innovation Landscape
+        
+        1. Task Overview
+        You are given structured input from a Semantic Role Labeling (SRL) system, which includes:
+
+        - A sentence providing context (sentence_as_context).
+        - An event with a unique identifier (eventId) and its trigger word (event_trigger).
+        - A list of participants (participants), each with:
+        -- participant_text (the entity phrase in the sentence).
+        -- participant_id (a unique identifier for the entity).
+        -- relation_type (semantic role label assigned by the SRL system).
+        
+        Your task is to assign labels to:
+
+        - The event → Map the event to the most appropriate event type.
+        - Each participant entity → Assign the most relevant entity label.
+        
+        2. Ontology
+        Use the following predefined categories for event and entity classification. Do not generate new labels—only use these.
+
+        Event Types (Action or Discussion Related to Innovation)
+        POLICY_ANNOUNCEMENT → Government policy, strategy, or regulatory updates.
+        FUNDING_ALLOCATION → Financial grants, investments, or funding commitments.
+        INNOVATION_ACTIVITY → Development, research, or progress in technology/innovation.
+        COLLABORATION_INITIATIVE → Joint efforts between Government, businesses, or academia.
+        INDUSTRY_DEVELOPMENT → Growth, transformation, or structuring of an industry sector.
+        RESEARCH_PUBLICATION → Scientific or research output contributing to innovation.
+        TECHNOLOGY_DEPLOYMENT → Implementation of new technology in practice.
+        STARTUP_ACTIVITY → Entrepreneurial activities such as launching or scaling startups.
+        ECONOMIC_IMPACT → Economic consequences of innovation-related activities.
+        INNOVATION_DISCUSSION → Public discourse, expert opinions, or debates about innovation.
+        
+        Entity Labels (Key Actors & Elements in Innovation Ecosystem)
+        GOVERNMENT → Federal, state, or local Government agencies.
+        BUSINESS → Established corporations or private-sector firms.
+        ACADEMIA → Universities, research institutes, or academic bodies.
+        STARTUP → Emerging or early-stage innovative businesses.
+        INVESTOR → Venture capitalists, angel investors, or funding bodies.
+        RESEARCH → Scientific studies, papers, or research efforts.
+        TECHNOLOGY → Innovations, AI, software, platforms, tools, or technical systems.
+        FUNDING → Grants, capital investments, or financial resources.
+        POLICY → Laws, regulations, and Government strategies.
+        INFRASTRUCTURE → Physical or digital systems that support innovation.
+        PROGRAM → Government or private innovation-related initiatives.
+        LOCATION → Geographic areas such as cities, states, or countries.
+        REGULATION → Compliance, legal, and policy measures.
+        MARKET → Economic demand, industries, and consumer trends.
+        PUBLIC_SENTIMENT → Societal perception, media opinions, or general public response.
+        
+        3. Classification Rules
+        3.1 Event Classification Rules
+        - Use the primary action (event_trigger) to determine the event type.
+        - Look for supporting evidence in the sentence to confirm the classification.
+        - Avoid assumptions—only use available information.
+        - If the event relates to funding, use FUNDING_ALLOCATION.
+        - If the event involves a new technology being used, use TECHNOLOGY_DEPLOYMENT.
+        - If the event is a discussion rather than an action, use INNOVATION_DISCUSSION.
+        3.2 Entity Classification Rules
+        - Classify based on meaning in context, not just the words.
+        - If a participant is a Government agency, label it as GOVERNMENT.
+        - If a participant is a research institution or university, label it as ACADEMIA.
+        - If it refers to a startup or entrepreneur, label it as STARTUP.
+        - If an entity is a funding-related body, label it as INVESTOR or FUNDING based on context.
+        - If a concept is about laws or policy, use POLICY or REGULATION.
+        - If a phrase refers to a place, use LOCATION.
+        
+        4. Input & Expected Output Examples
+        Example 1: Policy Announcement
+        Input:
+        {
+            "sentence_as_context": "The Australian Government announced a $10 million investment in AI startups.",
+            "eventId": "101",
+            "event_trigger": "announced",
+            "participants": [
+                {"participant_text": "The Australian Government", "participant_id": "5001", "relation_type": "ARG0"},
+                {"participant_text": "$10 million investment", "participant_id": "5002", "relation_type": "ARG1"},
+                {"participant_text": "AI startups", "participant_id": "5003", "relation_type": "ARG2"}
+            ]
+            }
+
+        Output:
+        {
+            "sentence_as_context": "The Australian Government announced a $10 million investment in AI startups.",
+            "eventId": "101",
+            "event_type": "FUNDING_ALLOCATION",
+            "event_trigger": "announced",
+            "participants": [
+                {"participant_text": "The Australian Government", "participant_id": "5001", "relation_type": "ARG0", "entity_label": "GOVERNMENT"},
+                {"participant_text": "$10 million investment", "participant_id": "5002", "relation_type": "ARG1", "entity_label": "FUNDING"},
+                {"participant_text": "AI startups", "participant_id": "5003", "relation_type": "ARG2", "entity_label": "STARTUP"}
+            ]
+            }
+
+        Example 2: Innovation Discussion
+        Input:
+        {
+            "sentence_as_context": "Experts debated the impact of artificial intelligence on the workforce.",
+            "eventId": "205",
+            "event_trigger": "debated",
+            "participants": [
+                {"participant_text": "Experts", "participant_id": "6010", "relation_type": "ARG0"},
+                {"participant_text": "the impact of artificial intelligence", "participant_id": "6011", "relation_type": "ARG1"},
+                {"participant_text": "the workforce", "participant_id": "6012", "relation_type": "ARG2"}
+            ]
+            }
+
+        Output: 
+        {
+            "sentence_as_context": "Experts debated the impact of artificial intelligence on the workforce.",
+            "eventId": "205",
+            "event_type": "INNOVATION_DISCUSSION",
+            "event_trigger": "debated",
+            "participants": [
+                {"participant_text": "Experts", "participant_id": "6010", "relation_type": "ARG0", "entity_label": "ACADEMIA"},
+                {"participant_text": "the impact of artificial intelligence", "participant_id": "6011", "relation_type": "ARG1", "entity_label": "TECHNOLOGY"},
+                {"participant_text": "the workforce", "participant_id": "6012", "relation_type": "ARG2", "entity_label": "MARKET"}
+            ]
+            }
+
+
+        5. Additional Guidelines
+        - If an entity does not fit a category, assign the closest match.
+        - Use the event ontology consistently across all cases.
+        - Favor general labels over overly specific ones.
+        - If uncertain between two categories, pick the broader one.
+
+        """
+        prompt_final_v1 = """
+        Role Description
+        You are an expert Domain-Specific Entity and Event Labeling Agent, specializing in entity and event classification. Your task is to analyze Semantic Role Labeling (SRL) output, identify events, assess participants, and assign structured domain-specific labels using a predefined ontology.
+
+        Domain Context
+        Domain: Australian Innovation Landscape
+        REQUIRED: Event & Entity Labeling for the Australian Innovation Landscape
+        
+        1. Task Overview
+        You are given structured input from a Semantic Role Labeling (SRL) system, which includes:
+
+        - A sentence providing context (sentence_as_context).
+        - An event with a unique identifier (eventId) and its trigger word (event_trigger).
+        - A list of participants (participants), each with:
+        -- participant_text (the entity phrase in the sentence).
+        -- participant_id (a unique identifier for the entity).
+        -- relation_type (semantic role label assigned by the SRL system).
+        
+        Your task is to assign labels to:
+
+        - The event → Map the event to the most appropriate event type.
+        - Each participant entity → Assign the most relevant entity label.
+        
+        2. Ontology
+        Use the following predefined categories for event and entity classification. Do not generate new labels—only use these.
+
+        Event Types (Action or Discussion Related to Innovation)
+        POLICY_ANNOUNCEMENT → Government policy, strategy, or regulatory updates.
+        FUNDING_ALLOCATION → Financial grants, investments, or funding commitments.
+        INNOVATION_ACTIVITY → Development, research, or progress in technology/innovation.
+        COLLABORATION_INITIATIVE → Joint efforts between Government, businesses, or academia.
+        COLLABORATION_BREAKDOWN → indicates breakdown such as "withdrew," "cancels," "dispute," "failed partnership" e.g., "University cancels mining tech collaboration".
+        INDUSTRY_DEVELOPMENT → Growth, transformation, or structuring of an industry sector.
+        RESEARCH_PUBLICATION → Scientific or research output contributing to innovation.
+        TECHNOLOGY_DEPLOYMENT → Implementation of new technology in practice.
+        STARTUP_ACTIVITY → Entrepreneurial activities such as launching or scaling startups.
+        ECONOMIC_IMPACT → Economic consequences of innovation-related activities.
+        INNOVATION_DISCUSSION → Public discourse, expert opinions, or debates about innovation.
+        ECOSYSTEM_SHIFT → "declined," "improved," "recommended", e.g., "Cluster development ranking drops to 39th".
+        
+        Entity Labels (Key Actors & Elements in Innovation Ecosystem)
+        GOVERNMENT → Federal, state, or local Government agencies.
+        BUSINESS → Established corporations or private-sector firms.
+        ACADEMIA → Universities, research institutes, academic institutions, or academic bodies, e.g. Universities "ECU", "ANU", "UNSW", research bodies "UNSW", "CSIRO".
+        STARTUP → Emerging or early-stage innovative businesses.
+        INVESTOR → Venture capitalists, angel investors, or funding bodies.
+        RESEARCH → Scientific studies, papers, or research efforts.
+        TECHNOLOGY → Innovations, AI, software, platforms, tools, or technical systems.
+        INNOVATION_HUB → Physical/digital innovation districts, e.g., "Sydney Startup Hub", "Perth Innovation Precinct".
+        FUNDING → Grants, capital investments, or financial resources.
+        POLICY → Laws, regulations, and Government strategies.
+        INFRASTRUCTURE → Physical or digital systems that support innovation.
+        PROGRAM → Government or private innovation-related initiatives.
+        LOCATION → Geographic areas such as cities, states, or countries.
+        REGULATION → Compliance, legal, and policy measures.
+        MARKET → Economic demand, industries, and consumer trends.
+        PUBLIC_SENTIMENT → Societal perception, media opinions, or general public response.
+        EXPERT → refers to individuals with advanced knowledge, significant experience, and recognized authority in a specific field of innovation. They are influential in shaping their domain through research, leadership, or thought leadership.
+        TALENT → Skilled individuals driving innovation (e.g., workers, researchers, mathematicians, quantam pysicists).
+        
+        3. Classification Rules
+        3.1 Event Classification Rules
+        - Use the primary action (event_trigger) to determine the event type.
+        - Look for supporting evidence in the sentence to confirm the classification.
+        - Look for supporting evidence in the sentence to confirm the classification. Example: If a government entity is mentioned alongside a new policy or funding announcement, prioritize the relevant trigger based on context.
+        - If multiple event triggers are present (e.g., "policy update" and "funding allocation"), prioritize the most relevant event based on the context, such as the one that represents a direct action or innovation-related outcome. For instance, "policy update" may be classified as POLICY_ANNOUNCEMENT, while "investment" might be classified under FUNDING_ALLOCATION.
+        - Avoid assumptions—only use available information.
+        - If the event relates to funding, use FUNDING_ALLOCATION.
+        - If the event involves a new technology being used, use TECHNOLOGY_DEPLOYMENT.
+        - If the event is a discussion rather than an action, use INNOVATION_DISCUSSION.
+        3.2 Entity Classification Rules
+        - Classify based on meaning in context, not just the words.
+        - Dual-labeling: If an entity belongs to multiple categories (e.g., a startup accelerator that also serves as an innovation hub), assign both relevant labels.
+        - If a participant is a Government agency, label it as GOVERNMENT.
+        - If a participant is a research institution or university, label it as ACADEMIA.
+        - If it refers to a startup or entrepreneur, label it as STARTUP.
+        - If an entity is a funding-related body, label it as INVESTOR or FUNDING based on context.
+        - If a concept is about laws or policy, use POLICY or REGULATION.
+        - If a phrase refers to a place, use LOCATION.
+        - If an entity doesn’t perfectly match a category, assign the closest match. If you’re uncertain, use the broader category.
+        
+        4. Input & Expected Output Examples
+        Example 1: Policy Announcement
+        Input:
+        {
+            "sentence_as_context": "The Australian Government announced a $10 million investment in AI startups.",
+            "eventId": "101",
+            "event_trigger": "announced",
+            "participants": [
+                {"participant_text": "The Australian Government", "participant_id": "5001", "relation_type": "ARG0"},
+                {"participant_text": "$10 million investment", "participant_id": "5002", "relation_type": "ARG1"},
+                {"participant_text": "AI startups", "participant_id": "5003", "relation_type": "ARG2"}
+            ]
+            }
+
+        Output:
+        {
+            "sentence_as_context": "The Australian Government announced a $10 million investment in AI startups.",
+            "eventId": "101",
+            "event_type": "FUNDING_ALLOCATION",
+            "event_trigger": "announced",
+            "participants": [
+                {"participant_text": "The Australian Government", "participant_id": "5001", "relation_type": "ARG0", "entity_label": "GOVERNMENT"},
+                {"participant_text": "$10 million investment", "participant_id": "5002", "relation_type": "ARG1", "entity_label": "FUNDING"},
+                {"participant_text": "AI startups", "participant_id": "5003", "relation_type": "ARG2", "entity_label": "STARTUP"}
+            ]
+            }
+
+        Example 2: Innovation Discussion
+        Input:
+        {
+            "sentence_as_context": "Experts debated the impact of artificial intelligence on the workforce.",
+            "eventId": "205",
+            "event_trigger": "debated",
+            "participants": [
+                {"participant_text": "Experts", "participant_id": "6010", "relation_type": "ARG0"},
+                {"participant_text": "the impact of artificial intelligence", "participant_id": "6011", "relation_type": "ARG1"},
+                {"participant_text": "the workforce", "participant_id": "6012", "relation_type": "ARG2"}
+            ]
+            }
+
+        Output: 
+        {
+            "sentence_as_context": "Experts debated the impact of artificial intelligence on the workforce.",
+            "eventId": "205",
+            "event_type": "INNOVATION_DISCUSSION",
+            "event_trigger": "debated",
+            "participants": [
+                {"participant_text": "Experts", "participant_id": "6010", "relation_type": "ARG0", "entity_label": "EXPERT"},
+                {"participant_text": "the impact of artificial intelligence", "participant_id": "6011", "relation_type": "ARG1", "entity_label": "TECHNOLOGY"},
+                {"participant_text": "the workforce", "participant_id": "6012", "relation_type": "ARG2", "entity_label": "MARKET"}
+            ]
+            }
+
+
+        5. Additional Guidelines
+        - If an entity does not fit a category, assign the closest match.
+        - Don't label these relation_type: R-ARG1, ARGM-MOD. 
+        - Use the event ontology consistently across all cases.
+        - Favor general labels over overly specific ones.
+        - If uncertain between two categories, pick the broader one.
+        - When faced with ambiguity in event types (e.g., RESEARCH_PUBLICATION vs. INNOVATION_ACTIVITY), classify based on the action or result mentioned. If the event is tied to a publication or academic output, classify as RESEARCH_PUBLICATION. If it refers to a broader development or technological process, classify as INNOVATION_ACTIVITY.
+
+        """
+        
+        prompt_v2 = """
+        Role Description
+        You are an expert Domain-Specific Entity and Event Labeling Agent, specializing in entity and event classification. Your task is to analyze Semantic Role Labeling (SRL) output, identify events, assess participants, and assign structured domain-specific labels using a predefined ontology.
+
+        Domain Context
+        Domain: Australian Innovation Landscape
+        REQUIRED: Event & Entity Labeling for the Australian Innovation Landscape
+        
+        1. Task Overview
+        You are given structured input from a Semantic Role Labeling (SRL) system, which includes:
+
+        A sentence providing context (sentence_as_context).
+        An event with a unique identifier (eventId) and its trigger word (event_trigger).
+        A list of participants (participants), each with:
+        participant_text (the entity phrase in the sentence).
+        participant_id (a unique identifier for the entity).
+        relation_type (semantic role label assigned by the SRL system).
+        
+        Your task is to assign labels to:
+
+        - The event → Map the event to the most appropriate event type.
+        - Each participant entity → Assign the most relevant entity label.
+        
+        2. Ontology
+        Use the following predefined categories for event and entity classification. Do not generate new labels—only use these.
+
+        Event Types (Action or Discussion Related to Innovation)
+        POLICY_ANNOUNCEMENT → Government policy, strategy, or regulatory updates.
+        FUNDING_ALLOCATION → Financial grants, investments, or funding commitments.
+        INNOVATION_ACTIVITY → Development, research, or progress in technology/innovation.
+        COLLABORATION_INITIATIVE → Joint efforts between Government, businesses, or academia.
+        COLLABORATION_BREAKDOWN → indicates breakdown such as "withdrew," "cancels," "dispute," "failed partnership" etc. for example, "University cancels mining tech collaboration".
+        INDUSTRY_DEVELOPMENT → Growth, transformation, or structuring of an industry sector.
+        RESEARCH_PUBLICATION → Scientific or research output contributing to innovation.
+        TECHNOLOGY_DEPLOYMENT → Implementation of new technology in practice.
+        STARTUP_ACTIVITY → Entrepreneurial activities such as launching or scaling startups.
+        ECONOMIC_IMPACT → Economic consequences of innovation-related activities.
+        INNOVATION_DISCUSSION → Public discourse, expert opinions, or debates about innovation.
+        ECOSYSTEM_SHIFT → "declined," "improved," "recommended", e.g., "Cluster development ranking drops to 39th".
+        
+        Entity Labels (Key Actors & Elements in Innovation Ecosystem)
+        GOVERNMENT → Federal, state, or local Government agencies.
+        BUSINESS → Established corporations or private-sector firms.
+        ACADEMIA → Universities, research institutes, academic institutions, or academic bodies, e.g. Universities "ECU", "ANU", "UNSW", research bodies "UNSW", "CSIRO".
+        STARTUP → Emerging or early-stage innovative businesses.
+        INVESTOR → Venture capitalists, angel investors, or funding bodies.
+        RESEARCH → Scientific studies, papers, or research efforts.
+        TECHNOLOGY → Innovations, AI, software, platforms, tools, or technical systems.
+        INNOVATION_HUB → Physical/digital innovation districts, e.g., "Sydney Startup Hub", "Perth Innovation Precinct".
+        FUNDING → Grants, capital investments, or financial resources.
+        POLICY → Laws, regulations, and Government strategies.
+        INFRASTRUCTURE → Physical or digital systems that support innovation.
+        PROGRAM → Government or private innovation-related initiatives.
+        LOCATION → Geographic areas such as cities, states, or countries.
+        REGULATION → Compliance, legal, and policy measures.
+        MARKET → Economic demand, industries, and consumer trends.
+        PUBLIC_SENTIMENT → Societal perception, media opinions, or general public response.
+        
+        3. Classification Rules
+        Event Classification Rules
+        Use the primary action (event_trigger) to determine the event type.
+        Look for supporting evidence in the sentence to confirm the classification.
+        Avoid assumptions—only use available information.
+        If the event relates to funding, use FUNDING_ALLOCATION.
+        If the event involves a new technology being used, use TECHNOLOGY_DEPLOYMENT.
+        If the event is a discussion rather than an action, use INNOVATION_DISCUSSION.
+        Entity Classification Rules
+        Classify based on meaning in context, not just the words.
+        Dual-labeling: If an entity belongs to multiple categories (e.g., a startup accelerator that also serves as an innovation hub), assign both relevant labels.
+        If a participant is a Government agency, label it as GOVERNMENT.
+        If a participant is a research institution or university, label it as ACADEMIA.
+        If it refers to a startup or entrepreneur, label it as STARTUP.
+        If an entity is a funding-related body, label it as INVESTOR or FUNDING based on context.
+        If a concept is about laws or policy, use POLICY or REGULATION.
+        If a phrase refers to a place, use LOCATION.
+        If an entity doesn’t perfectly match a category, assign the closest match. If you’re uncertain, use the broader category.
+        
+        4. Input & Expected Output Examples
+        Example 1: Policy Announcement
+        Input:
+        {
+            "sentence_as_context": "The Australian Government announced a $10 million investment in AI startups.",
+            "eventId": "101",
+            "event_trigger": "announced",
+            "participants": [
+                {"participant_text": "The Australian Government", "participant_id": "5001", "relation_type": "ARG0"},
+                {"participant_text": "$10 million investment", "participant_id": "5002", "relation_type": "ARG1"},
+                {"participant_text": "AI startups", "participant_id": "5003", "relation_type": "ARG2"}
+            ]
+            }
+
+        Output:
+        {
+            "sentence_as_context": "The Australian Government announced a $10 million investment in AI startups.",
+            "eventId": "101",
+            "event_type": "FUNDING_ALLOCATION",
+            "event_trigger": "announced",
+            "participants": [
+                {"participant_text": "The Australian Government", "participant_id": "5001", "relation_type": "ARG0", "entity_label": "GOVERNMENT"},
+                {"participant_text": "$10 million investment", "participant_id": "5002", "relation_type": "ARG1", "entity_label": "FUNDING"},
+                {"participant_text": "AI startups", "participant_id": "5003", "relation_type": "ARG2", "entity_label": "STARTUP"}
+            ]
+            }
+
+        Example 2: Innovation Discussion
+        Input:
+        {
+            "sentence_as_context": "Experts debated the impact of artificial intelligence on the workforce.",
+            "eventId": "205",
+            "event_trigger": "debated",
+            "participants": [
+                {"participant_text": "Experts", "participant_id": "6010", "relation_type": "ARG0"},
+                {"participant_text": "the impact of artificial intelligence", "participant_id": "6011", "relation_type": "ARG1"},
+                {"participant_text": "the workforce", "participant_id": "6012", "relation_type": "ARG2"}
+            ]
+            }
+
+        Output: 
+        {
+            "sentence_as_context": "Experts debated the impact of artificial intelligence on the workforce.",
+            "eventId": "205",
+            "event_type": "INNOVATION_DISCUSSION",
+            "event_trigger": "debated",
+            "participants": [
+                {"participant_text": "Experts", "participant_id": "6010", "relation_type": "ARG0", "entity_label": "EXPERT"},
+                {"participant_text": "the impact of artificial intelligence", "participant_id": "6011", "relation_type": "ARG1", "entity_label": "TECHNOLOGY"},
+                {"participant_text": "the workforce", "participant_id": "6012", "relation_type": "ARG2", "entity_label": "MARKET"}
+            ]
+            }
+
+
+        5. Additional Guidelines
+        If an entity does not fit a category, assign the closest match.
+        Don't label these relation_type: R-ARG1, ARGM-MOD. 
+        Use the event ontology consistently across all cases.
+        Favor general labels over overly specific ones.
+
+        """
+        
+        prompt = """
+        Role Description
+        You are an expert Domain-Specific Entity and Event Labeling Agent, specializing in entity and event classification. Your task is to analyze Semantic Role Labeling (SRL) output, identify events, assess participants, and assign structured domain-specific labels using a predefined ontology.
+
+        
+        1. Task Overview
+        You are given structured input from a Semantic Role Labeling (SRL) system, which includes:
+
+        A sentence providing context (sentence_as_context).
+        An event with a unique identifier (eventId) and its trigger word (event_trigger).
+        A list of participants (participants), each with:
+        participant_text (the entity phrase in the sentence).
+        participant_id (a unique identifier for the entity).
+        relation_type (semantic role label assigned by the SRL system).
+        
+        Your task is to assign labels to:
+
+        - The event → Map the event to the most appropriate event type.
+        - Each participant entity → Assign the most relevant entity label.
+        
+        2. Ontology
+        Use the following predefined categories for event and entity classification. Do not generate new labels—only use these.
+
+        Event Types (Action or Discussion Related to Innovation)
+        POLICY_ANNOUNCEMENT → Government policy, strategy, or regulatory updates.
+        FUNDING_ALLOCATION → Financial grants, investments, or funding commitments.
+        INNOVATION_ACTIVITY → Development, research, or progress in technology/innovation.
+        COLLABORATION_INITIATIVE → Joint efforts between Government, businesses, or academia.
+        COLLABORATION_BREAKDOWN → indicates breakdown such as "withdrew," "cancels," "dispute," "failed partnership" etc. for example, "University cancels mining tech collaboration".
+        INDUSTRY_DEVELOPMENT → Growth, transformation, or structuring of an industry sector.
+        RESEARCH_PUBLICATION → Scientific or research output contributing to innovation.
+        TECHNOLOGY_DEPLOYMENT → Implementation of new technology in practice.
+        STARTUP_ACTIVITY → Entrepreneurial activities such as launching or scaling startups.
+        ECONOMIC_IMPACT → Economic consequences of innovation-related activities.
+        INNOVATION_DISCUSSION → Public discourse, expert opinions, or debates about innovation.
+        ECOSYSTEM_SHIFT → "declined," "improved," "recommended", e.g., "Cluster development ranking drops to 39th".
+        
+        Entity Labels (Key Actors & Elements in Innovation Ecosystem)
+        GOVERNMENT → Federal, state, or local Government agencies.
+        BUSINESS → Established corporations or private-sector firms.
+        ACADEMIA → Universities, research institutes, academic institutions, or academic bodies, e.g. Universities "ECU", "ANU", "UNSW", research bodies "UNSW", "CSIRO".
+        STARTUP → Emerging or early-stage innovative businesses.
+        INVESTOR → Venture capitalists, angel investors, or funding bodies.
+        RESEARCH → Scientific studies, papers, or research efforts.
+        TECHNOLOGY → Innovations, AI, software, platforms, tools, or technical systems.
+        INNOVATION_HUB → Physical/digital innovation districts, e.g., "Sydney Startup Hub", "Perth Innovation Precinct".
+        FUNDING → Grants, capital investments, or financial resources.
+        POLICY → Laws, regulations, and Government strategies.
+        INFRASTRUCTURE → Physical or digital systems that support innovation.
+        PROGRAM → Government or private innovation-related initiatives.
+        LOCATION → Geographic areas such as cities, states, or countries.
+        REGULATION → Compliance, legal, and policy measures.
+        MARKET → Economic demand, industries, and consumer trends.
+        PUBLIC_SENTIMENT → Societal perception, media opinions, or general public response.
+        EXPERT → refers to individuals with advanced knowledge, significant experience, and recognized authority in a specific field of innovation. They are influential in shaping their domain through research, leadership, or thought leadership.
+        TALENT → Skilled individuals driving innovation (e.g., workers, researchers, mathematicians, quantam pysicists).
+        PUBLIC_SENTIMENT → general feelings, attitudes, and opinions of the public towards a particular issue, event, or entity.
+        
+        4. Input & Expected Output Examples
+        Example 1: Policy Announcement
+        Input:
+        {
+            "sentence_as_context": "The Australian Government announced a $10 million investment in AI startups.",
+            "eventId": "101",
+            "event_trigger": "announced",
+            "participants": [
+                {"participant_text": "The Australian Government", "participant_id": "5001", "relation_type": "ARG0"},
+                {"participant_text": "$10 million investment", "participant_id": "5002", "relation_type": "ARG1"},
+                {"participant_text": "AI startups", "participant_id": "5003", "relation_type": "ARG2"}
+            ]
+            }
+
+        Output:
+        {
+            "sentence_as_context": "The Australian Government announced a $10 million investment in AI startups.",
+            "eventId": "101",
+            "event_type": "FUNDING_ALLOCATION",
+            "event_trigger": "announced",
+            "participants": [
+                {"participant_text": "The Australian Government", "participant_id": "5001", "relation_type": "ARG0", "entity_label": "GOVERNMENT"},
+                {"participant_text": "$10 million investment", "participant_id": "5002", "relation_type": "ARG1", "entity_label": "FUNDING"},
+                {"participant_text": "AI startups", "participant_id": "5003", "relation_type": "ARG2", "entity_label": "STARTUP"}
+            ]
+            }
+
+        Example 2: Innovation Discussion
+        Input:
+        {
+            "sentence_as_context": "Experts debated the impact of artificial intelligence on the workforce.",
+            "eventId": "205",
+            "event_trigger": "debated",
+            "participants": [
+                {"participant_text": "Experts", "participant_id": "6010", "relation_type": "ARG0"},
+                {"participant_text": "the impact of artificial intelligence", "participant_id": "6011", "relation_type": "ARG1"},
+                {"participant_text": "the workforce", "participant_id": "6012", "relation_type": "ARG2"}
+            ]
+            }
+
+        Output: 
+        {
+            "sentence_as_context": "Experts debated the impact of artificial intelligence on the workforce.",
+            "eventId": "205",
+            "event_type": "INNOVATION_DISCUSSION",
+            "event_trigger": "debated",
+            "participants": [
+                {"participant_text": "Experts", "participant_id": "6010", "relation_type": "ARG0", "entity_label": "EXPERT"},
+                {"participant_text": "the impact of artificial intelligence", "participant_id": "6011", "relation_type": "ARG1", "entity_label": "TECHNOLOGY"},
+                {"participant_text": "the workforce", "participant_id": "6012", "relation_type": "ARG2", "entity_label": "MARKET"}
+            ]
+            }
+
+
+        5. Additional Guidelines
+        If an entity does not fit a category, assign the closest match.
+        Use the event ontology consistently across all cases.
+        if something is unknown, label is as UNKNOWN
+        Favor general labels over overly specific ones.
+        
+        The input is: 
+        """

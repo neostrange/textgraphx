@@ -98,9 +98,9 @@ def callAllenNlpApi(apiName, string):
 #ss = """LemonDuck's activities were first spotted in China in May 2019, before it began adopting COVID_19_themed lures in email attacks in 2020 and even the recently addressed ""ProxyLogon"" Exchange Server flaws to gain access to unpatched systems.""""
 #ss = """Deutsche Bank of Germany lost almost $3.5 billion in share value, forcing the government to organize a bail_out."""
 #ss = """The Federal Reserve met this week, but decided to maintain its target rate of 5.25%, although on Friday the federal funds rate was hovering around 6%, indicating a drop in liquidity."""
-ss= """Now, lenders are in a quagmire from millions of people who are unable to repay loans after taking adjustable rate mortgages, teaser rates, interest-only mortgages, or piggyback rates."""
-res_srl = callAllenNlpApi("semantic-role-labeling", ss)
-#res_srl = callAllenNlpApi("coreference-resolution", ss)
+# ss= """Now, lenders are in a quagmire from millions of people who are unable to repay loans after taking adjustable rate mortgages, teaser rates, interest-only mortgages, or piggyback rates."""
+# res_srl = callAllenNlpApi("semantic-role-labeling", ss)
+# #res_srl = callAllenNlpApi("coreference-resolution", ss)
 
 
-print(res_srl)
+# print(res_srl)
