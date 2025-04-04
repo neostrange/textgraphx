@@ -127,8 +127,14 @@ class GraphBasedNLP(GraphDBBase):
 
     # Stores a corpus of text in the database
     def store_corpus(self, directory):
-        # Initialize the text ID
-        text_id = 1
+        
+        # Query the database to get the count of AnnotatedText nodes
+        query = "MATCH (n:AnnotatedText) RETURN count(n) as count"
+        result = self.neo4j_repository.execute_query(query=query, params={})
+        count = result[0]['count'] if result else 0
+        
+        # Initialize the text ID based on the count of documents
+        text_id = count + 1
         
         # Initialize the list of text tuples
         text_tuples = []

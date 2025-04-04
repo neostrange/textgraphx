@@ -698,8 +698,12 @@ class RefinementPhase():
                         return p    
         
         """
-        data= graph.run(query).data()
+        # try:
+        #     data= graph.run(query).data()
+        # except Exception as e:
+        #     print(e)
         
+        data= graph.run(query).data()
         return ""
          
 

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NAF version="1.0" xml:lang="en">
+  <nafHeader>
+    <fileDesc author="UWA" creationtime="2025-02-12" filename="new-ai-tool-to-aid-forensic-investigations.xml" filetype="HTML" title="New AI tool to aid forensic investigations"/>
+    <public publicId="592e71dd-8466-4c9b-af88-0ef230b0fe90" uri="https://www.uwa.edu.au/news/article/2025/february/new-ai-tool-to-aid-forensic-investigations"/>
+  </nafHeader>
+  <raw>
+
+Researchers from The University of Western Australia and CSIRO have developed an advanced AI tool that could help forensic investigators estimate biological sex from human skulls.
+
+The research, published in Nature Scientific Reports, has the potential to support forensic investigators during natural disasters and criminal analyses by refining techniques that contribute to accurate identification of unknown individuals.
+
+Forensic anthropology experts from The University of Western Australia provided labelled data and domain knowledge to support model development, working in collaboration with CSIRO to develop the tool.
+
+UWA forensic anthropology researcher and postgraduate student affiliate at CSIRO, Ridhwan Lye, undertook the research as part of his PhD and is the study’s joint-first author.
+
+“What an amazing experience it is to collaborate with people who share my enthusiasm in understanding how technology can have a positive impact in our professional work,” Mr Lye said.
+
+He said the tool was a great first step in evaluating the potential of AI modelling as part of a forensic anthropological assessment.
+
+“Such models have great potential for enhancing accuracy and minimising bias in our assessments, especially when faced with a large number of deceased, such as in the context of a mass-death scenario,” Mr Lye said.
+
+“We hope that our joint contribution to the scientific literature will further encourage more deep and meaningful collaborations across other forensic disciplines.”
+
+CSIRO research scientist and joint first-author of the study, Dr Hollie Min, said imaging from a dataset of 200 computerised tomography or CT scans were analysed for sex-associated traits by the AI tool, which then produced a sex estimate output. The accuracy of the AI tool was then compared to that of a human analyst.
+
+The CT database was collected from Dr Wahidin Sudirohusodo General Hospital (RSWS) at Hasanuddin University in Indonesia with the assistance of one of the hospital’s radiologists, Dr Nur Amelia Bachtiar.
+
+Study co-author Professor Daniel Franklin, from UWA’s Centre for Forensic Anthropology, said the collaborative effort demonstrated the potential of AI to support forensic anthropology and advance the field with innovative and data-driven solutions.
+
+
+</raw>
+</NAF>
