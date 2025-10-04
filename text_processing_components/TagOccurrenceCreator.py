@@ -1,4 +1,7 @@
 
+import logging
+logger = logging.getLogger(__name__)
+
 class TagOccurrenceCreator:
     def __init__(self, nlp):
         self.nlp = nlp
@@ -6,7 +9,6 @@ class TagOccurrenceCreator:
 
 
     def create_tag_occurrences2(self, sentence, text_id, sentence_id):
-
         tag_occurrences = []
         for token in sentence:
             lexeme = self.nlp.vocab[token.text]
@@ -25,6 +27,8 @@ class TagOccurrenceCreator:
                                     "tok_index_sent": (token.i - sentence.start),
                                     "is_stop": (lexeme.is_stop or lexeme.is_punct or lexeme.is_space)}
                 tag_occurrences.append(tag_occurrence)
+
+        logger.debug("create_tag_occurrences2: produced %d occurrences for sentence_id=%s", len(tag_occurrences), sentence_id)
         return tag_occurrences
 
     def create_tag_occurrences(self, sentence, text_id, sentence_id):
@@ -55,4 +59,6 @@ class TagOccurrenceCreator:
                 for key, value in morph_features.items():
                     tag_occurrence[key] = value
                 tag_occurrences.append(tag_occurrence)
+
+        logger.debug("create_tag_occurrences: produced %d occurrences for sentence_id=%s", len(tag_occurrences), sentence_id)
         return tag_occurrences

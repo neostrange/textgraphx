@@ -1,5 +1,8 @@
 from abc import ABC
 from abc import ABC, abstractmethod
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class DocumentImporter(ABC):
@@ -24,10 +27,12 @@ class DocumentImporter(ABC):
         query = self.get_query()
         params = self.get_params()
         try:
+            logger.debug("Importing document id=%s", self.id)
             results = self.execute_query(query, params)
+            logger.info("Imported document id=%s rows=%s", self.id, len(results) if results else 0)
             return results
         except Exception as e:
-            print(f"Error importing document: {e}")
+            logger.exception("Error importing document id=%s: %s", self.id, e)
             return None
         
     def __str__(self):

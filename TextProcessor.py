@@ -1,3 +1,19 @@
+"""TextProcessor
+
+High-level pipeline orchestration helpers and convenience utilities used by
+examples and integration tests. This module wires together component classes
+that write tokens, frames, entities and coreference structures into Neo4j.
+
+Contract summary:
+- Inputs: spaCy `Doc` objects annotated with custom extensions (e.g. `._.text_id`,
+  `. _ .SRL`) and a configured Neo4j driver passed to the `TextProcessor`.
+- Side effects: writes `AnnotatedText`, `Sentence`, `TagOccurrence`, `Frame`,
+  `FrameArgument`, `NamedEntity`, and related relationships into the graph via
+  repository helpers. Methods generally delegate to smaller components and are
+  safe to run re-entrantly because underlying writes use deterministic MERGE
+  patterns.
+"""
+
 from cgitb import text
 import requests
 from distutils.command.config import config
@@ -19,9 +35,8 @@ from util.RestCaller import callAllenNlpApi
 from util.RestCaller import amuse_wsd_api_call
 from transformers import logging
 logging.set_verbosity_error()
-from py2neo import Graph
-from py2neo import *
-import configparser
+# py2neo usage removed in favor of the bolt-driver helper
+from textgraphx.config import get_config
 import os
 from util.RestCaller import callAllenNlpApi
 from util.CallAllenNlpCoref import callAllenNlpCoref
@@ -43,12 +58,26 @@ from text_processing_components.NounChunkProcessor import NounChunkProcessor
 from text_processing_components.EntityProcessor import EntityProcessor
 from text_processing_components.EntityFuser import EntityFuser
 from text_processing_components.EntityDisambiguator import EntityDisambiguator
+import logging
+
+# module logger
+logger = logging.getLogger(__name__)
 
 
 
 
 
 class TextProcessor(object):
+    """High-level text processing pipeline orchestrator.
+
+    This class wires together a collection of components (SRL, coreference,
+    sentence creation, entity processing) and exposes utility methods to
+    process a spaCy `Doc` and persist the extracted annotations into Neo4j.
+
+    The class expects a `neo4j.Driver` to be provided as `driver` in the
+    constructor. Many of the helper components accept `Neo4jRepository` which
+    wraps the driver to execute parameterized Cypher queries.
+    """
 
 
     # Define constants
@@ -65,57 +94,57 @@ class TextProcessor(object):
         self.nlp = nlp
         self._driver = driver
         self.neo4j_repository = Neo4jRepository(self._driver)
-        self.uri=""
-        self.username =""
-        self.password =""
-        config = configparser.ConfigParser()
-        #config_file = os.path.join(os.path.dirname(__file__), '..', 'config.ini')
-        config_file = os.path.join(os.path.dirname(__file__), 'config.ini')
-        config.read(config_file)
-        py2neo_params = config['py2neo']
-        self.uri = py2neo_params.get('uri')
-        self.username = py2neo_params.get('username')
-        self.password = py2neo_params.get('password')
+        self.uri = ""
+        self.username = ""
+        self.password = ""
+        cfg = get_config()
+        # prefer explicit neo4j settings from central config (env overrides applied there)
+        self.uri = cfg.neo4j.uri
+        self.username = cfg.neo4j.user
+        self.password = cfg.neo4j.password
         #self.graph = Graph(self.uri, auth=(self.username, self.password))
         self.AMUSE_WSD_API_ENDPOINT = "http://localhost:81/api/model"
         self.wsd = WordSenseDisambiguator(self.AMUSE_WSD_API_ENDPOINT, self.neo4j_repository)
         #wsd.perform_wsd("document-123")
         self.wn_token_enricher = WordnetTokenEnricher(self.neo4j_repository)
 
-
         self.coreference_service_endpoint = "http://localhost:9999/coreference_resolution"
-        self.coref= CoreferenceResolver(self.uri, self.username, self.password, self.coreference_service_endpoint)
+        # CoreferenceResolver reads DB config internally and requires only the endpoint
+        self.coref = CoreferenceResolver(self.coreference_service_endpoint)
 
+        # SRL Processor now obtains graph from configuration internally
+        self.srl_processor = SRLProcessor()
 
-        #SRL Processor
-        self.srl_processor = SRLProcessor(self.uri, self.username, self.password)
-
-        #Sentence Creator
+        # Sentence Creator
         self.sentence_creator = SentenceCreator(self.neo4j_repository)
 
-        #TagOccurrenceCreator
+        # TagOccurrenceCreator
         self.tag_occurrence_creator = TagOccurrenceCreator(self.nlp)
 
-        #TagOccurrenceDependencyProcessor
-        self.tag_occurrence_dependency_processor= TagOccurrenceDependencyProcessor(self.neo4j_repository)
+        # TagOccurrenceDependencyProcessor
+        self.tag_occurrence_dependency_processor = TagOccurrenceDependencyProcessor(self.neo4j_repository)
 
-        #TagOccurrenceQueryExecutor
-        self.tag_occurrence_query_executor= TagOccurrenceQueryExecutor(self.neo4j_repository)
+        # TagOccurrenceQueryExecutor
+        self.tag_occurrence_query_executor = TagOccurrenceQueryExecutor(self.neo4j_repository)
 
-        #NounChunkProcessor
+        # NounChunkProcessor
         self.noun_chunk_processor = NounChunkProcessor(self.neo4j_repository)
 
-        #EntityProcessor
+        # EntityProcessor
         self.entity_processor = EntityProcessor(self.neo4j_repository)
 
-
-        #EntityFuser
+        # EntityFuser
         self.entity_fuser = EntityFuser(self.neo4j_repository)
 
-        #EntityDisambiguator
+        # EntityDisambiguator
         self.entity_disambiguator = EntityDisambiguator(self.neo4j_repository)
 
-    def do_wsd(self,textId):
+    def do_wsd(self, textId: str) -> None:
+        """Run word-sense disambiguation for the given document id.
+
+        Args:
+            textId: Identifier of the AnnotatedText document in Neo4j.
+        """
         self.wsd.perform_wsd(textId)
 
     def process_sentences(self, annotated_text, doc, storeTag, text_id):
@@ -320,8 +349,8 @@ class TextProcessor(object):
                 tag_occurrences.append(tag_occurrence)
                 tag_occurrence_dependency_source = str(text_id) + "_" + str(sentence_id) + "_" + str(token.head.idx)
 
-                print(token.text, token.dep_, token.head.text, token.head.pos_,
-            [child for child in token.children])
+                logger.debug("Token debug: text=%s dep=%s head=%s head_pos=%s children=%s",
+                             token.text, token.dep_, token.head.text, token.head.pos_, [child for child in token.children])
                 dependency = {"source": tag_occurrence_dependency_source, "destination": tag_occurrence_id,
                                 "type": token.dep_}
                 tag_occurrence_dependencies.append(dependency)
@@ -471,7 +500,7 @@ class TextProcessor(object):
         query1 = """
                     match p = (ne:NamedEntity where ne.type in ['CARDINAL', 'DATE', 'ORDINAL', 'MONEY', 'TIME', 'QUANTITY', 'PERCENT'])--
                     (a:TagOccurrence )--(ne2:NamedEntity) 
-                    where a.tok_index_doc = ne.headTokenIndex and a.tok_index_doc = ne2.headTokenIndex and ne.id <> ne2.id
+                    where a.tok_index_doc = ne.headTokenIndex and a.tok_index_doc = ne2.headTokenIndex and coalesce(ne.token_id, ne.id) <> coalesce(ne2.token_id, ne2.id)
                     detach delete ne2
         """ 
         self.execute_query(query1, {"documentId": document_id})
@@ -482,7 +511,7 @@ class TextProcessor(object):
             # this query keeps the dbpedia ner entity but copies the spacy ner type information. 
         query2 = """
                     match p = (ne:NamedEntity where ne.kb_id is not null)--(a:TagOccurrence )--(ne2:NamedEntity) 
-                    where a.tok_index_doc = ne.headTokenIndex and a.tok_index_doc = ne2.headTokenIndex and ne.id <> ne2.id
+                    where a.tok_index_doc = ne.headTokenIndex and a.tok_index_doc = ne2.headTokenIndex and coalesce(ne.token_id, ne.id) <> coalesce(ne2.token_id, ne2.id)
                     set ne.spacyType = ne2.type
                     detach delete ne2 
         """
@@ -662,7 +691,7 @@ class TextProcessor(object):
             for item in response:
                 results.append(item)
         except Exception as e:
-            print("Query Failed: ", e)
+            logger.exception("Query Failed: %s", e)
         finally:
             if session is not None:
                 session.close()
@@ -681,8 +710,7 @@ class TextProcessor(object):
                 item = items["result"]
                 results.append(item)
         except Exception as e:
-            print("Query Failed: ", str(e))
-            traceback.print_exc()
+            logger.exception("Query Failed: %s", e)
         finally:
             if session is not None:
                 session.close()
@@ -746,12 +774,7 @@ class Neo4jRepository:
             for item in response:
                 results.append(item)
         except Exception as e:
-            print("Query Failed: ", e)
-            print("Query: ", query)
-            print("Params: ", params)
-            print("Traceback: ")
-            import traceback
-            traceback.print_exc()
+            logger.exception("Query Failed: %s; query=%s; params=%r", e, query, params)
         finally:
             if session is not None:
                 session.close()
@@ -770,8 +793,7 @@ class Neo4jRepository:
                 item = items["result"]
                 results.append(item)
         except Exception as e:
-            print("Query Failed: ", str(e))
-            traceback.print_exc()
+            logger.exception("Query Failed: %s", e)
         finally:
             if session is not None:
                 session.close()
@@ -795,7 +817,7 @@ class Neo4jRepository:
             records = self.execute_query(query, {})
         except Exception as e:
             # Handle the exception
-            print(f"An error occurred: {e}")
+            logger.exception("An error occurred while fetching annotated text docs: %s", e)
             return []
 
         annotated_text_docs = [

@@ -1,19 +1,38 @@
+"""EventEnrichmentPhase
+
+Attach frames to temporalized events and populate participant relationships
+between canonical `Entity`/`NUMERIC` nodes and `TEvent` nodes. This phase
+assumes frames and TIMEX/TEvent nodes are already present in the graph and
+performs idempotent MERGE updates to create `DESCRIBES` and `PARTICIPANT`
+edges.
+"""
+
 import os
 import spacy
 import sys
+
+# When run as a script, allow imports by ensuring repo root is available.
+if __name__ == '__main__' and __package__ is None:
+    from pathlib import Path
+    repo_root = Path(__file__).resolve().parent.parent
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
 #import neuralcoref
 
 from util.SemanticRoleLabeler import SemanticRoleLabel
 from util.EntityFishingLinker import EntityFishing
 from spacy.tokens import Doc, Token, Span
 from util.RestCaller import callAllenNlpApi
-import TextProcessor
-from util.GraphDbBase import GraphDBBase
-from TextProcessor import TextProcessor
+from textgraphx.util.GraphDbBase import GraphDBBase
+from textgraphx.TextProcessor import TextProcessor
 import xml.etree.ElementTree as ET
-from py2neo import Graph
-from py2neo import *
-import configparser
+# legacy py2neo imports removed; use bolt-driver wrapper via neo4j_client
+import logging
+
+from textgraphx.neo4j_client import make_graph_from_config
+from textgraphx.config import get_config
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -28,29 +47,23 @@ class EventEnrichmentPhase():
     graph=""
 
     def __init__(self, argv):
-        #super().__init__(command=__file__, argv=argv)
-        self.uri=""
-        self.username =""
-        self.password =""
-        config = configparser.ConfigParser()
-        #config_file = os.path.join(os.path.dirname(__file__), '..', 'config.ini')
-        config_file = os.path.join(os.path.dirname(__file__), 'config.ini')
-        config.read(config_file)
-        py2neo_params = config['py2neo']
-        self.uri = py2neo_params.get('uri')
-        self.username = py2neo_params.get('username')
-        self.password = py2neo_params.get('password')
+        # Initialize a shared py2neo Graph from config
+        self.graph = make_graph_from_config()
+        # keep legacy attrs for compatibility
+        self.uri = None
+        self.username = None
+        self.password = None
         #self.__text_processor = TextProcessor(self.nlp, self._driver)
         #self.create_constraints()
+    logger.info("EventEnrichmentPhase initialized; graph session ready")
 
          
 
 
     # Link FA to Event as a DESCRIBES relationship
     def link_frameArgument_to_event(self):
- 
-        print(self.uri)
-        graph = Graph(self.uri, auth=(self.username, self.password))
+        logger.debug("link_frameArgument_to_event")
+        graph = self.graph
 
         query = """    
                         match p = (f:Frame)<-[:PARTICIPATES_IN]-(t:TagOccurrence)-[:TRIGGERS]->(event:TEvent)
@@ -74,9 +87,8 @@ class EventEnrichmentPhase():
     #// version 1.1 : added support for NUMERIC participants.                  
 
     def add_core_participants_to_event(self):
- 
-        print(self.uri)
-        graph = Graph(self.uri, auth=(self.username, self.password))
+        logger.debug("add_core_participants_to_event")
+        graph = self.graph
 
         query = """    
                     match p= (event:TEvent)<-[:DESCRIBES]-(f:Frame)<-[:PARTICIPANT]-(fa:FrameArgument where fa.type in 
@@ -99,9 +111,8 @@ class EventEnrichmentPhase():
 # TODO: Though we have found fa nodes with duplicates content with same label or arg type but we will deal with it later.                 
 
     def add_non_core_participants_to_event(self):
- 
-        print(self.uri)
-        graph = Graph(self.uri, auth=(self.username, self.password))
+        logger.debug("add_non_core_participants_to_event")
+        graph = self.graph
 
         query = """    
                     MATCH (event:TEvent)<-[:DESCRIBES]-(f:Frame)<-[:PARTICIPANT]-(fa:FrameArgument)
@@ -146,9 +157,8 @@ class EventEnrichmentPhase():
  # 2nd step where we set the labels for the non-core fa arguments are assigned
 
     def add_label_to_non_core_fa(self):
- 
-        print(self.uri)
-        graph = Graph(self.uri, auth=(self.username, self.password))
+        logger.debug("add_label_to_non_core_fa")
+        graph = self.graph
 
         query = """    
                    

@@ -4,6 +4,8 @@ from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 from nltk import pos_tag
+import logging
+logger = logging.getLogger(__name__)
 
 class WordnetTokenEnricher:
     def __init__(self, neo4j_executor):
@@ -52,7 +54,7 @@ class WordnetTokenEnricher:
                         # Get synset information from WordNet
                         synset = wn.synset(nltk_synset)
                         synset_identifier = synset.name()
-                        print(synset_identifier)
+                        logger.debug("Found synset: %s", synset_identifier)
                         lemma, pos, sense_num = synset_identifier.split('.')
                         wn_synset_offset = synset.offset()
                         wn_synset_offset = str(wn_synset_offset) + pos
@@ -76,9 +78,11 @@ class WordnetTokenEnricher:
                         }
                         self.neo4j_executor.execute_query(update_query, params)
                     except Exception as e:
-                        print(f"Synset not found for token_id: {token_id}. Skipping processing. Error: {str(e)}")
+                        logger.exception("Synset not found for token_id: %s. Skipping processing.", token_id)
                 else:
-                    print(f"Synset offset 'O' or empty for token_id: {token_id}. Skipping processing.")
+                    # This is a noisy, expected condition when offsets are missing; log at DEBUG level
+                    # so it can be enabled when troubleshooting without flooding INFO logs.
+                    logger.debug("Synset offset 'O' or empty for token_id: %s. Skipping processing.", token_id)
     def get_all_hypernyms(self, synset):
         """
         Get all hypernyms for a given synset.

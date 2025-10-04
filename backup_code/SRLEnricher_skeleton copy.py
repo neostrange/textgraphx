@@ -1,7 +1,7 @@
 import requests
 import json
-from TextProcessor import Neo4jRepository  # Import the Neo4jRepository class
-from util.GraphDbBase import GraphDBBase  # Import the GraphDBBase class
+from textgraphx.TextProcessor import Neo4jRepository  # Import the Neo4jRepository class
+from textgraphx.util.GraphDbBase import GraphDBBase  # Import the GraphDBBase class
 
 class SRLEnricher(GraphDBBase):
     def __init__(self, argv, llm_api):

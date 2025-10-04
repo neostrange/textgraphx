@@ -1,12 +1,13 @@
 import unittest
 from textgraphx.text_processing_components.EntityExtractor import EntityExtractor
-from py2neo import Graph
+# tests should be updated to use the bolt driver helper if they run against a live DB
 
 class TestEntityExtractorWithData(unittest.TestCase):
 
     def setUp(self):
         self.api_url = "http://127.0.0.1:11435/process_text"
-        self.driver = Graph("your_neo4j_uri", auth=("your_username", "your_password"))
+        # TODO: replace with Neo4jRepository(self._driver) or a mock when running tests
+        self.driver = None
         self.extractor = EntityExtractor(self.api_url, self.driver)
 
     def test_integration_with_actual_data(self):

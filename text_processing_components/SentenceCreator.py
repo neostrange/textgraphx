@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger(__name__)
+
 class SentenceCreator:
     def __init__(self, neo4j_repository):
         self.neo4j_repository = neo4j_repository
@@ -12,7 +15,9 @@ class SentenceCreator:
             RETURN id(sentence) as result
         """
         params = {"ann_id": annotated_text, "text": sentence.text, "sentence_unique_id": str(text_id) + "_" + str(sentence_id)}
+        logger.debug("Creating sentence node for text_id=%s sentence_id=%s", text_id, sentence_id)
         results = self.execute_query(sentence_query, params)
+        logger.info("create_sentence_node: created/returned %s", results[0])
         return results[0]
 
     def execute_query(self, query, params):

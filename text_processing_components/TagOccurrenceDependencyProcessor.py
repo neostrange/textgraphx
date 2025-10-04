@@ -1,14 +1,20 @@
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 class TagOccurrenceDependencyProcessor:
     def __init__(self, neo4j_repository):
         self.neo4j_repository = neo4j_repository
-        pass
+        self.logger = logger
 
     def process_dependencies2(self, tag_occurrence_dependencies):
         tag_occurrence_query = """MATCH (source:TagOccurrence {id: $source_id})
                                     MATCH (destination:TagOccurrence {id: $destination_id})
                                     MERGE (source)-[:IS_DEPENDENT {type: $type}]->(destination)
                             """
+        self.logger.debug("process_dependencies2: processing %d dependencies", len(tag_occurrence_dependencies))
         for dependency in tag_occurrence_dependencies:
             self.neo4j_repository.execute_query(tag_occurrence_query, dependency)
 
@@ -18,6 +24,7 @@ class TagOccurrenceDependencyProcessor:
             MATCH (destination:TagOccurrence {id: dependency.destination})
             MERGE (source)-[:IS_DEPENDENT {type: dependency.type}]->(destination)
                 """
+        self.logger.debug("process_dependencies: unwinding %d dependencies", len(tag_occurrence_dependencies))
         self.neo4j_repository.execute_query_with_result_as_key(tag_occurrence_query, {"dependencies": tag_occurrence_dependencies})
 
     def create_tag_occurrence_dependencies(self, sentence, text_id, sentence_id):
@@ -25,5 +32,6 @@ class TagOccurrenceDependencyProcessor:
                                         "destination": str(text_id) + "_" + str(sentence_id) + "_" + str(token.idx),
                                         "type": token.dep_}
                                         for token in sentence]
+        self.logger.debug("create_tag_occurrence_dependencies: created %d dependencies for sentence %s", len(tag_occurrence_dependencies), sentence_id)
         return tag_occurrence_dependencies
     

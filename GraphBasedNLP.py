@@ -1,42 +1,77 @@
 import os
 import spacy
 import sys
+import argparse
+from pathlib import Path
+# When running this file directly (python textgraphx/GraphBasedNLP.py),
+# make sure the repository root is on sys.path so package imports work.
+if __package__ is None and __name__ == "__main__":
+    from pathlib import Path
+    repo_root = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(repo_root))
 from util.SemanticRoleLabeler import SemanticRoleLabel
 from util.EntityFishingLinker import EntityFishing
 from spacy.tokens import Doc, Token, Span
 from util.RestCaller import callAllenNlpApi
-from util.GraphDbBase import GraphDBBase
-from TextProcessor import TextProcessor
+from textgraphx.util.GraphDbBase import GraphDBBase
+from textgraphx.TextProcessor import TextProcessor
 import xml.etree.ElementTree as ET
 from spacy.lang.char_classes import ALPHA, ALPHA_LOWER, ALPHA_UPPER
 from spacy.lang.char_classes import CONCAT_QUOTES, LIST_ELLIPSES, LIST_ICONS
 from spacy.util import compile_infix_regex
 from neo4j import GraphDatabase
-from TextProcessor import Neo4jRepository
-from text_processing_components.DocumentImporter import MeantimeXMLImporter
+from textgraphx.TextProcessor import Neo4jRepository
+from textgraphx.text_processing_components.DocumentImporter import MeantimeXMLImporter
 # from spacy.util import load_config
 
 # from spacy_llm.util import assemble
 # from spacy_llm.registry import registry
 # from text_processing_components.llm.registry import openai_llama_3_1_8b
 # from spacy import util
+import logging
+import time
+
+# module logger
+logger = logging.getLogger(__name__)
 
 # Class representing a graph-based NLP model
 class GraphBasedNLP(GraphDBBase):
     # Initializes the NLP model with the given arguments
-    def __init__(self, argv):
+    def __init__(self, argv, model_name: str = "en_core_web_trf", require_neo4j: bool = False):
         # Calls the parent class's constructor
         super().__init__(command=__file__, argv=argv)
+        logger.info("Starting GraphBasedNLP initialization")
+        logger.debug("Constructor args: argv=%s, model_name=%s, require_neo4j=%s", argv, model_name, require_neo4j)
         
         # self.config_path="/home/neo/environments/text2graphs/textgraphx/config.cfg"  # Default value provided for config_path argument
         # self.examples_path="/home/neo/environments/text2graphs/textgraphx/examples.json" 
 
-        # Prefer GPU for processing
-        spacy.prefer_gpu()
-        
-        #registry.llm_models.register(openai_llama_3_1_8b)
-        # Load the English language model
-        self.nlp = spacy.load('en_core_web_trf')
+        # Prefer GPU for processing when available
+        try:
+            spacy.prefer_gpu()
+            logger.info("Requested GPU preference for spaCy")
+        except Exception:
+            # prefer_gpu may fail in some environments; continue on CPU
+            logger.debug("spaCy prefer_gpu() failed or is not available; continuing on CPU")
+            pass
+
+        # Allow an environment override for fast, lightweight runs (useful in CI/dev)
+        if os.getenv('TEXTGRAPHX_FAST', '0') == '1':
+            model_name = 'en_core_web_sm'
+            logger.info("TEXTGRAPHX_FAST enabled: forcing spaCy model to %s", model_name)
+
+        # Load the requested spaCy model (allow passing lightweight model for quick runs)
+        try:
+            self.nlp = spacy.load(model_name)
+            logger.info("Loaded spaCy model '%s'", model_name)
+        except Exception as e:
+            logger.warning("Failed to load spaCy model '%s': %s. Falling back to 'en_core_web_sm'", model_name, e)
+            try:
+                self.nlp = spacy.load('en_core_web_sm')
+                logger.info("Loaded fallback spaCy model 'en_core_web_sm'")
+            except Exception as e2:
+                logger.exception("Failed to load fallback spaCy model 'en_core_web_sm': %s", e2)
+                raise
 
         #config = load_config("/home/neo/environments/text2graphs/textgraphx/config.cfg")
 
@@ -50,24 +85,81 @@ class GraphBasedNLP(GraphDBBase):
         
         #self.nlp = assemble(config_path=self.config_path, overrides={"paths.examples": str(self.examples_path)})
         #self.nlp = assemble(config_path=self.config_path)
-        print("config: ", self.nlp.config.to_str())
+        # config string may be large for transformer models; log cautiously
+        try:
+            logger.info("nlp config: %s", self.nlp.config.to_str())
+        except Exception:
+            logger.debug("nlp config not available or too large to serialize")
         #llm_component = self.nlp.add_pipe("llm", config=llm_config["components"]["llm"], last=True)
 
 
-        print("PIPELINE:  ", self.nlp.pipeline)
+        logger.info("PIPELINE: %s", self.nlp.pipeline)
+        logger.debug("spaCy pipeline components: %s", self.nlp.pipe_names)
         # Configure the tokenizer
+        logger.info("Configuring tokenizer infixes and behavior")
         self._configure_tokenizer()
-        
         # Add pipes to the model
+        logger.info("Adding pipeline components/pipes")
         self._add_pipes()
-        
-        # Initialize the text processor
-        self.__text_processor = TextProcessor(self.nlp, self._driver)
 
-        self.neo4j_repository = Neo4jRepository(self._driver)
-        
+        # Initialize the text processor
+        t0 = time.time()
+        self.__text_processor = TextProcessor(self.nlp, self._driver)
+        logger.info("TextProcessor initialized in %.3fs", time.time() - t0)
+        # expose the neo4j repository from the TextProcessor for backwards compatibility
+        try:
+            self.neo4j_repository = self.__text_processor.neo4j_repository
+            logger.info("Neo4j repository exposed from TextProcessor")
+        except Exception:
+            self.neo4j_repository = None
+            logger.warning("TextProcessor did not expose neo4j_repository; continuing with None")
+
         # Create constraints in the database
+        logger.info("Creating DB constraints (idempotent)")
+        start_constraints = time.time()
         self.create_constraints()
+        logger.info("create_constraints finished in %.3fs", time.time() - start_constraints)
+
+        # Optionally enforce Neo4j connectivity early with a clear error
+        # Allow optional retry attempts via NEO4J_CONNECT_RETRIES env var
+        retries = int(os.getenv('NEO4J_CONNECT_RETRIES', '1'))
+        try:
+            self._check_neo4j(require=require_neo4j, retries=retries)
+        except Exception:
+            # if _check_neo4j raised, re-raise to fail fast
+            raise
+
+    def _check_neo4j(self, require: bool = False, retries: int = 1, backoff_seconds: float = 1.0) -> bool:
+        """Test Neo4j connectivity. If `require` is True raise a RuntimeError on failure,
+        otherwise log a warning and return False.
+        """
+        attempt = 0
+        last_exc = None
+        while attempt < max(1, int(retries)):
+            try:
+                # Driver.verify_connectivity is a lightweight way to check reachability
+                t0 = time.time()
+                self._driver.verify_connectivity()
+                logger.info("Connected to Neo4j successfully on attempt %d (%.3fs)", attempt + 1, time.time() - t0)
+                return True
+            except Exception as e:
+                last_exc = e
+                attempt += 1
+                if attempt < retries:
+                    sleep_time = backoff_seconds * (2 ** (attempt - 1))
+                    logger.warning("Neo4j connectivity check failed on attempt %d, retrying in %.1fs: %s", attempt, sleep_time, e)
+                    try:
+                        time.sleep(sleep_time)
+                    except Exception:
+                        pass
+                    continue
+                # no more retries
+                if require:
+                    logger.exception("Unable to connect to Neo4j at startup after %d attempt(s): %s", attempt, last_exc)
+                    raise RuntimeError(f"Unable to connect to Neo4j after {attempt} attempts: {last_exc}") from last_exc
+                else:
+                    logger.warning("Neo4j connectivity check failed after %d attempt(s) (continuing in degraded mode): %s", attempt, last_exc)
+                    return False
 
     # Configures the tokenizer with custom infixes
     def _configure_tokenizer(self):
@@ -94,7 +186,6 @@ class GraphBasedNLP(GraphDBBase):
     # Adds pipes to the model
     def _add_pipes(self):
         # Add the dbpedia spotlight pipe
-        self.nlp.add_pipe('dbpedia_spotlight', config={'confidence': 0.5, 'overwrite_ents': True})
         
         # Remove and re-add the srl pipe if it exists
         if "srl" in self.nlp.pipe_names:
@@ -118,7 +209,6 @@ class GraphBasedNLP(GraphDBBase):
             "CREATE CONSTRAINT for (l:Relationship) require l.id IS NODE KEY",
             "CREATE CONSTRAINT for (l:NounChunk) require l.id IS NODE KEY",
             "CREATE CONSTRAINT for (l:TEvent) require (l.eiid, l.doc_id) IS NODE KEY",
-            "CREATE CONSTRAINT for (l:TIMEX) require (l.tid, l.doc_id) IS NODE KEY"
         ]
         
         # Execute each constraint
@@ -146,8 +236,8 @@ class GraphBasedNLP(GraphDBBase):
             
             # Check if the file is a file
             if os.path.isfile(f):
-                # Print the filename
-                print(filename)
+                # Log the filename being processed
+                logger.info(filename)
 
                 try:
                     # Parse the XML file
@@ -188,7 +278,7 @@ class GraphBasedNLP(GraphDBBase):
                     # Increment the text ID
                     text_id += 1
                 except Exception as e:
-                    print(f"Error processing file {filename}: {e}")
+                    logger.exception("Error processing file %s", filename)
                 
                 # Append the annotated text to the list of text tuples
                # text_tuples.append(self.__text_processor.get_annotated_text())
@@ -295,17 +385,50 @@ class GraphBasedNLP(GraphDBBase):
 
 # Main function
 if __name__ == '__main__':
-    # Create a GraphBasedNLP object
-    basic_nlp = GraphBasedNLP(sys.argv[1:])
-    
-    # Define the directory path
-    directory = r'/../home/neo/environments/text2graphs/textgraphx/datastore/dataset'
-    
+    # Ensure logging is configured for CLI runs so users see console logs by default
+    try:
+        from textgraphx.logging_config import configure_logging
+        configure_logging()
+    except Exception:
+        # If logging configuration fails, continue with the default logging setup
+        import logging as _logging
+        _logging.basicConfig(level=_logging.INFO)
+
+    parser = argparse.ArgumentParser(prog="GraphBasedNLP", description="Run the Graph-based NLP pipeline")
+    parser.add_argument('--dir', '-d', dest='directory',
+                        default=str(Path(__file__).resolve().parent / 'datastore' / 'dataset'),
+                        help='Path to datastore/dataset directory')
+    parser.add_argument('--model', '-m', choices=['trf', 'sm'], default='sm',
+                        help="Which spaCy model to load: 'trf' -> en_core_web_trf, 'sm' -> en_core_web_sm (default)")
+    parser.add_argument('--require-neo4j', dest='require_neo4j', action='store_true', default=False,
+                        help='Fail fast if Neo4j is unreachable at startup')
+    parser.add_argument('--neo4j-retries', dest='neo4j_retries', type=int, default=None,
+                        help='Number of retries for Neo4j connectivity check (overrides NEO4J_CONNECT_RETRIES env var)')
+    parser.add_argument('--neo4j-backoff', dest='neo4j_backoff', type=float, default=None,
+                        help='Initial backoff seconds for Neo4j retries (exponential backoff multiplier)')
+    # parse_known_args so we keep compatibility with GraphDBBase arg parsing (e.g., -b, -u, -p)
+    args, unknown = parser.parse_known_args()
+
+    model_map = {'trf': 'en_core_web_trf', 'sm': 'en_core_web_sm'}
+
+    # Create a GraphBasedNLP object. Pass through any unknown args for GraphDBBase
+    # Map CLI choices to model names
+    model_name = model_map.get(args.model, 'en_core_web_sm')
+
+    # If CLI provided explicit retries/backoff, set env vars so constructor picks them up
+    if args.neo4j_retries is not None:
+        os.environ['NEO4J_CONNECT_RETRIES'] = str(args.neo4j_retries)
+    if args.neo4j_backoff is not None:
+        os.environ['NEO4J_CONNECT_BACKOFF'] = str(args.neo4j_backoff)
+
+    basic_nlp = GraphBasedNLP(unknown, model_name=model_name, require_neo4j=args.require_neo4j)
+
     # Store the corpus
+    directory = args.directory
     text_tuples = basic_nlp.store_corpus(directory)
-    
+
     # Tokenize and store the text tuples
     basic_nlp.process_text(text_tuples=text_tuples, text_id=1, storeTag=False)
-    
+
     # Close the NLP object
     basic_nlp.close()

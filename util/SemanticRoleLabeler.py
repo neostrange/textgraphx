@@ -18,10 +18,7 @@ import re
 
 logging.set_verbosity_error()
 
-from py2neo import Graph
-from py2neo import *
-
-#graph = Graph("bolt://10.1.48.224:7687", auth=("neo4j", "neo123"))
+# Neo4j access is handled via textgraphx.neo4j_client when needed
 
 #try:
 #    dd.set_extension("SRL", default=dict())
@@ -225,10 +222,9 @@ class SemanticRoleLabel:
         PARAMS = {"Content-Type": "application/json"}
 
         #payload = {"sentence":string}
-        
         r = requests.post(URL, headers=PARAMS, data=json.dumps(payload))
-
-        print(r.text)
-
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.debug("AllenNLP response: %s", r.text)
         return json.loads(r.text)
 # end of class: SemanticRoleLabel
