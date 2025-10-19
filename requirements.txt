@@ -1,0 +1,7 @@
+# Minimal runtime requirements for textgraphx tooling (non-exhaustive)
+spacy>=3.8
+neo4j>=5.9
+requests>=2.28
+nltk>=3.8
+python-json-logger>=2.0
+# Optional: add structlog if you later want more advanced structured logging

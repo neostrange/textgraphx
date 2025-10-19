@@ -1,0 +1,23 @@
+[neo4j]
+uri = "bolt://localhost:7687"
+user = "neo4j"
+password = "password"
+database = "neo4j"
+
+[logging]
+level = "INFO"
+json = false
+file = ""
+
+[spacy]
+model = "en_core_web_trf"
+use_gpu = false
+
+[paths]
+data_dir = "data"
+output_dir = "out"
+tmp_dir = "/tmp"
+
+[features]
+create_refinement_run = true
+compute_token_ids = false

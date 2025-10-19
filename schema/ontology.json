@@ -1,0 +1,77 @@
+{
+  "nodes": {
+    "AnnotatedText": {
+      "purpose": "Document-level node",
+      "key_properties": ["id", "text", "author", "creationtime", "filename", "filetype", "title", "publicId", "uri"],
+      "id_convention": "importer-provided document id"
+    },
+    "Sentence": {
+      "purpose": "Sentence container",
+      "key_properties": ["id", "text"],
+      "id_convention": "<doc>_<sent_index>"
+    },
+    "TagOccurrence": {
+      "purpose": "Token-level node used across pipeline",
+      "key_properties": ["id", "index", "end_index", "text", "lemma", "pos", "upos", "tok_index_doc", "tok_index_sent", "is_stop"],
+      "id_convention": "<doc>_<sent>_<token_idx>"
+    },
+    "Tag": { "purpose": "Lemma grouping node", "key_properties": ["id"] },
+    "NamedEntity": {
+      "purpose": "NER mention (surface)",
+      "key_properties": ["id", "type", "value", "index", "end_index", "kb_id", "score", "normal_term", "head", "headTokenIndex"],
+      "id_convention": "<doc>_<start>_<end>_<type>"
+    },
+    "Entity": { "purpose": "Canonical/disambiguated entity", "key_properties": ["id", "type", "kb_id"] },
+    "Frame": {
+      "purpose": "SRL predicate frame",
+      "key_properties": ["id", "headword", "headTokenIndex", "text", "startIndex", "endIndex"],
+      "id_convention": "frame_<doc>_<start>_<end>"
+    },
+    "FrameArgument": {
+      "purpose": "SRL argument span",
+      "key_properties": ["id", "type", "text", "startIndex", "endIndex", "head", "headTokenIndex", "syntacticType", "complementFullText"],
+      "id_convention": "fa_<doc>_<start>_<end>_<argtype>"
+    },
+    "NounChunk": { "purpose": "Noun chunk span", "key_properties": ["id", "type", "value"] },
+    "Antecedent": { "purpose": "Coref cluster head", "key_properties": ["id", "text", "startIndex", "endIndex"] },
+    "CorefMention": { "purpose": "Coreference mention", "key_properties": ["id", "text", "startIndex", "endIndex"] },
+    "NUMERIC": { "purpose": "Numeric literal node", "key_properties": ["id", "value", "type"] },
+    "TIMEX": { "purpose": "Temporal expression", "key_properties": ["tid", "doc_id", "type", "value", "text"] },
+    "TEvent": { "purpose": "Temporal event", "key_properties": ["eiid", "doc_id", "begin", "end", "class", "tense"] },
+    "Evidence": { "purpose": "Provenance/evidence node for relation extraction", "key_properties": ["id", "type"] },
+    "Relationship": { "purpose": "High-level relation node between Entities", "key_properties": ["id", "type"] }
+  },
+  "relationships": {
+    "CONTAINS_SENTENCE": "AnnotatedText -> Sentence",
+    "HAS_TOKEN": "Sentence -> TagOccurrence",
+    "HAS_NEXT": "TagOccurrence -> TagOccurrence (properties: sentence)",
+    "REFERS_TO": "Mention node -> Entity (or TagOccurrence -> Tag)",
+    "PARTICIPATES_IN": "TagOccurrence -> (NamedEntity|Frame|FrameArgument|CorefMention|Antecedent|NounChunk)",
+    "PARTICIPANT": "FrameArgument -> Frame (properties: type, prep?)",
+    "IS_DEPENDENT": "TagOccurrence -> TagOccurrence (properties: type)",
+    "COREF": "CorefMention -> Antecedent",
+    "TRIGGERS": "TagOccurrence -> TIMEX|TEvent",
+    "DESCRIBES": "Frame -> TEvent",
+    "TLINK": "TEvent/TIMEX -> TEvent/TIMEX (properties: id, relType)",
+    "IS_RELATED_TO": "NamedEntity -> NamedEntity (properties: root, type)",
+    "SOURCE": "ne <- Evidence",
+    "DESTINATION": "ne <- Evidence",
+    "HAS_EVIDENCE": "Relationship -> Evidence",
+    "FROM": "entity <- Relationship",
+    "TO": "entity <- Relationship"
+  },
+  "diagnostics": [
+  {"name": "TagOccurrence", "query": "MATCH (n:TagOccurrence) RETURN count(n) AS cnt", "min": 1},
+  {"name": "NamedEntity", "query": "MATCH (n:NamedEntity) RETURN count(n) AS cnt", "min": 1},
+  {"name": "FrameArgument", "query": "MATCH (n:FrameArgument) RETURN count(n) AS cnt"},
+  {"name": "FrameArgument_with_headTokenIndex", "query": "MATCH (f:FrameArgument) WHERE exists(f.headTokenIndex) RETURN count(f) AS cnt"},
+  {"name": "Frame", "query": "MATCH (n:Frame) RETURN count(n) AS cnt", "min": 0},
+    {"name": "Antecedent", "query": "MATCH (n:Antecedent) RETURN count(n) AS cnt"},
+    {"name": "CorefMention", "query": "MATCH (n:CorefMention) RETURN count(n) AS cnt"},
+  {"name": "IS_DEPENDENT_rels", "query": "MATCH ()-[r:IS_DEPENDENT]-() RETURN count(r) AS cnt", "min": 1},
+  {"name": "PARTICIPATES_IN_rels", "query": "MATCH ()-[r:PARTICIPATES_IN]-() RETURN count(r) AS cnt", "min": 1},
+    {"name": "IS_RELATED_TO_rels", "query": "MATCH ()-[r:IS_RELATED_TO]-() RETURN count(r) AS cnt"},
+    {"name": "Evidence_nodes", "query": "MATCH (n:Evidence) RETURN count(n) AS cnt"},
+    {"name": "Relationship_nodes", "query": "MATCH (n:Relationship) RETURN count(n) AS cnt"}
+  ]
+}

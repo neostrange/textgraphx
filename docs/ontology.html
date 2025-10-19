@@ -1,0 +1,461 @@
+<html><head><meta charset="utf-8"><title>Ontology</title>
+<style>body{font-family:Arial,Helvetica,sans-serif;margin:24px}pre{background:#f6f8fa;padding:12px;border-radius:6px}</style>
+</head><body>
+<h1>Ontology — schema</h1>
+<h2>nodes</h2>
+<h3>AnnotatedText</h3>
+<h4>purpose</h4>
+<pre>&quot;Document-level node&quot;</pre>
+<h4>key_properties</h4>
+<ul>
+<li>
+id
+</li>
+<li>
+text
+</li>
+<li>
+author
+</li>
+<li>
+creationtime
+</li>
+<li>
+filename
+</li>
+<li>
+filetype
+</li>
+<li>
+title
+</li>
+<li>
+publicId
+</li>
+<li>
+uri
+</li>
+</ul>
+<h4>id_convention</h4>
+<pre>&quot;importer-provided document id&quot;</pre>
+<h3>Sentence</h3>
+<h4>purpose</h4>
+<pre>&quot;Sentence container&quot;</pre>
+<h4>key_properties</h4>
+<ul>
+<li>
+id
+</li>
+<li>
+text
+</li>
+</ul>
+<h4>id_convention</h4>
+<pre>&quot;&lt;doc&gt;_&lt;sent_index&gt;&quot;</pre>
+<h3>TagOccurrence</h3>
+<h4>purpose</h4>
+<pre>&quot;Token-level node used across pipeline&quot;</pre>
+<h4>key_properties</h4>
+<ul>
+<li>
+id
+</li>
+<li>
+index
+</li>
+<li>
+end_index
+</li>
+<li>
+text
+</li>
+<li>
+lemma
+</li>
+<li>
+pos
+</li>
+<li>
+upos
+</li>
+<li>
+tok_index_doc
+</li>
+<li>
+tok_index_sent
+</li>
+<li>
+is_stop
+</li>
+</ul>
+<h4>id_convention</h4>
+<pre>&quot;&lt;doc&gt;_&lt;sent&gt;_&lt;token_idx&gt;&quot;</pre>
+<h3>Tag</h3>
+<h4>purpose</h4>
+<pre>&quot;Lemma grouping node&quot;</pre>
+<h4>key_properties</h4>
+<ul>
+<li>
+id
+</li>
+</ul>
+<h3>NamedEntity</h3>
+<h4>purpose</h4>
+<pre>&quot;NER mention (surface)&quot;</pre>
+<h4>key_properties</h4>
+<ul>
+<li>
+id
+</li>
+<li>
+type
+</li>
+<li>
+value
+</li>
+<li>
+index
+</li>
+<li>
+end_index
+</li>
+<li>
+kb_id
+</li>
+<li>
+score
+</li>
+<li>
+normal_term
+</li>
+<li>
+head
+</li>
+<li>
+headTokenIndex
+</li>
+</ul>
+<h4>id_convention</h4>
+<pre>&quot;&lt;doc&gt;_&lt;start&gt;_&lt;end&gt;_&lt;type&gt;&quot;</pre>
+<h3>Entity</h3>
+<h4>purpose</h4>
+<pre>&quot;Canonical/disambiguated entity&quot;</pre>
+<h4>key_properties</h4>
+<ul>
+<li>
+id
+</li>
+<li>
+type
+</li>
+<li>
+kb_id
+</li>
+</ul>
+<h3>Frame</h3>
+<h4>purpose</h4>
+<pre>&quot;SRL predicate frame&quot;</pre>
+<h4>key_properties</h4>
+<ul>
+<li>
+id
+</li>
+<li>
+headword
+</li>
+<li>
+headTokenIndex
+</li>
+<li>
+text
+</li>
+<li>
+startIndex
+</li>
+<li>
+endIndex
+</li>
+</ul>
+<h4>id_convention</h4>
+<pre>&quot;frame_&lt;doc&gt;_&lt;start&gt;_&lt;end&gt;&quot;</pre>
+<h3>FrameArgument</h3>
+<h4>purpose</h4>
+<pre>&quot;SRL argument span&quot;</pre>
+<h4>key_properties</h4>
+<ul>
+<li>
+id
+</li>
+<li>
+type
+</li>
+<li>
+text
+</li>
+<li>
+startIndex
+</li>
+<li>
+endIndex
+</li>
+<li>
+head
+</li>
+<li>
+headTokenIndex
+</li>
+<li>
+syntacticType
+</li>
+<li>
+complementFullText
+</li>
+</ul>
+<h4>id_convention</h4>
+<pre>&quot;fa_&lt;doc&gt;_&lt;start&gt;_&lt;end&gt;_&lt;argtype&gt;&quot;</pre>
+<h3>NounChunk</h3>
+<h4>purpose</h4>
+<pre>&quot;Noun chunk span&quot;</pre>
+<h4>key_properties</h4>
+<ul>
+<li>
+id
+</li>
+<li>
+type
+</li>
+<li>
+value
+</li>
+</ul>
+<h3>Antecedent</h3>
+<h4>purpose</h4>
+<pre>&quot;Coref cluster head&quot;</pre>
+<h4>key_properties</h4>
+<ul>
+<li>
+id
+</li>
+<li>
+text
+</li>
+<li>
+startIndex
+</li>
+<li>
+endIndex
+</li>
+</ul>
+<h3>CorefMention</h3>
+<h4>purpose</h4>
+<pre>&quot;Coreference mention&quot;</pre>
+<h4>key_properties</h4>
+<ul>
+<li>
+id
+</li>
+<li>
+text
+</li>
+<li>
+startIndex
+</li>
+<li>
+endIndex
+</li>
+</ul>
+<h3>NUMERIC</h3>
+<h4>purpose</h4>
+<pre>&quot;Numeric literal node&quot;</pre>
+<h4>key_properties</h4>
+<ul>
+<li>
+id
+</li>
+<li>
+value
+</li>
+<li>
+type
+</li>
+</ul>
+<h3>TIMEX</h3>
+<h4>purpose</h4>
+<pre>&quot;Temporal expression&quot;</pre>
+<h4>key_properties</h4>
+<ul>
+<li>
+tid
+</li>
+<li>
+doc_id
+</li>
+<li>
+type
+</li>
+<li>
+value
+</li>
+<li>
+text
+</li>
+</ul>
+<h3>TEvent</h3>
+<h4>purpose</h4>
+<pre>&quot;Temporal event&quot;</pre>
+<h4>key_properties</h4>
+<ul>
+<li>
+eiid
+</li>
+<li>
+doc_id
+</li>
+<li>
+begin
+</li>
+<li>
+end
+</li>
+<li>
+class
+</li>
+<li>
+tense
+</li>
+</ul>
+<h3>Evidence</h3>
+<h4>purpose</h4>
+<pre>&quot;Provenance/evidence node for relation extraction&quot;</pre>
+<h4>key_properties</h4>
+<ul>
+<li>
+id
+</li>
+<li>
+type
+</li>
+</ul>
+<h3>Relationship</h3>
+<h4>purpose</h4>
+<pre>&quot;High-level relation node between Entities&quot;</pre>
+<h4>key_properties</h4>
+<ul>
+<li>
+id
+</li>
+<li>
+type
+</li>
+</ul>
+<h2>relationships</h2>
+<h3>CONTAINS_SENTENCE</h3>
+<pre>&quot;AnnotatedText -&gt; Sentence&quot;</pre>
+<h3>HAS_TOKEN</h3>
+<pre>&quot;Sentence -&gt; TagOccurrence&quot;</pre>
+<h3>HAS_NEXT</h3>
+<pre>&quot;TagOccurrence -&gt; TagOccurrence (properties: sentence)&quot;</pre>
+<h3>REFERS_TO</h3>
+<pre>&quot;Mention node -&gt; Entity (or TagOccurrence -&gt; Tag)&quot;</pre>
+<h3>PARTICIPATES_IN</h3>
+<pre>&quot;TagOccurrence -&gt; (NamedEntity|Frame|FrameArgument|CorefMention|Antecedent|NounChunk)&quot;</pre>
+<h3>PARTICIPANT</h3>
+<pre>&quot;FrameArgument -&gt; Frame (properties: type, prep?)&quot;</pre>
+<h3>IS_DEPENDENT</h3>
+<pre>&quot;TagOccurrence -&gt; TagOccurrence (properties: type)&quot;</pre>
+<h3>COREF</h3>
+<pre>&quot;CorefMention -&gt; Antecedent&quot;</pre>
+<h3>TRIGGERS</h3>
+<pre>&quot;TagOccurrence -&gt; TIMEX|TEvent&quot;</pre>
+<h3>DESCRIBES</h3>
+<pre>&quot;Frame -&gt; TEvent&quot;</pre>
+<h3>TLINK</h3>
+<pre>&quot;TEvent/TIMEX -&gt; TEvent/TIMEX (properties: id, relType)&quot;</pre>
+<h3>IS_RELATED_TO</h3>
+<pre>&quot;NamedEntity -&gt; NamedEntity (properties: root, type)&quot;</pre>
+<h3>SOURCE</h3>
+<pre>&quot;ne &lt;- Evidence&quot;</pre>
+<h3>DESTINATION</h3>
+<pre>&quot;ne &lt;- Evidence&quot;</pre>
+<h3>HAS_EVIDENCE</h3>
+<pre>&quot;Relationship -&gt; Evidence&quot;</pre>
+<h3>FROM</h3>
+<pre>&quot;entity &lt;- Relationship&quot;</pre>
+<h3>TO</h3>
+<pre>&quot;entity &lt;- Relationship&quot;</pre>
+<h2>diagnostics</h2>
+<ul>
+<li>
+<h4>name</h4>
+<pre>&quot;TagOccurrence&quot;</pre>
+<h4>query</h4>
+<pre>&quot;MATCH (n:TagOccurrence) RETURN count(n) AS cnt&quot;</pre>
+</li>
+<li>
+<h4>name</h4>
+<pre>&quot;NamedEntity&quot;</pre>
+<h4>query</h4>
+<pre>&quot;MATCH (n:NamedEntity) RETURN count(n) AS cnt&quot;</pre>
+</li>
+<li>
+<h4>name</h4>
+<pre>&quot;FrameArgument&quot;</pre>
+<h4>query</h4>
+<pre>&quot;MATCH (n:FrameArgument) RETURN count(n) AS cnt&quot;</pre>
+</li>
+<li>
+<h4>name</h4>
+<pre>&quot;FrameArgument_with_headTokenIndex&quot;</pre>
+<h4>query</h4>
+<pre>&quot;MATCH (f:FrameArgument) WHERE exists(f.headTokenIndex) RETURN count(f) AS cnt&quot;</pre>
+</li>
+<li>
+<h4>name</h4>
+<pre>&quot;Frame&quot;</pre>
+<h4>query</h4>
+<pre>&quot;MATCH (n:Frame) RETURN count(n) AS cnt&quot;</pre>
+</li>
+<li>
+<h4>name</h4>
+<pre>&quot;Antecedent&quot;</pre>
+<h4>query</h4>
+<pre>&quot;MATCH (n:Antecedent) RETURN count(n) AS cnt&quot;</pre>
+</li>
+<li>
+<h4>name</h4>
+<pre>&quot;CorefMention&quot;</pre>
+<h4>query</h4>
+<pre>&quot;MATCH (n:CorefMention) RETURN count(n) AS cnt&quot;</pre>
+</li>
+<li>
+<h4>name</h4>
+<pre>&quot;IS_DEPENDENT_rels&quot;</pre>
+<h4>query</h4>
+<pre>&quot;MATCH ()-[r:IS_DEPENDENT]-() RETURN count(r) AS cnt&quot;</pre>
+</li>
+<li>
+<h4>name</h4>
+<pre>&quot;PARTICIPATES_IN_rels&quot;</pre>
+<h4>query</h4>
+<pre>&quot;MATCH ()-[r:PARTICIPATES_IN]-() RETURN count(r) AS cnt&quot;</pre>
+</li>
+<li>
+<h4>name</h4>
+<pre>&quot;IS_RELATED_TO_rels&quot;</pre>
+<h4>query</h4>
+<pre>&quot;MATCH ()-[r:IS_RELATED_TO]-() RETURN count(r) AS cnt&quot;</pre>
+</li>
+<li>
+<h4>name</h4>
+<pre>&quot;Evidence_nodes&quot;</pre>
+<h4>query</h4>
+<pre>&quot;MATCH (n:Evidence) RETURN count(n) AS cnt&quot;</pre>
+</li>
+<li>
+<h4>name</h4>
+<pre>&quot;Relationship_nodes&quot;</pre>
+<h4>query</h4>
+<pre>&quot;MATCH (n:Relationship) RETURN count(n) AS cnt&quot;</pre>
+</li>
+</ul>
+</body></html>
