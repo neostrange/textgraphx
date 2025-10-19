@@ -1,17 +1,41 @@
+"""TemporalPhase
+
+Responsible for creating temporal expressions (TIMEX) and temporal events
+(`TEvent`) in the graph and for wiring TLINK relationships. This module
+integrates with external tools (Heideltime/TTK/TARSQI) and expects
+document-level XML outputs to be available for parsing.
+
+Important notes:
+- The phase relies on `AnnotatedText` and `TagOccurrence` nodes produced by
+    upstream tokenization and import phases.
+- It uses deterministic ids (e.g., `tid`, `eiid`) and MERGE patterns so runs
+    are safe to re-run, but external service availability affects what gets
+    created.
+"""
+
 import os
 import spacy
 import sys
 
+if __name__ == '__main__' and __package__ is None:
+        repo_root = os.path.dirname(os.path.dirname(__file__))
+        if repo_root not in sys.path:
+                sys.path.insert(0, repo_root)
+
 
 
 from spacy.tokens import Doc, Token, Span
-from util.GraphDbBase import GraphDBBase
+from textgraphx.util.GraphDbBase import GraphDBBase
 import xml.etree.ElementTree as ET
-from py2neo import Graph
-from py2neo import *
-import configparser
+# legacy py2neo imports removed; use bolt-driver wrapper via neo4j_client
 import requests
 import json
+import logging
+
+from textgraphx.neo4j_client import make_graph_from_config
+from textgraphx.config import get_config
+
+logger = logging.getLogger(__name__)
 
 
 # call TTK service which uses TARSQI toolkit and 
@@ -27,28 +51,23 @@ class TemporalPhase():
     graph=""
 
     def __init__(self, argv):
-        #super().__init__(command=__file__, argv=argv)
-        self.uri=""
-        self.username =""
-        self.password =""
-        config = configparser.ConfigParser()
-        #config_file = os.path.join(os.path.dirname(__file__), '..', 'config.ini')
-        config_file = os.path.join(os.path.dirname(__file__), 'config.ini')
-        config.read(config_file)
-        py2neo_params = config['py2neo']
-        self.uri = py2neo_params.get('uri')
-        self.username = py2neo_params.get('username')
-        self.password = py2neo_params.get('password')
+        # Initialize a shared py2neo Graph from config
+        self.graph = make_graph_from_config()
+        # keep legacy attrs for compatibility
+        self.uri = None
+        self.username = None
+        self.password = None
         #self.__text_processor = TextProcessor(self.nlp, self._driver)
         #self.create_constraints()
+    logger.info("TemporalPhase initialized; graph session ready")
 
         
 
     
     def get_annotated_text(self):
 
-        print(self.uri)
-        graph = Graph(self.uri, auth=(self.username, self.password))
+        logger.debug("get_annotated_text")
+        graph = self.graph
 
         query = "MATCH (n:AnnotatedText) RETURN n.id"
         data= graph.run(query).data()
@@ -71,9 +90,8 @@ class TemporalPhase():
         #-- this query should be executed in the beginning of the temporal phase. 
         #-- precondition: the annotatedText should be there.
     def create_DCT_node(self, doc_id):
-
-        print(self.uri)
-        graph = Graph(self.uri, auth=(self.username, self.password))
+        logger.debug("create_DCT_node %s", doc_id)
+        graph = self.graph
 
         query = """ match (ann:AnnotatedText where ann.id = """+str(doc_id)+""")
                     merge (DCT:TIMEX {type: 'DATE', value: replace(split(ann.creationtime, 'T')[0],'-','') , tid: 'dct'+ toString(ann.id), 
@@ -86,9 +104,8 @@ class TemporalPhase():
 
 
     def create_tlinks_e2e(self, doc_id):
-
-        print(self.uri)
-        graph = Graph(self.uri, auth=(self.username, self.password))
+        logger.debug("create_tlinks_e2e %s", doc_id)
+        graph = self.graph
 
         query = """CALL apoc.load.xml('"""+str(doc_id)+""".xml') 
                     YIELD value as result
@@ -104,9 +121,8 @@ class TemporalPhase():
 
 
     def create_tlinks_e2t(self, doc_id):
-
-        print(self.uri)
-        graph = Graph(self.uri, auth=(self.username, self.password))
+        logger.debug("create_tlinks_e2t %s", doc_id)
+        graph = self.graph
 
         query = """CALL apoc.load.xml('"""+str(doc_id)+""".xml') 
                     YIELD value as result
@@ -123,9 +139,8 @@ class TemporalPhase():
         
 
     def create_tlinks_t2t(self, doc_id):
-
-        print(self.uri)
-        graph = Graph(self.uri, auth=(self.username, self.password))
+        logger.debug("create_tlinks_t2t %s", doc_id)
+        graph = self.graph
 
         query = """CALL apoc.load.xml('"""+str(doc_id)+""".xml')
                     YIELD value as result
@@ -140,10 +155,10 @@ class TemporalPhase():
         return ""
 
     def get_doc_text_and_dct(self, doc_id):
-        graph = Graph(self.uri, auth=(self.username, self.password))
+        graph = self.graph
 
         query = """match (n:AnnotatedText) where n.id = """+str(doc_id)+""" return n.text, n.creationtime """
-        
+
         data = graph.run(query).data()
         result={}
 
@@ -161,8 +176,7 @@ class TemporalPhase():
         doc_id = str(doc_id)
 
         #print(result_xml)
-        graph = Graph(self.uri, auth=(self.username, self.password))
-
+        graph = self.graph
 
 
 
@@ -206,9 +220,8 @@ class TemporalPhase():
 
 
     def create_timexes(self, doc_id):
-
-        print(self.uri)
-        graph = Graph(self.uri, auth=(self.username, self.password))
+        logger.debug("create_timexes %s", doc_id)
+        graph = self.graph
 
         query = """CALL apoc.load.xml('"""+str(doc_id)+""".xml') 
                     YIELD value as result
@@ -257,9 +270,7 @@ class TemporalPhase():
         doc_id = str(doc_id)
 
         #print(result_xml)
-
-        graph = Graph(self.uri, auth=(self.username, self.password))
-
+        graph = self.graph
 
 
         query = """WITH $result_xml
@@ -278,9 +289,8 @@ class TemporalPhase():
 
 
     def create_tevents(self, doc_id):
-
-        print(self.uri)
-        graph = Graph(self.uri, auth=(self.username, self.password))
+        logger.debug("create_tevents %s", doc_id)
+        graph = self.graph
 
         query = """CALL apoc.load.xml('"""+str(doc_id)+""".xml') 
                     YIELD value as result

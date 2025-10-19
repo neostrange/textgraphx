@@ -14,6 +14,8 @@
 class EntityFuser:
     def __init__(self, neo4j_repository):
         self.neo4j_repository = neo4j_repository
+        import logging
+        self.logger = logging.getLogger(__name__)
 
     def assign_head_info_to_multitoken_entities(self, document_id):
         """
@@ -32,6 +34,7 @@ class EntityFuser:
             (case when a.pos in ['NNS', 'NN'] then ne END).syntacticType ='NOMINAL' ,
             (case when a.pos in ['NNP', 'NNPS'] then ne END).syntacticType ='NAM' 
         """
+        self.logger.debug("assign_head_info_to_multitoken_entities: running for %s", document_id)
         self.execute_query(query, {'documentId': document_id})
 
     def assign_head_info_to_singletoken_entities(self, document_id):
@@ -51,6 +54,7 @@ class EntityFuser:
             (case when a.pos in ['NNS', 'NN'] then ne END).syntacticType ='NOMINAL' ,
             (case when a.pos in ['NNP', 'NNPS'] then ne END).syntacticType ='NAM'   
         """
+        self.logger.debug("assign_head_info_to_singletoken_entities: running for %s", document_id)
         self.execute_query(query, {'documentId': document_id})
 
     def prioritize_spacy_entities(self, document_id):
@@ -65,9 +69,10 @@ class EntityFuser:
         query = """
             match p = (ne:NamedEntity where ne.type in ['CARDINAL', 'DATE', 'ORDINAL', 'MONEY', 'TIME', 'QUANTITY', 'PERCENT'])--
             (a:TagOccurrence )--(ne2:NamedEntity) 
-            where a.tok_index_doc = ne.headTokenIndex and a.tok_index_doc = ne2.headTokenIndex and ne.id <> ne2.id
+            where a.tok_index_doc = ne.headTokenIndex and a.tok_index_doc = ne2.headTokenIndex and coalesce(ne.token_id, ne.id) <> coalesce(ne2.token_id, ne2.id)
             detach delete ne2
         """
+        self.logger.debug("prioritize_spacy_entities: running for %s", document_id)
         self.execute_query(query, {"documentId": document_id})
 
     def prioritize_dbpedia_entities(self, document_id):
@@ -82,10 +87,11 @@ class EntityFuser:
         """
         query = """
             match p = (ne:NamedEntity where ne.kb_id is not null)--(a:TagOccurrence )--(ne2:NamedEntity) 
-            where a.tok_index_doc = ne.headTokenIndex and a.tok_index_doc = ne2.headTokenIndex and ne.id <> ne2.id
+            where a.tok_index_doc = ne.headTokenIndex and a.tok_index_doc = ne2.headTokenIndex and coalesce(ne.token_id, ne.id) <> coalesce(ne2.token_id, ne2.id)
             set ne.spacyType = ne2.type
             detach delete ne2 
         """
+        self.logger.debug("prioritize_dbpedia_entities: running for %s", document_id)
         self.execute_query(query, {"documentId": document_id})
 
     def fuse_entities(self, document_id):
@@ -99,12 +105,15 @@ class EntityFuser:
         prioritizing entities from Spacy and DBpedia
         :return: An empty string is being returned from the `fuse_entities` method.
         """
+        self.logger.info("fuse_entities: starting fuse for %s", document_id)
         self.assign_head_info_to_multitoken_entities(document_id)
         self.assign_head_info_to_singletoken_entities(document_id)
         self.prioritize_spacy_entities(document_id)
         self.prioritize_dbpedia_entities(document_id)
+        self.logger.info("fuse_entities: completed fuse for %s", document_id)
         return ''
 
     def execute_query(self, query, params):
+        self.logger.debug("execute_query called with params: %s", params)
         result = self.neo4j_repository.execute_query(query, params)
         return result

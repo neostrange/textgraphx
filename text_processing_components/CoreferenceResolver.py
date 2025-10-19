@@ -1,90 +1,143 @@
-from py2neo import Graph
-from py2neo import *
+"""CoreferenceResolver
+
+Create Antecedent and CorefMention nodes from an external coreference
+service output and link mention tokens to the created nodes. The
+implementation creates deterministic ids for nodes so other phases can
+reference them consistently.
+"""
+
 import requests
 import json
+from textgraphx.neo4j_client import make_graph_from_config
+import logging
 
+# module logger
+logger = logging.getLogger(__name__)
 
 
 class CoreferenceResolver:
+    """Component that persists coreference cluster information into Neo4j.
 
-    
-    def __init__(self, uri, username, password, coreference_service_endpoint):
-        self.uri = uri
-        self.username = username
-        self.password = password
-        self.graph = Graph(self.uri, auth=(self.username, self.password))
+    Methods:
+      - create_node(node_type, text, start_index, end_index, doc_id): create or
+        merge a node representing an antecedent or mention.
+      - connect_node_to_tag_occurrences(node_id, index_range, doc_id): bulk link
+        TagOccurrence tokens to a node via `PARTICIPATES_IN`.
+      - resolve_coreference(doc, text_id): call an external coref service and
+        persist the returned clusters as nodes and COREF relations.
+    """
+
+    def __init__(self, coreference_service_endpoint):
+        """Initialize resolver and create a bolt-driver backed graph wrapper.
+
+        Args:
+            coreference_service_endpoint (str): URL of the coref service.
+        """
+        self.graph = make_graph_from_config()
         self.coreference_service_endpoint = coreference_service_endpoint
+        logger.debug("CoreferenceResolver initialized with endpoint=%s", coreference_service_endpoint)
 
-    def create_node(self, node_type, text, start_index, end_index):
-        return Node(node_type, text=text, startIndex=start_index, endIndex=end_index)
+    def create_node(self, node_type, text, start_index, end_index, doc_id):
+        """Create or merge a coreference-related node and return its generated id string.
 
-    def connect_node_to_tag_occurrences(self, node, index_range, doc):
-        PARTICIPATES_IN = Relationship.type("PARTICIPATES_IN")
-        atg = ""
-        for index in index_range:
-            query = "match (x:TagOccurrence {tok_index_doc:" + str(index) + "})-[:HAS_TOKEN]-()-[:CONTAINS_SENTENCE]-(:AnnotatedText {id:"+str(doc._.text_id)+"}) return x"
-            token_node = self.graph.evaluate(query)
-            if token_node is None:
-                continue
-            token_mention_rel = PARTICIPATES_IN(token_node, node)
-            if atg == "":
-                atg = token_mention_rel
-            else:
-                atg = atg | token_mention_rel
-        self.graph.create(atg)
+        The created node will have a stable id based on the node_type, document id
+        and token span. This lets other code refer to the node deterministically
+        without needing the numeric internal node id from Neo4j.
+
+        Args:
+            node_type: Label for the node (e.g., 'Antecedent' or 'CorefMention').
+            text: Surface text of the span.
+            start_index: Start token index (inclusive).
+            end_index: End token index (inclusive).
+            doc_id: Document identifier used to scope the id.
+
+        Returns:
+            The string id assigned to the node (used as the node's `id` property).
+        """
+        node_id = f"{node_type}_{doc_id}_{start_index}_{end_index}"
+        query = """
+        MERGE (n:%s {id: $node_id})
+        SET n.text = $text, n.startIndex = $start, n.endIndex = $end
+        RETURN n.id
+        """ % node_type
+        params = {"node_id": node_id, "text": text, "start": start_index, "end": end_index}
+        self.graph.run(query, params)
+        logger.debug("create_node: created/merged %s for doc=%s span=%s-%s", node_id, doc_id, start_index, end_index)
+        return node_id
+
+    def connect_node_to_tag_occurrences(self, node_id, index_range, doc_id):
+        """Link TagOccurrence nodes (tokens) to a previously created node.
+
+        This method issues a single UNWIND Cypher query that matches TagOccurrence
+        nodes by their tok_index_doc and creates PARTICIPATES_IN relationships to
+        the node identified by `node_id`.
+
+        Args:
+            node_id: The string id of the previously created node.
+            index_range: Iterable of integer token indices (tok_index_doc values).
+            doc_id: Document identifier used to scope the matching AnnotatedText.
+        """
+        query = """
+        UNWIND $indices as idx
+        MATCH (x:TagOccurrence {tok_index_doc: idx})-[:HAS_TOKEN]-()-[:CONTAINS_SENTENCE]-(:AnnotatedText {id: $doc_id})
+        MATCH (n {id: $node_id})
+        MERGE (x)-[:PARTICIPATES_IN]->(n)
+        """
+        params = {"indices": list(index_range), "doc_id": doc_id, "node_id": node_id}
+        logger.debug("connect_node_to_tag_occurrences: linking %d indices to node %s in doc %s", len(list(index_range)), node_id, doc_id)
+        self.graph.run(query, params)
 
     def resolve_coreference(self, doc, text_id):
+        """Resolve coreference clusters and persist nodes/relations in the graph.
+
+        The method expects the external coreference service to return a JSON
+        structure containing a `clusters` key whose value is a list of clusters.
+        Each cluster is a sequence of spans where a span is itself a list of
+        integer token indices. The first span in each cluster is treated as the
+        antecedent and subsequent spans are treated as mentions referring to it.
+
+        The function will create `Antecedent` and `CorefMention` nodes and
+        connect TagOccurrence nodes to them. It also creates `COREF` relations
+        from mention nodes to their antecedents.
+
+        Args:
+            doc: spaCy Doc object (tokens accessible by index).
+            text_id: AnnotatedText document id used to scope graph matches.
+
+        Returns:
+            A list of dicts describing created coreference links: each dict has
+            keys `referent` and `antecedent` with the created node id strings.
+        """
+        logger.info("resolve_coreference: resolving coref for text_id=%s", text_id)
         result = self.call_coreference_resolution_api(self.coreference_service_endpoint, doc.text)
-        print("Coref Result: ", result)
+        if result is None:
+            logger.warning("resolve_coreference: coref service returned no result for text_id=%s", text_id)
+            return []
 
         coref = []
-        for cluster in result["clusters"]:
-            i = 0
-            antecedent_span = ""
-            cag = ""  # coreferents - antecedent relationships sub-graph
+        for cluster in result.get("clusters", []):
+            if not cluster:
+                continue
+            antecedent = cluster[0]
+            ant_start, ant_end = antecedent[0], antecedent[-1]
+            antecedent_node_id = self.create_node("Antecedent", doc[ant_start:ant_end+1].text, ant_start, ant_end, text_id)
+            self.connect_node_to_tag_occurrences(antecedent_node_id, range(ant_start, ant_end + 1), text_id)
+            logger.debug("Created antecedent %s for cluster size=%d", antecedent_node_id, len(cluster))
 
-            for span_token_indexes in cluster:
-                if i == 0:
-                    i += 1
-                    # the first span will be the antecedent for all other references
-                    antecedent_span = doc[span_token_indexes[0]:span_token_indexes[-1]]  # updated for index
-                    antecedent_node = self.create_node("Antecedent", antecedent_span.text, span_token_indexes[0], span_token_indexes[-1])
-                    self.connect_node_to_tag_occurrences(antecedent_node, range(span_token_indexes[0], span_token_indexes[-1]), doc)
-                    continue
+            for span_token_indexes in cluster[1:]:
+                start, end = span_token_indexes[0], span_token_indexes[-1]
+                mention_node_id = self.create_node("CorefMention", doc[start:end+1].text, start, end, text_id)
+                self.connect_node_to_tag_occurrences(mention_node_id, range(start, end + 1), text_id)
+                # create COREF relation
+                q = """
+                MATCH (a {id: $mention_id}), (b {id: $ante_id})
+                MERGE (a)-[:COREF]->(b)
+                """
+                self.graph.run(q, {"mention_id": mention_node_id, "ante_id": antecedent_node_id})
+                coref.append({"referent": mention_node_id, "antecedent": antecedent_node_id})
+                logger.debug("Created mention %s for antecedent %s", mention_node_id, antecedent_node_id)
 
-                coref_mention_span = doc[span_token_indexes[0]:span_token_indexes[-1]]  # updated index
-                coref_mention_node = self.create_node("CorefMention", coref_mention_span.text, span_token_indexes[0], span_token_indexes[-1])
-                self.connect_node_to_tag_occurrences(coref_mention_node, range(span_token_indexes[0], span_token_indexes[-1]),doc)
-
-                coref_rel = Relationship.type("COREF")(coref_mention_node, antecedent_node)
-                if cag == "":
-                    cag = coref_rel
-                else:
-                    cag = cag | coref_rel
-
-                coref.append({"referent": coref_mention_node, "antecedent": antecedent_node})
-
-            self.graph.create(cag)
-
-        print(coref)
-
-    # def call_coreference_resolution_api(self, coreference_service_endpoint, text):
-    #     # to integrate spacy-experimental-coref
-    #     #URL = "http://localhost:9999/coreference_resolution"
-
-    #     URL = coreference_service_endpoint
-    #     PARAMS = {"Content-Type": "application/json"}
-
-    #     payload = ''
-
-    #     payload = {"document":text}
-
-    #     r = requests.post(URL, headers=PARAMS, data=json.dumps(payload))
-
-    #     return json.loads(r.text)
-    
-
-
+        return coref
 
     def call_coreference_resolution_api(self, coreference_service_endpoint, text):
         """
@@ -117,10 +170,10 @@ class CoreferenceResolver:
 
         except requests.exceptions.HTTPError as http_err:
             # Handle HTTP errors
-            print(f"HTTP error occurred: {http_err}")
+            logger.exception("HTTP error occurred when calling coref service: %s", http_err)
         except Exception as err:
             # Handle any other exceptions
-            print(f"An error occurred: {err}")
+            logger.exception("An error occurred when calling coref service: %s", err)
 
         # If an error occurs, return None
         return None

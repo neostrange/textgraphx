@@ -1,0 +1,43 @@
+"""Central constants used across the textgraphx pipeline.
+
+Keep label and relationship names centralized so typos are avoided and
+renames are straightforward.
+"""
+# Node labels
+LABEL_ANNOTATED_TEXT = "AnnotatedText"
+LABEL_SENTENCE = "Sentence"
+LABEL_TAG_OCCURRENCE = "TagOccurrence"
+LABEL_TAG = "Tag"
+LABEL_NAMED_ENTITY = "NamedEntity"
+LABEL_ENTITY = "Entity"
+LABEL_FRAME = "Frame"
+LABEL_FRAME_ARG = "FrameArgument"
+LABEL_ANTECEDENT = "Antecedent"
+LABEL_COREF_MENTION = "CorefMention"
+LABEL_TIMEX = "TIMEX"
+LABEL_TEVENT = "TEvent"
+LABEL_NUMERIC = "NUMERIC"
+LABEL_EVIDENCE = "Evidence"
+LABEL_RELATIONSHIP = "Relationship"
+
+# Relationship types
+REL_CONTAINS_SENTENCE = "CONTAINS_SENTENCE"
+REL_HAS_TOKEN = "HAS_TOKEN"
+REL_HAS_NEXT = "HAS_NEXT"
+REL_PARTICIPATES_IN = "PARTICIPATES_IN"
+REL_PARTICIPANT = "PARTICIPANT"
+REL_IS_DEPENDENT = "IS_DEPENDENT"
+REL_TRIGGERS = "TRIGGERS"
+REL_DESCRIBES = "DESCRIBES"
+REL_TLINK = "TLINK"
+REL_REFERS_TO = "REFERS_TO"
+REL_IS_RELATED_TO = "IS_RELATED_TO"
+REL_SOURCE = "SOURCE"
+REL_DESTINATION = "DESTINATION"
+REL_HAS_EVIDENCE = "HAS_EVIDENCE"
+REL_FROM = "FROM"
+REL_TO = "TO"
+
+# Common property names
+PROP_ID = "id"
+PROP_DOC_ID = "doc_id"

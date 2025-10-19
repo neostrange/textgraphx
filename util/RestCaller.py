@@ -1,6 +1,9 @@
 import requests
 import re
 import json
+import logging
+logger = logging.getLogger(__name__)
+logger.info("textgraphx.util.RestCaller module imported")
 
 def amuse_wsd_api_call2(api_endpoint, sentence):
     headers = {
@@ -11,11 +14,12 @@ def amuse_wsd_api_call2(api_endpoint, sentence):
     data_json = "[" + ",".join([f'{{"text": "{item["text"]}", "lang": "{item["lang"]}"}}' for item in data]) + "]"
 
     try:
+        logger.debug("POST %s (AMuSE-WSD) payload size=%d", api_endpoint, len(data_json))
         response = requests.post(api_endpoint, data=data_json, headers=headers)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
-        print(f"Error while calling AMuSE-WSD API: {e}")
+        logger.exception("Error while calling AMuSE-WSD API: %s", e)
         return None
     
 # this method has been implemented just for preprocessing input for AMUSE-WSD 
@@ -45,11 +49,12 @@ def amuse_wsd_api_call(api_endpoint, sentences):
     data = [{"text": sentence, "lang": "EN"} for sentence in updated_sentences]
 
     try:
+        logger.debug("POST %s (AMuSE-WSD bulk) sentences=%d", api_endpoint, len(data))
         response = requests.post(api_endpoint, json=data, headers=headers)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
-        print(f"Error while calling AMuSE-WSD API: {e}")
+        logger.exception("Error while calling AMuSE-WSD API: %s", e)
         return None
     
 def callHeidelTimeService(parameters):
@@ -62,8 +67,9 @@ def callHeidelTimeService(parameters):
 
 
     response = requests.post("http://localhost:5000/annotate", json=data, headers=headers)
+    logger.debug("HeidelTime POST to http://localhost:5000/annotate (dct=%s)", dct)
 
-    # print(response.content)
+    # response.content
     return response.text
 
 def callAllenNlpApi(apiName, string):
@@ -92,7 +98,7 @@ def callAllenNlpApi(apiName, string):
     #r = requests.post(URL, headers=PARAMS, data=payload)
 
     #return print(r.text)
-
+    logger.debug("AllenNLP response: %s", r.text)
     return json.loads(r.text)
 
 #ss = """LemonDuck's activities were first spotted in China in May 2019, before it began adopting COVID_19_themed lures in email attacks in 2020 and even the recently addressed ""ProxyLogon"" Exchange Server flaws to gain access to unpatched systems.""""

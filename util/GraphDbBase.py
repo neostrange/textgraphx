@@ -1,8 +1,12 @@
 from neo4j import GraphDatabase
-import configparser
 import os
 import sys
 import getopt
+import logging
+from textgraphx.config import get_config
+
+# module logger
+logger = logging.getLogger(__name__)
 
 help_message = '-u <neo4j username> -p <password> -s <source directory> -b <bolt uri>'
 
@@ -25,28 +29,38 @@ class GraphDBBase():
             self.__get_main_parameters__(command=command, argv=argv, extended_options=extended_options,
                                          extended_long_options=extended_long_options)
 
-        config = configparser.ConfigParser()
-        config_file = os.path.join(os.path.dirname(__file__), '..', 'config.ini')
-        config.read(config_file)
-        neo4j_params = config['neo4j']
+        cfg = get_config()
 
-        uri = self.uri or os.getenv('NEO4J_URI') or neo4j_params.get('uri', 'bolt://localhost:7687')
-        user = self.neo4j_user or os.getenv('NEO4J_USER') or neo4j_params.get('user', 'neo4j')
-        password = self.neo4j_password or os.getenv('NEO4J_PASSWORD') or neo4j_params.get('password', 'password')
-        ignored_params = {'uri', 'user', 'password'}
-        param_converters = {'encrypted': lambda x: int(x)}
+        # allow command-line or explicit overrides to take precedence
+        uri = self.uri or os.getenv('NEO4J_URI') or cfg.neo4j.uri or 'bolt://localhost:7687'
+        user = self.neo4j_user or os.getenv('NEO4J_USER') or cfg.neo4j.user or 'neo4j'
+        password = self.neo4j_password or os.getenv('NEO4J_PASSWORD') or cfg.neo4j.password or 'password'
 
-        def maybe_convert(key: str, value: str):
-            if key in param_converters:
-                return param_converters[key](value)
-            return value
-
-        other_params = dict([(key, maybe_convert(key, value)) for key, value in neo4j_params.items()
-                             if key not in ignored_params])
-        # print(other_params)
+        # Pass through any driver-specific options defined in a repo-local
+        # config.ini under [neo4j] if present. We try to read textgraphx/config.ini
+        # for compatibility with older deployments.
+        other_params = {}
+        try:
+            import configparser
+            config_file = os.path.join(os.path.dirname(__file__), '..', 'config.ini')
+            cp = configparser.ConfigParser()
+            cp.read(config_file)
+            if 'neo4j' in cp:
+                for k, v in cp['neo4j'].items():
+                    if k in ('uri', 'user', 'password'):
+                        continue
+                    # simple converters for common keys
+                    if k == 'encrypted':
+                        other_params[k] = bool(int(v))
+                    else:
+                        other_params[k] = v
+        except Exception:
+            # if config isn't present just continue with defaults
+            pass
 
         self._driver = GraphDatabase.driver(uri, auth=(user, password), **other_params)
         self._session = None
+        logger.info("GraphDBBase initialized for uri=%s user=%s", uri, user)
 
     def get_opts(self):
         return self.opts
@@ -82,12 +96,12 @@ class GraphDBBase():
                                        ['help', 'neo4j-user=', 'neo4j-password=', 'source-path=',
                                         'bolt='] + extended_long_options)
         except getopt.GetoptError as e:
-            print(e)
-            print(command, help_message)
+            logger.exception("Error parsing command line options: %s", e)
+            logger.info("%s %s", command, help_message)
             sys.exit(2)
         for opt, arg in self.opts:
             if opt == '-h':
-                print(command, help_message)
+                logger.info("%s %s", command, help_message)
                 sys.exit()
             elif opt in ("-u", "--neo4j-user"):
                 self.neo4j_user = arg

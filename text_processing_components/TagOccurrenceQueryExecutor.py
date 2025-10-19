@@ -1,11 +1,17 @@
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 class TagOccurrenceQueryExecutor:
     def __init__(self, neo4j_repository):
         self.neo4j_repository = neo4j_repository
-        pass
+        self.logger = logger
 
     def execute_tag_occurrence_query(self, sentence_tag_occurrences, sentence_id):
         # implement the execute_tag_occurrence_query method
+        self.logger.debug("execute_tag_occurrence_query: sentence_id=%s occurrences=%d", sentence_id, len(sentence_tag_occurrences))
         tag_occurrences = []
         for tag_occurrence in sentence_tag_occurrences:
             tag_occurrence_dict = dict(tag_occurrence)
