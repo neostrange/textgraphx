@@ -297,7 +297,7 @@ These do not change the architectural direction, but they are important for reli
 2. Add startup/service health checks with clear warnings and fail-fast mode.
 3. Parameterize remaining interpolated Cypher in temporal and refinement-related methods.
 4. Add one end-to-end smoke test (single tiny document) that verifies stage output counts.
-
+pytest tests/test_smoke_e2e.py -v -m slow
 ### Iteration 2: pipeline correctness and observability
 
 5. Add phase-level assertions (expected node/edge minimums) and structured per-phase timing logs.
@@ -312,12 +312,32 @@ These do not change the architectural direction, but they are important for reli
 11. Expand integration tests for each phase and for cross-phase invariants.
 12. Add a stable query pack for graph inspection and debugging.
 
+Current implementation status:
+
+- Done: `TextProcessor.py` now delegates component construction to `text_processing_components/pipeline/component_factory.py`, with explicit orchestration interfaces in `text_processing_components/pipeline/interfaces.py`.
+- Done: `RefinementPhase.py` now exposes `RULE_FAMILIES` and supports family-wise execution through `run_rule_family()` / `run_all_rule_families()`.
+- Done: integration tests were expanded with cross-phase invariant checks in `tests/test_integration_cross_phase_invariants.py` and phase-level checks in `tests/test_integration_phase_assertions.py`.
+- Done: stable query pack added under `queries/` (`counts_by_label.cypher`, `doc_invariants.cypher`, `recent_phase_runs.cypher`) with loader utilities in `queries/query_pack.py`.
+
 ### Iteration 4: semantic quality and KG completeness
 
 13. Add evaluation harnesses for entity/event/temporal quality (precision/coverage style metrics).
 14. Introduce confidence/provenance attributes for inferred links where feasible.
 15. Expand cross-sentence/cross-document fusion logic for stronger global KG coherence.
 16. Add domain-specific semantic enrichment layers as optional post-processing modules.
+
+Current implementation status:
+
+- Done: Iteration 4.13 baseline evaluation harness added in `evaluation/metrics.py` with stable metric primitives (`precision_recall_f1`, `coverage`, `macro_average`) and graph-backed snapshots via `GraphEvaluationHarness`.
+- Done: unit/regression tests for metric contracts in `tests/test_evaluation_metrics.py`.
+- Done: integration coverage for the harness in `tests/test_integration_evaluation_harness.py`.
+- Done: Iteration 4.14 provenance/confidence stamping added through `provenance.py` and wired into phase wrappers for `TLINK`, `DESCRIBES`, and `PARTICIPANT` inferred links.
+- Done: provenance unit/regression tests in `tests/test_provenance.py` and integration checks in `tests/test_integration_provenance.py`.
+- Done: Iteration 4.15 cross-sentence and cross-document fusion baseline added in `fusion.py`, creating `CO_OCCURS_WITH` links for sentence-local entity pairs and `SAME_AS` links for cross-document entities that share `kb_id`.
+- Done: refinement orchestration now runs fusion post-processing in `phase_wrappers.py` and reports created link counts.
+- Done: fusion unit/regression tests in `tests/test_fusion.py` and integration checks in `tests/test_integration_fusion.py`.
+- Done: strict post-run materialization gate added in `orchestration/orchestrator.py` (review runs now fail fast if key layers like `TEvent`, `DESCRIBES`, or `TLINK` are missing).
+- Done: integration regression added in `tests/test_integration_pipeline_materialization.py` to ensure single-document review runs materialize temporal/event layers.
 
 ## 8. Enhancement backlog (prioritized list)
 

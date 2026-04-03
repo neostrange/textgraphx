@@ -46,6 +46,8 @@ class SemanticRoleLabel:
 
     def __init__(self, ):
         self.apiName = "semantic-role-labeling"
+        from textgraphx.config import get_config
+        self._srl_url = get_config().services.srl_url
 
 
     # this method is just to accomodate long text documents. the reason is allennlp couldn't deal with such long docs
@@ -204,9 +206,8 @@ class SemanticRoleLabel:
 
     def callAllenNlpApi(self, apiName, string):
 
-        #URL = "http://localhost:8080/api/"+apiName+"/predict"
-        URL = "http://localhost:8000/predict"
-        
+        URL = self._srl_url
+
         payload = ""
         
         if apiName == 'semantic-role-labeling':

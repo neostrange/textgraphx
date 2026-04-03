@@ -31,10 +31,10 @@ if __package__ is None and __name__ == '__main__':
 
 #import neuralcoref
 #import coreferee
-from util.SemanticRoleLabeler import SemanticRoleLabel
-from util.EntityFishingLinker import EntityFishing
+from textgraphx.util.SemanticRoleLabeler import SemanticRoleLabel
+from textgraphx.util.EntityFishingLinker import EntityFishing
 from spacy.tokens import Doc, Token, Span
-from util.RestCaller import callAllenNlpApi
+from textgraphx.util.RestCaller import callAllenNlpApi
 from textgraphx.util.GraphDbBase import GraphDBBase
 from textgraphx.TextProcessor import TextProcessor
 import xml.etree.ElementTree as ET
@@ -88,6 +88,73 @@ class RefinementPhase():
     username = ""
     password = ""
     graph = ""
+
+    # Iteration 3: refinement rules are grouped into families to make the
+    # pipeline easier to reason about and selectively execute.
+    RULE_FAMILIES = {
+        "head_assignment": [
+            "get_and_assign_head_info_to_entity_multitoken",
+            "get_and_assign_head_info_to_entity_singletoken",
+            "get_and_assign_head_info_to_antecedent_multitoken",
+            "get_and_assign_head_info_to_antecedent_singletoken",
+            "get_and_assign_head_info_to_corefmention_multitoken",
+            "get_and_assign_head_info_to_corefmention_singletoken",
+            "get_and_assign_head_info_to_all_frameArgument_singletoken",
+            "get_and_assign_head_info_to_all_frameArgument_multitoken",
+            "get_and_assign_head_info_to_frameArgument_singletoken",
+            "get_and_assign_head_info_to_frameArgument_multitoken",
+            "get_and_assign_head_info_to_frameArgument_with_preposition",
+            "get_and_assign_head_info_to_temporal_frameArgument_singletoken",
+            "get_and_assign_head_info_to_temporal_frameArgument_multitoken_mark",
+            "get_and_assign_head_info_to_temporal_frameArgument_multitoken_pcomp",
+            "get_and_assign_head_info_to_temporal_frameArgument_multitoken_pobj",
+            "get_and_assign_head_info_to_eventive_frameArgument_multitoken_pcomp",
+        ],
+        "linking": [
+            "link_antecedent_to_namedEntity",
+            "link_frameArgument_to_namedEntity_for_nam_nom",
+            "link_frameArgument_to_namedEntity_for_pobj",
+            "link_frameArgument_to_namedEntity_for_pobj_entity",
+            "link_frameArgument_to_namedEntity_for_pro",
+            "link_frameArgument_to_new_entity",
+            "link_frameArgument_to_numeric_entities",
+            "link_frameArgument_to_entity_via_named_entity",
+        ],
+        "nel_correction": [
+            "detect_correct_NEL_result_for_missing_kb_id",
+        ],
+        "numeric_value": [
+            "tag_value_entities",
+            "tag_numeric_entities",
+            "detect_quantified_entities_from_frameArgument",
+        ],
+    }
+
+    def get_rule_families(self):
+        """Return the configured refinement rule families.
+
+        Keys are family names and values are ordered method-name lists.
+        """
+        return self.RULE_FAMILIES
+
+    def iter_rule_names(self):
+        """Yield refinement rule method names in execution order."""
+        for family, methods in self.RULE_FAMILIES.items():
+            for method_name in methods:
+                yield family, method_name
+
+    def run_rule_family(self, family_name):
+        """Execute one refinement rule family by name."""
+        if family_name not in self.RULE_FAMILIES:
+            raise ValueError(f"Unknown refinement rule family: {family_name}")
+        for method_name in self.RULE_FAMILIES[family_name]:
+            logger.info("Running refinement rule [%s]: %s", family_name, method_name)
+            getattr(self, method_name)()
+
+    def run_all_rule_families(self):
+        """Execute all configured refinement rule families in order."""
+        for family_name in self.RULE_FAMILIES:
+            self.run_rule_family(family_name)
 
     def __init__(self, argv=None):
         # Create a bolt-driver backed compatibility graph object.
@@ -1153,46 +1220,7 @@ class RefinementPhase():
 
 if __name__ == '__main__':
     tp= RefinementPhase(sys.argv[1:])
-
-    tp.get_and_assign_head_info_to_entity_multitoken()
-    tp.get_and_assign_head_info_to_entity_singletoken()
-    tp.get_and_assign_head_info_to_antecedent_multitoken()
-    tp.get_and_assign_head_info_to_antecedent_singletoken()
-    tp.get_and_assign_head_info_to_corefmention_multitoken()
-    tp.get_and_assign_head_info_to_corefmention_singletoken()
-
-    # NOTE: it assigns the grammatical head to all the framearguments without any condition or filter 
-    tp.get_and_assign_head_info_to_all_frameArgument_singletoken()
-    tp.get_and_assign_head_info_to_all_frameArgument_multitoken()
-    # -----------------------------------------------------------------------------------------------
-    
-    tp.get_and_assign_head_info_to_frameArgument_singletoken()
-    tp.get_and_assign_head_info_to_frameArgument_multitoken()
-    tp.get_and_assign_head_info_to_frameArgument_with_preposition()
-    tp.get_and_assign_head_info_to_temporal_frameArgument_singletoken()
-    tp.get_and_assign_head_info_to_temporal_frameArgument_multitoken_mark()
-    tp.get_and_assign_head_info_to_temporal_frameArgument_multitoken_pcomp()
-    tp.get_and_assign_head_info_to_temporal_frameArgument_multitoken_pobj()
-    tp.get_and_assign_head_info_to_eventive_frameArgument_multitoken_pcomp()
-    
-
-
-    tp.link_antecedent_to_namedEntity()
-    #tp.detect_correct_NEL_result_for_having_kb_id()
-    tp.detect_correct_NEL_result_for_missing_kb_id()
-
-    tp.link_frameArgument_to_namedEntity_for_nam_nom()
-    tp.link_frameArgument_to_namedEntity_for_pobj()
-    tp.link_frameArgument_to_namedEntity_for_pobj_entity()
-    tp.link_frameArgument_to_namedEntity_for_pro()
-    
-    tp.link_frameArgument_to_new_entity()
-    
-    tp.tag_value_entities()
-    tp.tag_numeric_entities()
-    tp.detect_quantified_entities_from_frameArgument()
-    tp.link_frameArgument_to_numeric_entities()
-    tp.link_frameArgument_to_entity_via_named_entity()
+    tp.run_all_rule_families()
 
     # Record a lightweight run marker in the database so we can detect that
     # the refinement sequence was executed. This is intentionally minimal: a
@@ -1201,36 +1229,7 @@ if __name__ == '__main__':
     try:
         from datetime import datetime
         run_id = datetime.utcnow().isoformat()
-        passes = [
-            'get_and_assign_head_info_to_entity_multitoken',
-            'get_and_assign_head_info_to_entity_singletoken',
-            'get_and_assign_head_info_to_antecedent_multitoken',
-            'get_and_assign_head_info_to_antecedent_singletoken',
-            'get_and_assign_head_info_to_corefmention_multitoken',
-            'get_and_assign_head_info_to_corefmention_singletoken',
-            'get_and_assign_head_info_to_all_frameArgument_singletoken',
-            'get_and_assign_head_info_to_all_frameArgument_multitoken',
-            'get_and_assign_head_info_to_frameArgument_singletoken',
-            'get_and_assign_head_info_to_frameArgument_multitoken',
-            'get_and_assign_head_info_to_frameArgument_with_preposition',
-            'get_and_assign_head_info_to_temporal_frameArgument_singletoken',
-            'get_and_assign_head_info_to_temporal_frameArgument_multitoken_mark',
-            'get_and_assign_head_info_to_temporal_frameArgument_multitoken_pcomp',
-            'get_and_assign_head_info_to_temporal_frameArgument_multitoken_pobj',
-            'get_and_assign_head_info_to_eventive_frameArgument_multitoken_pcomp',
-            'link_antecedent_to_namedEntity',
-            'detect_correct_NEL_result_for_missing_kb_id',
-            'link_frameArgument_to_namedEntity_for_nam_nom',
-            'link_frameArgument_to_namedEntity_for_pobj',
-            'link_frameArgument_to_namedEntity_for_pobj_entity',
-            'link_frameArgument_to_namedEntity_for_pro',
-            'link_frameArgument_to_new_entity',
-            'tag_value_entities',
-            'tag_numeric_entities',
-            'detect_quantified_entities_from_frameArgument',
-            'link_frameArgument_to_numeric_entities',
-            'link_frameArgument_to_entity_via_named_entity'
-        ]
+        passes = [name for _, name in tp.iter_rule_names()]
 
         marker_q = """
         MERGE (r:RefinementRun {id: $id})

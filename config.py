@@ -43,6 +43,21 @@ class PathsConfig:
 
 
 @dataclass
+class ServicesConfig:
+    wsd_url: str = "http://localhost:81/api/model"
+    coref_url: str = "http://localhost:9999/coreference_resolution"
+    temporal_url: str = "http://localhost:5050/annotate"
+    heideltime_url: str = "http://localhost:5000/annotate"
+    srl_url: str = "http://localhost:8000/predict"
+    llm_url: str = "http://localhost:11434/api/generate"
+
+
+@dataclass
+class RuntimeConfig:
+    mode: str = "production"
+
+
+@dataclass
 class FeatureFlags:
     create_refinement_run: bool = True
     compute_token_ids: bool = False
@@ -55,6 +70,12 @@ class Config:
     spacy: SpaCyConfig
     paths: PathsConfig
     features: FeatureFlags
+    runtime: RuntimeConfig
+    services: ServicesConfig = None
+
+    def __post_init__(self):
+        if self.services is None:
+            self.services = ServicesConfig()
 
 
 _CACHED: Optional[Config] = None
@@ -130,6 +151,8 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
     spacy = SpaCyConfig()
     paths = PathsConfig()
     features = FeatureFlags()
+    runtime = RuntimeConfig()
+    services = ServicesConfig()
 
     if file_cfg:
         ext = os.path.splitext(file_cfg)[1].lower()
@@ -154,6 +177,15 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
             if cp.has_section('features'):
                 features.create_refinement_run = _coerce_bool(cp.get('features', 'create_refinement_run', fallback=str(features.create_refinement_run)))
                 features.compute_token_ids = _coerce_bool(cp.get('features', 'compute_token_ids', fallback=str(features.compute_token_ids)))
+            if cp.has_section('runtime'):
+                runtime.mode = cp.get('runtime', 'mode', fallback=runtime.mode).strip().lower()
+            if cp.has_section('services'):
+                services.wsd_url = cp.get('services', 'wsd_url', fallback=services.wsd_url)
+                services.coref_url = cp.get('services', 'coref_url', fallback=services.coref_url)
+                services.temporal_url = cp.get('services', 'temporal_url', fallback=services.temporal_url)
+                services.heideltime_url = cp.get('services', 'heideltime_url', fallback=services.heideltime_url)
+                services.srl_url = cp.get('services', 'srl_url', fallback=services.srl_url)
+                services.llm_url = cp.get('services', 'llm_url', fallback=services.llm_url)
         else:
             tom = _read_toml(file_cfg)
             neo_map = tom.get('neo4j', {})
@@ -175,6 +207,15 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
             feat_map = tom.get('features', {})
             features.create_refinement_run = bool(feat_map.get('create_refinement_run', features.create_refinement_run))
             features.compute_token_ids = bool(feat_map.get('compute_token_ids', features.compute_token_ids))
+            runtime_map = tom.get('runtime', {})
+            runtime.mode = str(runtime_map.get('mode', runtime.mode)).strip().lower()
+            svc_map = tom.get('services', {})
+            services.wsd_url = svc_map.get('wsd_url', services.wsd_url)
+            services.coref_url = svc_map.get('coref_url', services.coref_url)
+            services.temporal_url = svc_map.get('temporal_url', services.temporal_url)
+            services.heideltime_url = svc_map.get('heideltime_url', services.heideltime_url)
+            services.srl_url = svc_map.get('srl_url', services.srl_url)
+            services.llm_url = svc_map.get('llm_url', services.llm_url)
 
     # environment overrides
     if allow_env:
@@ -203,7 +244,27 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
         if os.getenv('TEXTGRAPHX_COMPUTE_TOKEN_IDS') is not None:
             features.compute_token_ids = _coerce_bool(os.getenv('TEXTGRAPHX_COMPUTE_TOKEN_IDS'))
 
-    cfg = Config(neo4j=neo, logging=log, spacy=spacy, paths=paths, features=features)
+        runtime.mode = (os.getenv('TEXTGRAPHX_RUNTIME_MODE') or runtime.mode).strip().lower()
+
+        services.wsd_url = os.getenv('WSD_API_URL') or services.wsd_url
+        services.coref_url = os.getenv('COREF_SERVICE_URL') or services.coref_url
+        services.temporal_url = os.getenv('TEMPORAL_SERVICE_URL') or services.temporal_url
+        services.heideltime_url = os.getenv('HEIDELTIME_SERVICE_URL') or services.heideltime_url
+        services.srl_url = os.getenv('SRL_SERVICE_URL') or services.srl_url
+        services.llm_url = os.getenv('LLM_API_URL') or services.llm_url
+
+    if runtime.mode not in {"production", "testing"}:
+        raise ValueError("runtime.mode must be either 'production' or 'testing'")
+
+    cfg = Config(
+        neo4j=neo,
+        logging=log,
+        spacy=spacy,
+        paths=paths,
+        features=features,
+        runtime=runtime,
+        services=services,
+    )
     if path is None:
         _CACHED = cfg
     return cfg
@@ -234,6 +295,9 @@ output_dir = out
 [features]
 create_refinement_run = true
 compute_token_ids = false
+
+[runtime]
+mode = production
 """
 
     example_toml = """[neo4j]
@@ -255,6 +319,9 @@ output_dir = "out"
 [features]
 create_refinement_run = true
 compute_token_ids = false
+
+[runtime]
+mode = "production"
 """
 
     if fmt == 'ini':

@@ -160,11 +160,31 @@ class TlinksRecognizer:
 
 
 if __name__ == '__main__':
+    import time as _time
     tp = TlinksRecognizer(sys.argv[1:])
+    _phase_start = _time.time()
     tp.create_tlinks_case1()
     tp.create_tlinks_case2()
     tp.create_tlinks_case3()
     tp.create_tlinks_case4()
     tp.create_tlinks_case5()
     tp.create_tlinks_case6()
+    _phase_duration = _time.time() - _phase_start
+
+    # Record a PhaseRun marker for restart visibility (Item 7)
+    try:
+        from textgraphx.phase_assertions import record_phase_run
+        record_phase_run(
+            tp.graph,
+            phase_name="tlinks",
+            duration_seconds=_phase_duration,
+            metadata={
+                "passes": "case1,case2,case3,case4,case5,case6"
+            },
+        )
+    except Exception:
+        import logging as _logging
+        _logging.getLogger(__name__).exception(
+            "Failed to write TLinksRun marker (non-fatal)"
+        )
 

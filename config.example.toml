@@ -21,3 +21,15 @@ tmp_dir = "/tmp"
 [features]
 create_refinement_run = true
 compute_token_ids = false
+
+[runtime]
+mode = "production"
+
+[services]
+# External NLP service endpoints (override with env vars WSD_API_URL, COREF_SERVICE_URL, etc.)
+wsd_url = "http://localhost:81/api/model"
+coref_url = "http://localhost:9999/coreference_resolution"
+temporal_url = "http://localhost:5050/annotate"
+heideltime_url = "http://localhost:5000/annotate"
+srl_url = "http://localhost:8000/predict"
+llm_url = "http://localhost:11434/api/generate"

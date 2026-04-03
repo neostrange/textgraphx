@@ -144,7 +144,8 @@ class SRLEnricher(GraphDBBase):
         return enriched_output
 
 def main():
-    llm_api = "http://localhost:11434/api/generate"  # Replace with your actual LLM API endpoint
+    from textgraphx.config import get_config
+    llm_api = get_config().services.llm_url
     enricher = SRLEnricher(argv=[], llm_api=llm_api)
     
     prompt = enricher.create_prompt_for_llm()

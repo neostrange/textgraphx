@@ -31,33 +31,24 @@ from spacy.matcher import Matcher, DependencyMatcher
 from spacy.tokens import Doc, Token, Span
 from spacy.language import Language
 import textwrap
-from util.RestCaller import callAllenNlpApi
-from util.RestCaller import amuse_wsd_api_call
+from textgraphx.util.RestCaller import callAllenNlpApi
+from textgraphx.util.RestCaller import amuse_wsd_api_call
 from transformers import logging
 logging.set_verbosity_error()
 # py2neo usage removed in favor of the bolt-driver helper
 from textgraphx.config import get_config
 import os
-from util.RestCaller import callAllenNlpApi
-from util.CallAllenNlpCoref import callAllenNlpCoref
+from textgraphx.util.RestCaller import callAllenNlpApi
+from textgraphx.util.CallAllenNlpCoref import callAllenNlpCoref
 import traceback
 from nltk.corpus import wordnet31 as wn
 from nltk.corpus.reader.wordnet import WordNetError as wn_error
 from functools import reduce  # Import reduce function
 import logging
 from typing import List, Dict
-from text_processing_components.WordSenseDisambiguator import WordSenseDisambiguator
-from text_processing_components.WordnetTokenEnricher import WordnetTokenEnricher
-from text_processing_components.CoreferenceResolver import CoreferenceResolver
-from text_processing_components.SRLProcessor import SRLProcessor
-from text_processing_components.SentenceCreator import SentenceCreator
-from text_processing_components.TagOccurrenceCreator import TagOccurrenceCreator
-from text_processing_components.TagOccurrenceDependencyProcessor import TagOccurrenceDependencyProcessor
-from text_processing_components.TagOccurrenceQueryExecutor import TagOccurrenceQueryExecutor
-from text_processing_components.NounChunkProcessor import NounChunkProcessor
-from text_processing_components.EntityProcessor import EntityProcessor
-from text_processing_components.EntityFuser import EntityFuser
-from text_processing_components.EntityDisambiguator import EntityDisambiguator
+from textgraphx.text_processing_components.pipeline.component_factory import (
+    TextPipelineComponentFactory,
+)
 import logging
 
 # module logger
@@ -103,41 +94,29 @@ class TextProcessor(object):
         self.username = cfg.neo4j.user
         self.password = cfg.neo4j.password
         #self.graph = Graph(self.uri, auth=(self.username, self.password))
-        self.AMUSE_WSD_API_ENDPOINT = "http://localhost:81/api/model"
-        self.wsd = WordSenseDisambiguator(self.AMUSE_WSD_API_ENDPOINT, self.neo4j_repository)
-        #wsd.perform_wsd("document-123")
-        self.wn_token_enricher = WordnetTokenEnricher(self.neo4j_repository)
+        self.AMUSE_WSD_API_ENDPOINT = cfg.services.wsd_url
+        self.coreference_service_endpoint = cfg.services.coref_url
+        components = TextPipelineComponentFactory.build(
+            nlp=self.nlp,
+            neo4j_repository=self.neo4j_repository,
+            wsd_endpoint=self.AMUSE_WSD_API_ENDPOINT,
+            coref_endpoint=self.coreference_service_endpoint,
+        )
 
-        self.coreference_service_endpoint = "http://localhost:9999/coreference_resolution"
-        # CoreferenceResolver reads DB config internally and requires only the endpoint
-        self.coref = CoreferenceResolver(self.coreference_service_endpoint)
-
-        # SRL Processor now obtains graph from configuration internally
-        self.srl_processor = SRLProcessor()
-
-        # Sentence Creator
-        self.sentence_creator = SentenceCreator(self.neo4j_repository)
-
-        # TagOccurrenceCreator
-        self.tag_occurrence_creator = TagOccurrenceCreator(self.nlp)
-
-        # TagOccurrenceDependencyProcessor
-        self.tag_occurrence_dependency_processor = TagOccurrenceDependencyProcessor(self.neo4j_repository)
-
-        # TagOccurrenceQueryExecutor
-        self.tag_occurrence_query_executor = TagOccurrenceQueryExecutor(self.neo4j_repository)
-
-        # NounChunkProcessor
-        self.noun_chunk_processor = NounChunkProcessor(self.neo4j_repository)
-
-        # EntityProcessor
-        self.entity_processor = EntityProcessor(self.neo4j_repository)
-
-        # EntityFuser
-        self.entity_fuser = EntityFuser(self.neo4j_repository)
-
-        # EntityDisambiguator
-        self.entity_disambiguator = EntityDisambiguator(self.neo4j_repository)
+        # Stage services are constructed by the dedicated factory so this
+        # orchestrator remains focused on process flow rather than wiring.
+        self.wsd = components.wsd
+        self.wn_token_enricher = components.wn_token_enricher
+        self.coref = components.coref
+        self.srl_processor = components.srl_processor
+        self.sentence_creator = components.sentence_creator
+        self.tag_occurrence_creator = components.tag_occurrence_creator
+        self.tag_occurrence_dependency_processor = components.tag_occurrence_dependency_processor
+        self.tag_occurrence_query_executor = components.tag_occurrence_query_executor
+        self.noun_chunk_processor = components.noun_chunk_processor
+        self.entity_processor = components.entity_processor
+        self.entity_fuser = components.entity_fuser
+        self.entity_disambiguator = components.entity_disambiguator
 
     def do_wsd(self, textId: str) -> None:
         """Run word-sense disambiguation for the given document id.
