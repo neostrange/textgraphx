@@ -61,7 +61,12 @@ class PipelineOrchestrator:
     def _log_step(step_name: str, fn) -> None:
         started = time.perf_counter()
         logger.info("Starting step: %s", step_name)
-        fn()
+        try:
+            fn()
+        except Exception as e:
+            elapsed = time.perf_counter() - started
+            logger.error("Failed step: %s after %.2fs - %s", step_name, elapsed, e, exc_info=True)
+            raise
         elapsed = time.perf_counter() - started
         logger.info("Finished step: %s (%.2fs)", step_name, elapsed)
 
@@ -80,9 +85,34 @@ class PipelineOrchestrator:
         Path(self.directory).mkdir(parents=True, exist_ok=True)
         graph_nlp = GraphBasedNLP([], model_name=self.model_name, require_neo4j=False)
         try:
-            text_tuples = graph_nlp.store_corpus(self.directory)
+            try:
+                text_tuples = graph_nlp.store_corpus(self.directory)
+            except FileNotFoundError as e:
+                raise FileNotFoundError(
+                    f"Dataset directory not accessible: {self.directory}\n"
+                    f"Original error: {e}"
+                ) from e
+            except Exception as e:
+                raise RuntimeError(
+                    f"Failed to load documents from {self.directory}: {e}"
+                ) from e
+            
             logger.info("Loaded %d documents from %s", len(text_tuples), self.directory)
-            graph_nlp.process_text(text_tuples=text_tuples, text_id=text_id, storeTag=store_tag)
+            
+            if not text_tuples:
+                logger.warning(
+                    "No documents found in %s. Check that dataset has .txt or .xml files "
+                    "in the top-level directory.",
+                    self.directory
+                )
+            
+            try:
+                graph_nlp.process_text(text_tuples=text_tuples, text_id=text_id, storeTag=store_tag)
+            except Exception as e:
+                raise RuntimeError(
+                    f"Failed to process documents: {e}\n"
+                    f"This may indicate a Neo4j connection issue or missing spaCy model."
+                ) from e
         finally:
             graph_nlp.close()
 
@@ -122,7 +152,14 @@ class PipelineOrchestrator:
 
         try:
             for step in steps:
-                self._log_step(f"refinement::{step}", lambda s=step: getattr(phase, s)())
+                try:
+                    self._log_step(f"refinement::{step}", lambda s=step: getattr(phase, s)())
+                except Exception as e:
+                    logger.error(
+                        "Refinement step '%s' failed. This may indicate missing ingestion data.",
+                        step
+                    )
+                    raise
         finally:
             self._close_graph_if_present(phase)
 
@@ -130,21 +167,42 @@ class PipelineOrchestrator:
         """Run temporal extraction for all annotated documents."""
         phase = TemporalPhase([])
         try:
-            ids = phase.get_annotated_text()
+            try:
+                ids = phase.get_annotated_text()
+            except Exception as e:
+                raise RuntimeError(
+                    f"Failed to retrieve annotated documents for temporal phase: {e}\n"
+                    f"Make sure refinement phase completed successfully."
+                ) from e
+            
             logger.info("Temporal phase will process %d documents", len(ids))
+            
+            if not ids:
+                logger.warning(
+                    "No annotated documents found. This may indicate the refinement phase "
+                    "did not complete or found no data."
+                )
+            
             for doc_id in ids:
-                self._log_step(
-                    f"temporal::create_DCT_node(doc_id={doc_id})",
-                    lambda d=doc_id: phase.create_DCT_node(d),
-                )
-                self._log_step(
-                    f"temporal::create_tevents2(doc_id={doc_id})",
-                    lambda d=doc_id: phase.create_tevents2(d),
-                )
-                self._log_step(
-                    f"temporal::create_timexes2(doc_id={doc_id})",
-                    lambda d=doc_id: phase.create_timexes2(d),
-                )
+                try:
+                    self._log_step(
+                        f"temporal::create_DCT_node(doc_id={doc_id})",
+                        lambda d=doc_id: phase.create_DCT_node(d),
+                    )
+                    self._log_step(
+                        f"temporal::create_tevents2(doc_id={doc_id})",
+                        lambda d=doc_id: phase.create_tevents2(d),
+                    )
+                    self._log_step(
+                        f"temporal::create_timexes2(doc_id={doc_id})",
+                        lambda d=doc_id: phase.create_timexes2(d),
+                    )
+                except Exception as e:
+                    logger.error(
+                        "Temporal phase failed for document %d: %s",
+                        doc_id, e
+                    )
+                    raise
         finally:
             self._close_graph_if_present(phase)
 

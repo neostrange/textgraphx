@@ -6,9 +6,8 @@
 #   ./run.sh                          # Full pipeline with default dataset
 #   ./run.sh --dataset /custom/path   # Full pipeline with custom dataset
 #   ./run.sh --phases ingestion       # Run only ingestion phase
+#   ./run.sh --check                  # Run health checks without executing
 #   ./run.sh --help                   # Show all options
-
-set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_DIR="$SCRIPT_DIR/.venv310"
