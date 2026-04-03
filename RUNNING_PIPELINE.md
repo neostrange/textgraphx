@@ -10,16 +10,46 @@
 ./run.sh
 ```
 
-## Diagnostic Mode
+**What happens after the pipeline finishes:**
+```
+======================================================================
+📊 Execution Summary
+======================================================================
+Status:     ✅ SUCCESS
+Duration:   24.8s
+Phases:     5/5 completed
+Documents:  15 processed
 
-Before running the pipeline, verify your setup:
+Phase Details:
+----------------------------------------------------------------------
+  ✅ ingestion              16.12s
+  ✅ refinement             1.83s
+  ✅ temporal               4.98s
+  ✅ event_enrichment       0.23s
+  ✅ tlinks                 0.62s
+======================================================================
+```
+
+## Using the Streamlit UI
+
+For an interactive web-based experience with live progress visualization:
 
 ```bash
-# Run health checks without executing pipeline
-python run_pipeline.py --check
-# OR
-./run.sh --check
+# Activate environment and run UI
+source .venv310/bin/activate
+export PYTHONPATH=/path/to/textgraphx:$PYTHONPATH
+streamlit run app.py
 ```
+
+**Features:**
+- Configure dataset directory and spaCy model
+- Upload files directly through web interface
+- Select individual phases to run
+- See live progress bar and phase execution
+- View detailed metrics dashboard with timings
+- Document count and completion tracking
+
+## Diagnostic Mode
 
 This checks for:
 - ✅ Python packages installed (spacy, neo4j)
@@ -178,6 +208,16 @@ Validates setup before execution:
 
 Use with `--check` flag to diagnose issues without running pipeline.
 
+### Execution Summary (`execution_summary.py`)
+Tracks and reports performance metrics:
+- PhaseMetrics class records duration and status for each phase
+- ExecutionSummary aggregates results across pipeline
+- Documents processed counter
+- Error collection and reporting
+- Human-readable duration formatting (ms, s, m)
+
+Automatically reports after successful runs.
+
 ### Error Handling
 Enhanced error messages provide:
 - Clear error description
@@ -185,12 +225,33 @@ Enhanced error messages provide:
 - Specific fix suggestions
 - Recovery hints
 
+### CLI Features (`run_pipeline.py`)
+- Health check integration with `--check` flag
+- Execution summary displayed after each run
+- Partial results shown on failure
+- Clear error messages with diagnostics hint
+
+### Streamlit UI (`app.py`)
+Interactive dashboard with:
+- Live progress bar
+- Phase execution status tracking
+- Detailed metrics dashboard
+  - Total duration
+  - Phases completed / total
+  - Documents processed
+  - Success/failure status
+- Phase timing breakdown table
+- File upload functionality
+- Dataset and model configuration
+
 ### Files
 
 - `run.sh` - Bash wrapper (environment setup + execution)
 - `run_pipeline.py` - Python orchestrator entry point with health checks
 - `health_check.py` - Pre-flight validation module
+- `execution_summary.py` - Performance metrics and reporting
 - `PipelineOrchestrator.py` - Core pipeline logic with error context
+- `app.py` - Streamlit web UI
 - `RUNNING_PIPELINE.md` - This guide
 
 ## Files
