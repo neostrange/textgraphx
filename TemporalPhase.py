@@ -212,7 +212,7 @@ class TemporalPhase():
         headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
 
 
-        response = requests.post("http://localhost:5000/annotate", json=data, headers=headers)
+        response = requests.post("http://localhost:5050/annotate", json=data, headers=headers)
 
         # print(response.content)
         return response.text
