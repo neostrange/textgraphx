@@ -57,6 +57,9 @@ class TemporalPhase():
         self.uri = None
         self.username = None
         self.password = None
+        cfg = get_config()
+        self.temporal_url = cfg.services.temporal_url
+        self.heideltime_url = cfg.services.heideltime_url
         #self.__text_processor = TextProcessor(self.nlp, self._driver)
         #self.create_constraints()
     logger.info("TemporalPhase initialized; graph session ready")
@@ -93,12 +96,12 @@ class TemporalPhase():
         logger.debug("create_DCT_node %s", doc_id)
         graph = self.graph
 
-        query = """ match (ann:AnnotatedText where ann.id = """+str(doc_id)+""")
-                    merge (DCT:TIMEX {type: 'DATE', value: replace(split(ann.creationtime, 'T')[0],'-','') , tid: 'dct'+ toString(ann.id), 
+        query = """MATCH (ann:AnnotatedText WHERE ann.id = $doc_id)
+                    MERGE (DCT:TIMEX {type: 'DATE', value: replace(split(ann.creationtime, 'T')[0],'-','') , tid: 'dct'+ toString(ann.id),
                     doc_id: ann.id})<-[:CREATED_ON]-(ann)
                 """
-        
-        data= graph.run(query,parameters={'doc_id': doc_id}).data()
+
+        data = graph.run(query, parameters={'doc_id': doc_id}).data()
         
         return ""
 
@@ -107,15 +110,15 @@ class TemporalPhase():
         logger.debug("create_tlinks_e2e %s", doc_id)
         graph = self.graph
 
-        query = """CALL apoc.load.xml('"""+str(doc_id)+""".xml') 
+        query = """CALL apoc.load.xml($xml_path)
                     YIELD value as result
                     UNWIND [item in result._children where item._type ="tarsqi_tags"] AS tarsqi
                     UNWIND [item in tarsqi._children where item._type ="TLINK"] AS tlink
                     WITH tlink.lid as lid, tlink.origin as origin, tlink.relType as relType, tlink.relatedToTime as relatedToTime, tlink.timeID as timeID, tlink.eventInstanceID as eventInstanceID, tlink.relatedToEventInstance as relatedToEventInstance, tlink.syntax as syntax
-                    foreach(ignoreMe IN CASE WHEN eventInstanceID IS NOT NULL and relatedToEventInstance IS NOT NULL THEN [1] ELSE [] END | merge (e1:TEvent{eiid:eventInstanceID, doc_id: """+str(doc_id)+"""}) merge (e2:TEvent{eiid:relatedToEventInstance, doc_id:"""+str(doc_id)+"""}) MERGE (e1)-[:TLINK{id:lid, relType:relType}]->(e2))
+                    foreach(ignoreMe IN CASE WHEN eventInstanceID IS NOT NULL and relatedToEventInstance IS NOT NULL THEN [1] ELSE [] END | merge (e1:TEvent{eiid:eventInstanceID, doc_id:$doc_id}) merge (e2:TEvent{eiid:relatedToEventInstance, doc_id:$doc_id}) MERGE (e1)-[:TLINK{id:lid, relType:relType}]->(e2))
                 """
         
-        data= graph.run(query).data()
+        data= graph.run(query, parameters={'xml_path': str(doc_id) + '.xml', 'doc_id': doc_id}).data()
         
         return ""
 
@@ -124,15 +127,15 @@ class TemporalPhase():
         logger.debug("create_tlinks_e2t %s", doc_id)
         graph = self.graph
 
-        query = """CALL apoc.load.xml('"""+str(doc_id)+""".xml') 
+        query = """CALL apoc.load.xml($xml_path)
                     YIELD value as result
                     UNWIND [item in result._children where item._type ="tarsqi_tags"] AS tarsqi
                     UNWIND [item in tarsqi._children where item._type ="TLINK"] AS tlink
                     WITH tlink.lid as lid, tlink.origin as origin, tlink.relType as relType, tlink.relatedToTime as relatedToTime, tlink.timeID as timeID, tlink.eventInstanceID as eventInstanceID, tlink.relatedToEventInstance as relatedToEventInstance, tlink.syntax as syntax
-                    foreach(ignoreMe IN CASE WHEN relatedToTime IS NOT NULL and eventInstanceID IS NOT NULL THEN [1] ELSE [] END | merge (e:TEvent{eiid:eventInstanceID, doc_id:"""+str(doc_id)+"""}) merge (t:TIMEX {tid:relatedToTime, doc_id:"""+str(doc_id)+"""}) MERGE (e)-[:TLINK{id:lid, relType:relType}]->(t))
+                    foreach(ignoreMe IN CASE WHEN relatedToTime IS NOT NULL and eventInstanceID IS NOT NULL THEN [1] ELSE [] END | merge (e:TEvent{eiid:eventInstanceID, doc_id:$doc_id}) merge (t:TIMEX {tid:relatedToTime, doc_id:$doc_id}) MERGE (e)-[:TLINK{id:lid, relType:relType}]->(t))
                 """
         
-        data= graph.run(query).data()
+        data= graph.run(query, parameters={'xml_path': str(doc_id) + '.xml', 'doc_id': doc_id}).data()
         
         return data
 
@@ -142,24 +145,24 @@ class TemporalPhase():
         logger.debug("create_tlinks_t2t %s", doc_id)
         graph = self.graph
 
-        query = """CALL apoc.load.xml('"""+str(doc_id)+""".xml')
+        query = """CALL apoc.load.xml($xml_path)
                     YIELD value as result
                     UNWIND [item in result._children where item._type ="tarsqi_tags"] AS tarsqi
                     UNWIND [item in tarsqi._children where item._type ="TLINK"] AS tlink
                     WITH tlink.lid as lid, tlink.origin as origin, tlink.relType as relType, tlink.relatedToTime as relatedToTime, tlink.timeID as timeID, tlink.eventInstanceID as eventInstanceID, tlink.relatedToEventInstance as relatedToEventInstance, tlink.syntax as syntax
-                    foreach(ignoreMe IN CASE WHEN relatedToTime IS NOT NULL and timeID IS NOT NULL THEN [1] ELSE [] END | merge (t1:TIMEX{tid:timeID, doc_id:"""+str(doc_id)+"""}) merge (t2:TIMEX {tid:relatedToTime, doc_id:"""+str(doc_id)+"""}) MERGE (t1)-[:TLINK{id:lid, relType:relType}]->(t2))
+                    foreach(ignoreMe IN CASE WHEN relatedToTime IS NOT NULL and timeID IS NOT NULL THEN [1] ELSE [] END | merge (t1:TIMEX{tid:timeID, doc_id:$doc_id}) merge (t2:TIMEX {tid:relatedToTime, doc_id:$doc_id}) MERGE (t1)-[:TLINK{id:lid, relType:relType}]->(t2))
                     """
         
-        data= graph.run(query).data()
+        data= graph.run(query, parameters={'xml_path': str(doc_id) + '.xml', 'doc_id': doc_id}).data()
         
         return ""
 
     def get_doc_text_and_dct(self, doc_id):
         graph = self.graph
 
-        query = """match (n:AnnotatedText) where n.id = """+str(doc_id)+""" return n.text, n.creationtime """
+        query = "MATCH (n:AnnotatedText) WHERE n.id = $doc_id RETURN n.text, n.creationtime"
 
-        data = graph.run(query).data()
+        data = graph.run(query, parameters={'doc_id': doc_id}).data()
         result={}
 
         result["text"] = str(data[0].get('n.text'))
@@ -211,8 +214,7 @@ class TemporalPhase():
 
         headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
 
-
-        response = requests.post("http://localhost:5050/annotate", json=data, headers=headers)
+        response = requests.post(self.heideltime_url, json=data, headers=headers)
 
         # print(response.content)
         return response.text
@@ -223,18 +225,18 @@ class TemporalPhase():
         logger.debug("create_timexes %s", doc_id)
         graph = self.graph
 
-        query = """CALL apoc.load.xml('"""+str(doc_id)+""".xml') 
+        query = """CALL apoc.load.xml($xml_path)
                     YIELD value as result
                     UNWIND [item in result._children where item._type ="tarsqi_tags"] AS tarsqi
                     UNWIND [item in tarsqi._children where item._type ="TIMEX3"] AS timex
                     WITH timex.begin as begin, timex.end as end, timex.origin as orig, timex.tid as tid, timex.type as typ, timex.value as val
-                    MERGE (t:TIMEX {tid:tid, doc_id:"""+str(doc_id)+""", begin:toInteger(begin), end:toInteger(end), origin:orig, type:typ,  value:val})
+                    MERGE (t:TIMEX {tid:tid, doc_id:$doc_id, begin:toInteger(begin), end:toInteger(end), origin:orig, type:typ, value:val})
                     WITH t
-                    MATCH (a:AnnotatedText {id:"""+str(doc_id)+"""})-[*2]->(ta:TagOccurrence) where ta.index>= toInteger(t.begin) AND ta.end_index <= toInteger(t.end)
+                    MATCH (a:AnnotatedText {id:$doc_id})-[*2]->(ta:TagOccurrence) where ta.index>= toInteger(t.begin) AND ta.end_index <= toInteger(t.end)
                     MERGE (ta)-[:TRIGGERS]->(t)"""
-        
-        data= graph.run(query).data()
-        
+
+        data = graph.run(query, parameters={'xml_path': str(doc_id) + '.xml', 'doc_id': doc_id}).data()
+
         return ""
 
 
@@ -255,8 +257,7 @@ class TemporalPhase():
 
         headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
 
-
-        response = requests.post("http://localhost:5050/annotate", json=data, headers=headers)
+        response = requests.post(self.temporal_url, json=data, headers=headers)
 
         # print(response.content)
         return response.text
@@ -279,8 +280,18 @@ class TemporalPhase():
                     UNWIND [item in result._children where item._type ="tarsqi_tags"] AS tarsqi
                     UNWIND [item in tarsqi._children where item._type ="EVENT"] AS event
                     WITH event.begin as begin, event.end as end, event.aspect as aspect, event.class as class, event.eid as eid, event.eiid as eiid, event.epos as epos, event.form as form, event.pos as pos, event.tense as tense
-                    match (a:AnnotatedText {id:"""+str(doc_id)+"""})-[*2]->(ta:TagOccurrence) where ta.index= toInteger(begin) 
-                    MERGE (ta)-[:TRIGGERS]->(event:TEvent{doc_id:"""+str(doc_id)+""", eiid:eiid}) set event.begin=toInteger(begin), event.end=toInteger(end), event.aspect=aspect, event.class=class,  event.epos=epos, event.form=form, event.pos=pos, event.tense=tense"""
+                    MATCH (a:AnnotatedText {id: toInteger($doc_id)})-[*2]->(ta:TagOccurrence)
+                    WHERE ta.index = toInteger(begin)
+                    MERGE (event:TEvent {doc_id: toInteger($doc_id), eiid: eiid})
+                    SET event.begin = toInteger(begin),
+                        event.end = toInteger(end),
+                        event.aspect = aspect,
+                        event.class = class,
+                        event.epos = epos,
+                        event.form = form,
+                        event.pos = pos,
+                        event.tense = tense
+                    MERGE (ta)-[:TRIGGERS]->(event)"""
         
         data= graph.run(query,parameters={'result_xml': result_xml, 'doc_id': doc_id}).data()
         
@@ -292,27 +303,29 @@ class TemporalPhase():
         logger.debug("create_tevents %s", doc_id)
         graph = self.graph
 
-        query = """CALL apoc.load.xml('"""+str(doc_id)+""".xml') 
+        query = """CALL apoc.load.xml($xml_path)
                     YIELD value as result
                     UNWIND [item in result._children where item._type ="tarsqi_tags"] AS tarsqi
-                    UNWIND [item in tarsqi._children where item._type ="EVENT"] AS event
-                    WITH event.begin as begin, event.end as end, event.aspect as aspect, event.class as class, event.eid as eid, event.eiid as eiid, event.epos as epos, event.form as form, event.pos as pos, event.tense as tense
-                    match (a:AnnotatedText {id:"""+str(doc_id)+"""})-[*2]->(ta:TagOccurrence) where ta.index= toInteger(begin) 
-                    MERGE (ta)-[:TRIGGERS]->(event:TEvent{doc_id:"""+str(doc_id)+""", eiid:eiid}) set event.begin=toInteger(begin), event.end=toInteger(end), event.aspect=aspect, event.class=class,  event.epos=epos, event.form=form, event.pos=pos, event.tense=tense"""
+                    UNWIND [item in tarsqi._children where item._type ="TLINK"] AS tlink
+                    WITH tlink.lid as lid, tlink.origin as origin, tlink.relType as relType, tlink.relatedToTime as relatedToTime, tlink.timeID as timeID, tlink.eventInstanceID as eventInstanceID, tlink.relatedToEventInstance as relatedToEventInstance, tlink.syntax as syntax
+                    foreach(ignoreMe IN CASE WHEN relatedToTime IS NOT NULL and timeID IS NOT NULL THEN [1] ELSE [] END | merge (t1:TIMEX{tid:timeID, doc_id:$doc_id}) merge (t2:TIMEX {tid:relatedToTime, doc_id:$doc_id}) MERGE (t1)-[:TLINK{id:lid, relType:relType}]->(t2))
+                    """
         
-        data= graph.run(query).data()
+        data= graph.run(query, parameters={'xml_path': str(doc_id) + '.xml', 'doc_id': doc_id}).data()
         
         return ""
 
 if __name__ == '__main__':
-    tp= TemporalPhase(sys.argv[1:])
+    import time as _time
+    tp = TemporalPhase(sys.argv[1:])
 
-    # create the filename by getting the id of the document. 
+    # create the filename by getting the id of the document.
 
     # query for getting all AnnotatedDoc
     ids = tp.get_annotated_text()
+    _phase_start = _time.time()
     for id in ids:
-        
+
         tp.create_DCT_node(id)
         tp.create_tevents2(id)
         #tp.create_timexes(id)
@@ -320,4 +333,18 @@ if __name__ == '__main__':
         #tp.create_tlinks_e2e(id)
         #tp.create_tlinks_e2t(id)
         #tp.create_tlinks_t2t(id)
+
+    _phase_duration = _time.time() - _phase_start
+    # Record a PhaseRun marker for restart visibility (Item 7)
+    try:
+        from textgraphx.phase_assertions import record_phase_run
+        record_phase_run(
+            tp.graph,
+            phase_name="temporal",
+            duration_seconds=_phase_duration,
+            documents_processed=len(ids),
+            metadata={"passes": "create_DCT_node,create_tevents2,create_timexes2"},
+        )
+    except Exception:
+        logger.exception("Failed to write TemporalRun marker (non-fatal)")
         

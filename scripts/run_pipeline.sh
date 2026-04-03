@@ -2,21 +2,24 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VENV="$ROOT/venv"
-
-if [ ! -d "$VENV" ]; then
-  python3 -m venv "$VENV"
+if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "$VIRTUAL_ENV/bin/python" ]; then
+  PYTHON_BIN="$VIRTUAL_ENV/bin/python"
+elif [ -x "$ROOT/.venv310/bin/python" ]; then
+  PYTHON_BIN="$ROOT/.venv310/bin/python"
+elif [ -x "$ROOT/.venv/bin/python" ]; then
+  PYTHON_BIN="$ROOT/.venv/bin/python"
+elif [ -x "$ROOT/venv/bin/python" ]; then
+  PYTHON_BIN="$ROOT/venv/bin/python"
+else
+  python3 -m venv "$ROOT/venv"
+  PYTHON_BIN="$ROOT/venv/bin/python"
 fi
 
-# activate venv
-# shellcheck source=/dev/null
-source "$VENV/bin/activate"
-
 # install deps
-pip install -r "$ROOT/requirements.txt"
+"$PYTHON_BIN" -m pip install -r "$ROOT/requirements.txt"
 
 # install lightweight spaCy model (skip if already installed)
-python -m spacy download en_core_web_sm || true
+"$PYTHON_BIN" -m spacy download en_core_web_sm || true
 
 # defaults
 DATASET="${1:-$ROOT/datastore/dataset}"
@@ -28,19 +31,7 @@ MODEL="${2:-sm}"
 
 export NEO4J_URI NEO4J_USER NEO4J_PASSWORD
 
-echo "Running GraphBasedNLP (model=$MODEL, dir=$DATASET)..."
-python "$ROOT/GraphBasedNLP.py" --dir "$DATASET" --model "$MODEL"
-
-echo "Running RefinementPhase..."
-python "$ROOT/RefinementPhase.py"
-
-echo "Running TemporalPhase..."
-python "$ROOT/TemporalPhase.py"
-
-echo "Running EventEnrichmentPhase..."
-python "$ROOT/EventEnrichmentPhase.py"
-
-echo "Running TlinksRecognizer..."
-python "$ROOT/TlinksRecognizer.py"
+echo "Running full pipeline review flow (model=$MODEL, dir=$DATASET)..."
+"$PYTHON_BIN" -m textgraphx.orchestration.orchestrator --dir "$DATASET" --model "$MODEL"
 
 echo "Pipeline complete."

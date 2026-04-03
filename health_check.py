@@ -120,11 +120,68 @@ def check_required_modules() -> Tuple[bool, str]:
     return True, "✓ All required Python packages installed"
 
 
+def check_http_service(name: str, url: str, timeout: int = 3) -> Tuple[bool, str]:
+    """
+    Check if an HTTP service is reachable.
+
+    Returns:
+        (success: bool, message: str)
+    """
+    try:
+        import requests
+        requests.get(url, timeout=timeout)
+        return True, f"✓ {name} reachable ({url})"
+    except ImportError:
+        return False, "✗ requests package not installed"
+    except Exception:
+        return False, f"✗ {name} not reachable: {url}\n  Service may not be running"
+
+
+def check_external_services(cfg=None, fail_fast: bool = False) -> Tuple[bool, List[str]]:
+    """
+    Check all configured external NLP services.
+
+    Args:
+        cfg: Config object (loads from default config if None)
+        fail_fast: If True, raise HealthCheckError on first failure
+
+    Returns:
+        (all_reachable: bool, messages: List[str])
+    """
+    if cfg is None:
+        from textgraphx.config import get_config
+        cfg = get_config()
+
+    services = [
+        ("WSD (AMUSE)", cfg.services.wsd_url),
+        ("Coreference", cfg.services.coref_url),
+        ("Temporal (TTK)", cfg.services.temporal_url),
+        ("HeidelTime", cfg.services.heideltime_url),
+        ("SRL (AllenNLP)", cfg.services.srl_url),
+        ("LLM (Ollama)", cfg.services.llm_url),
+    ]
+
+    results = []
+    all_reachable = True
+
+    for name, url in services:
+        passed, message = check_http_service(name, url)
+        results.append(message)
+        if not passed:
+            all_reachable = False
+            logger.warning(message)
+            if fail_fast:
+                raise HealthCheckError(message)
+
+    return all_reachable, results
+
+
 def run_health_checks(
     dataset_path: str,
     model_name: str = "en_core_web_sm",
     neo4j_uri: str = "bolt://localhost:7687",
     verbose: bool = False,
+    check_services: bool = False,
 ) -> Tuple[bool, List[str]]:
     """
     Run all health checks and return results.
@@ -134,6 +191,7 @@ def run_health_checks(
         model_name: spaCy model name
         neo4j_uri: Neo4j connection URI
         verbose: Print detailed results
+        check_services: If True, also check external NLP service URLs
     
     Returns:
         (all_passed: bool, messages: List[str])
@@ -161,6 +219,12 @@ def run_health_checks(
             results.append(result_msg)
             all_passed = False
             logger.error(result_msg)
+
+    if check_services:
+        svc_passed, svc_messages = check_external_services()
+        results.extend(svc_messages)
+        if not svc_passed:
+            all_passed = False
     
     return all_passed, results
 

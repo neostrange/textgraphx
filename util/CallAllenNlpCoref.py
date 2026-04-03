@@ -1,14 +1,10 @@
 import requests
 import json
+from textgraphx.config import get_config
 
 
 def callAllenNlpCoref(apiName, string):
-    #URL = "https://demo.allennlp.org/api/"+apiName+"/predict"
-    #URL = "http://localhost:8080/api/"+apiName+"/predict"
-    #URL = "http://localhost:8000/predict"
-
-    # to integrate spacy-experimental-coref
-    URL = "http://localhost:9999/coreference_resolution"
+    URL = get_config().services.coref_url
 
     PARAMS = {"Content-Type": "application/json"}
     #PARAMS = {"Content-Type": "text/plain;charset=UTF-8", "Host": "localhost:8080"}

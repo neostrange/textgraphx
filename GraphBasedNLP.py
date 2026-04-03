@@ -9,10 +9,10 @@ if __package__ is None and __name__ == "__main__":
     from pathlib import Path
     repo_root = Path(__file__).resolve().parent.parent
     sys.path.insert(0, str(repo_root))
-from util.SemanticRoleLabeler import SemanticRoleLabel
-from util.EntityFishingLinker import EntityFishing
+from textgraphx.util.SemanticRoleLabeler import SemanticRoleLabel
+from textgraphx.util.EntityFishingLinker import EntityFishing
 from spacy.tokens import Doc, Token, Span
-from util.RestCaller import callAllenNlpApi
+from textgraphx.util.RestCaller import callAllenNlpApi
 from textgraphx.util.GraphDbBase import GraphDBBase
 from textgraphx.TextProcessor import TextProcessor
 import xml.etree.ElementTree as ET
@@ -428,7 +428,23 @@ if __name__ == '__main__':
     text_tuples = basic_nlp.store_corpus(directory)
 
     # Tokenize and store the text tuples
+    import time as _time
+    _phase_start = _time.time()
     basic_nlp.process_text(text_tuples=text_tuples, text_id=1, storeTag=False)
+    _phase_duration = _time.time() - _phase_start
+
+    # Record an IngestionRun marker for restart visibility (Item 7)
+    try:
+        from textgraphx.phase_assertions import record_phase_run
+        record_phase_run(
+            basic_nlp.graph,
+            phase_name="ingestion",
+            duration_seconds=_phase_duration,
+            documents_processed=len(text_tuples) if text_tuples else 0,
+        )
+    except Exception:
+        import logging as _log
+        _log.getLogger(__name__).exception("Failed to write IngestionRun marker (non-fatal)")
 
     # Close the NLP object
     basic_nlp.close()

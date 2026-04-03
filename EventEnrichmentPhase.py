@@ -19,10 +19,10 @@ if __name__ == '__main__' and __package__ is None:
         sys.path.insert(0, str(repo_root))
 #import neuralcoref
 
-from util.SemanticRoleLabeler import SemanticRoleLabel
-from util.EntityFishingLinker import EntityFishing
+from textgraphx.util.SemanticRoleLabeler import SemanticRoleLabel
+from textgraphx.util.EntityFishingLinker import EntityFishing
 from spacy.tokens import Doc, Token, Span
-from util.RestCaller import callAllenNlpApi
+from textgraphx.util.RestCaller import callAllenNlpApi
 from textgraphx.util.GraphDbBase import GraphDBBase
 from textgraphx.TextProcessor import TextProcessor
 import xml.etree.ElementTree as ET
@@ -60,20 +60,40 @@ class EventEnrichmentPhase():
          
 
 
-    # Link FA to Event as a DESCRIBES relationship
+    # Link Frame to TEvent via DESCRIBES relationship.
+    # Two complementary paths are used to maximise coverage (Item 6 refactor):
+    #   Path 1 – direct:   TagOccurrence PARTICIPATES_IN Frame  AND  TRIGGERS TEvent
+    #   Path 2 – via args: TagOccurrence PARTICIPATES_IN FrameArgument PARTICIPANT Frame
+    #                      AND same TagOccurrence TRIGGERS TEvent
+    # Both paths are idempotent (MERGE) so running them together is safe.
     def link_frameArgument_to_event(self):
         logger.debug("link_frameArgument_to_event")
         graph = self.graph
+        linked = 0
 
-        query = """    
-                        match p = (f:Frame)<-[:PARTICIPATES_IN]-(t:TagOccurrence)-[:TRIGGERS]->(event:TEvent)
-                        merge (f)-[:DESCRIBES]->(event)
-                        return p    
-        
+        # Path 1: token directly participates in Frame and triggers TEvent
+        query_direct = """
+            MATCH (f:Frame)<-[:PARTICIPATES_IN]-(t:TagOccurrence)-[:TRIGGERS]->(event:TEvent)
+            MERGE (f)-[:DESCRIBES]->(event)
+            RETURN count(*) AS linked
         """
-        data= graph.run(query).data()
-        
-        return ""
+        rows = graph.run(query_direct).data()
+        if rows:
+            linked += rows[0].get("linked", 0)
+
+        # Path 2: token participates in FrameArgument whose Frame triggers TEvent
+        query_via_arg = """
+            MATCH (f:Frame)<-[:PARTICIPANT]-(fa:FrameArgument)
+            MATCH (fa)<-[:PARTICIPATES_IN]-(t:TagOccurrence)-[:TRIGGERS]->(event:TEvent)
+            MERGE (f)-[:DESCRIBES]->(event)
+            RETURN count(*) AS linked
+        """
+        rows = graph.run(query_via_arg).data()
+        if rows:
+            linked += rows[0].get("linked", 0)
+
+        logger.info("link_frameArgument_to_event: %d DESCRIBES relationships merged", linked)
+        return linked
 
 
 
@@ -175,12 +195,27 @@ class EventEnrichmentPhase():
 
 
 if __name__ == '__main__':
-    tp= EventEnrichmentPhase(sys.argv[1:])
+    import time as _time
+    tp = EventEnrichmentPhase(sys.argv[1:])
 
+    _phase_start = _time.time()
     tp.link_frameArgument_to_event()
     tp.add_core_participants_to_event()
     tp.add_non_core_participants_to_event()
     tp.add_label_to_non_core_fa()
+    _phase_duration = _time.time() - _phase_start
+
+    # Record a PhaseRun marker in the graph for restart visibility (Item 7)
+    try:
+        from textgraphx.phase_assertions import record_phase_run
+        record_phase_run(
+            tp.graph,
+            phase_name="event_enrichment",
+            duration_seconds=_phase_duration,
+            metadata={"passes": "link,core_participants,non_core_participants,label_non_core"},
+        )
+    except Exception:
+        logger.exception("Failed to write EventEnrichmentRun marker (non-fatal)")
 
 
 

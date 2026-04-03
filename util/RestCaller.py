@@ -2,6 +2,7 @@ import requests
 import re
 import json
 import logging
+from textgraphx.config import get_config
 logger = logging.getLogger(__name__)
 logger.info("textgraphx.util.RestCaller module imported")
 
@@ -65,19 +66,15 @@ def callHeidelTimeService(parameters):
 
     headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
 
-
-    response = requests.post("http://localhost:5000/annotate", json=data, headers=headers)
-    logger.debug("HeidelTime POST to http://localhost:5000/annotate (dct=%s)", dct)
+    url = get_config().services.heideltime_url
+    response = requests.post(url, json=data, headers=headers)
+    logger.debug("HeidelTime POST to %s (dct=%s)", url, dct)
 
     # response.content
     return response.text
 
 def callAllenNlpApi(apiName, string):
-    #URL = "https://35.247.6.38/api/"+apiName+"/predict"
-    #URL = "https://demo.allennlp.org/api/"+apiName+"/predict"
-    URL = "http://localhost:8000/predict"
-    #URL = "http://10.1.50.92:8000/predict"
-    #URL = "http://localhost:8080/api/"+apiName+"/predict"
+    URL = get_config().services.srl_url
 
     PARAMS = {"Content-Type": "application/json"}
     #PARAMS = {"Content-Type": "text/plain;charset=UTF-8", "Host": "localhost:8080"}
