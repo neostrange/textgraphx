@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Iterable
+import time
 
 import streamlit as st
 
@@ -81,21 +82,65 @@ def main() -> None:
 
         orchestrator = PipelineOrchestrator(directory=dataset_dir, model_name=model_name)
 
+        # Create progress tracker
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        phase_details = st.empty()
+
         with st.status("Running pipeline...", expanded=True) as status:
             try:
-                for phase in PipelineOrchestrator.PHASE_ORDER:
-                    if phase not in selected_phases:
-                        continue
+                # Run all selected phases
+                orchestrator.run_selected(selected_phases)
 
-                    status.write(f"Starting {phase_map[phase]}...")
-                    with st.spinner(f"Executing {phase_map[phase]} phase"):
-                        orchestrator.run_selected([phase])
-                    status.write(f"Completed {phase_map[phase]}.")
+                # Update progress
+                progress_bar.progress(100)
+                status_text.success("✅ All phases completed successfully!")
 
-                status.update(label="Pipeline completed successfully", state="complete")
-                st.success("Pipeline run finished.")
+                # Display results summary
+                st.divider()
+                st.subheader("📊 Execution Summary")
+
+                summary = orchestrator.summary
+
+                # Summary metrics
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Total Duration", f"{summary.total_duration:.1f}s")
+                with col2:
+                    st.metric("Phases Completed", f"{summary.success_count}/{summary.phase_count}")
+                with col3:
+                    st.metric("Documents Processed", summary.total_documents or "N/A")
+                with col4:
+                    st.metric("Status", "✅ Success" if summary.failed_count == 0 else "❌ Failed")
+
+                # Detailed phase breakdown
+                st.subheader("Phase Timings")
+                phase_data = []
+                for phase_name in ["ingestion", "refinement", "temporal", "event_enrichment", "tlinks"]:
+                    if phase_name in summary.phases:
+                        phase = summary.phases[phase_name]
+                        status_icon = "✅" if phase.status == "completed" else "❌" if phase.status == "failed" else "⏳"
+                        phase_data.append({
+                            "Phase": f"{status_icon} {phase_name.replace('_', ' ').title()}",
+                            "Duration": f"{phase.duration:.2f}s",
+                            "Status": phase.status.title()
+                        })
+
+                if phase_data:
+                    st.dataframe(phase_data, use_container_width=True)
+
+                status.update(label="Pipeline completed successfully ✅", state="complete")
+
             except Exception as exc:
-                status.update(label="Pipeline failed", state="error")
+                progress_bar.progress(100)
+                status_text.error(f"❌ Pipeline failed: {exc}")
+                status.update(label="Pipeline failed ❌", state="error")
+
+                # Show partial results if any phases completed
+                if orchestrator.summary.success_count > 0:
+                    st.info("Partial results from completed phases:")
+                    st.write(f"  Phases completed: {orchestrator.summary.success_count}")
+
                 st.exception(exc)
 
 

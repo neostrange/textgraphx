@@ -11,6 +11,7 @@ from GraphBasedNLP import GraphBasedNLP
 from RefinementPhase import RefinementPhase
 from TemporalPhase import TemporalPhase
 from TlinksRecognizer import TlinksRecognizer
+from execution_summary import ExecutionSummary
 
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,7 @@ class PipelineOrchestrator:
     def __init__(self, directory: str, model_name: str = "en_core_web_sm") -> None:
         self.directory = str(Path(directory))
         self.model_name = self._resolve_model_name(model_name)
+        self.summary = ExecutionSummary()
         logger.info(
             "PipelineOrchestrator initialized: directory=%s model_name=%s",
             self.directory,
@@ -258,21 +260,31 @@ class PipelineOrchestrator:
         selected = [phase for phase in self.PHASE_ORDER if phase in set(normalized)]
         logger.info("Selected phases (ordered): %s", selected)
 
-        for phase in selected:
-            if phase == "ingestion":
-                self._log_step(
-                    "phase::ingestion",
-                    lambda: self.run_ingestion(text_id=text_id, store_tag=store_tag),
-                )
-            elif phase == "refinement":
-                self._log_step("phase::refinement", self.run_refinement)
-            elif phase == "temporal":
-                self._log_step("phase::temporal", self.run_temporal)
-            elif phase == "event_enrichment":
-                self._log_step("phase::event_enrichment", self.run_event_enrichment)
-            elif phase == "tlinks":
-                self._log_step("phase::tlinks", self.run_tlinks)
+        self.summary.start()
 
+        for phase_idx, phase in enumerate(selected, 1):
+            self.summary.start_phase(phase)
+            try:
+                if phase == "ingestion":
+                    self._log_step(
+                        "phase::ingestion",
+                        lambda: self.run_ingestion(text_id=text_id, store_tag=store_tag),
+                    )
+                elif phase == "refinement":
+                    self._log_step("phase::refinement", self.run_refinement)
+                elif phase == "temporal":
+                    self._log_step("phase::temporal", self.run_temporal)
+                elif phase == "event_enrichment":
+                    self._log_step("phase::event_enrichment", self.run_event_enrichment)
+                elif phase == "tlinks":
+                    self._log_step("phase::tlinks", self.run_tlinks)
+                
+                self.summary.complete_phase(phase)
+            except Exception as e:
+                self.summary.fail_phase(phase, str(e))
+                raise
+
+        self.summary.finish()
         return selected
 
 
