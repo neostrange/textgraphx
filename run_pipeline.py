@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 # Now import and run orchestrator
 from textgraphx.PipelineOrchestrator import PipelineOrchestrator
 from textgraphx.health_check import run_health_checks, print_health_check_report
+from textgraphx.execution_summary import print_phase_progress
 import argparse
 from datetime import datetime
 
@@ -31,6 +32,8 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)-8s [%(name)s] %(message)s"
 )
+
+logger = logging.getLogger(__name__)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -125,13 +128,14 @@ def main():
                 "tlinks"
             ])
         
-        print("\n" + "=" * 70)
-        print("✅ Pipeline completed successfully")
-        print(f"End time: {datetime.now().isoformat()}")
-        print("=" * 70 + "\n")
+        # Print execution summary
+        orchestrator.summary.print_summary()
         
     except KeyboardInterrupt:
         print("\n\n⚠️  Pipeline interrupted by user")
+        if orchestrator.summary.success_count > 0:
+            print("\nPartial results:")
+            orchestrator.summary.print_summary()
         sys.exit(130)
     except ValueError as e:
         print(f"\n❌ Configuration error: {e}")
@@ -141,6 +145,12 @@ def main():
         print(f"\n❌ Error during pipeline execution: {e}")
         import traceback
         traceback.print_exc()
+        
+        # Print partial results if any phases completed
+        if orchestrator.summary.success_count > 0:
+            print("\nPartial results:")
+            orchestrator.summary.print_summary()
+        
         print(f"\n💡 For diagnostics, run: python run_pipeline.py --check\n")
         sys.exit(1)
 
