@@ -469,13 +469,19 @@ def build_document_from_neo4j(
         tgt_kind = _node_kind_from_labels(row.get("target_labels", []))
         if src_kind is None or tgt_kind is None:
             continue
+        src_span = _span_from_bounds(int(row["a_start"]), int(row["a_end"]), token_index_alignment)
+        tgt_span = _span_from_bounds(int(row["b_start"]), int(row["b_end"]), token_index_alignment)
+        if src_kind == "event":
+            src_span = _align_relation_event_span(src_span, doc.event_mentions)
+        if tgt_kind == "event":
+            tgt_span = _align_relation_event_span(tgt_span, doc.event_mentions)
         doc.relations.add(
             Relation(
                 kind="tlink",
                 source_kind=src_kind,
-                source_span=_span_from_bounds(int(row["a_start"]), int(row["a_end"]), token_index_alignment),
+                source_span=src_span,
                 target_kind=tgt_kind,
-                target_span=_span_from_bounds(int(row["b_start"]), int(row["b_end"]), token_index_alignment),
+                target_span=tgt_span,
                 attrs=(("reltype", str(row.get("reltype") or "")),),
             )
         )
@@ -493,14 +499,19 @@ def build_document_from_neo4j(
             WITH coalesce(mention, src) AS endpoint, evt, r, doc_id
             MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(evt_tok:TagOccurrence)-[:TRIGGERS]->(evt)
             OPTIONAL MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(src_tok:TagOccurrence)-[:PARTICIPATES_IN]->(endpoint)
-            WITH endpoint, r,
+              WITH endpoint, evt, r,
                  min(src_tok.tok_index_doc) AS src_start,
                  max(src_tok.tok_index_doc) AS src_end,
-                 min(evt_tok.tok_index_doc) AS evt_start,
-                 max(evt_tok.tok_index_doc) AS evt_end,
+                  min(evt_tok.tok_index_doc) AS evt_tok_start,
+                  max(evt_tok.tok_index_doc) AS evt_tok_end,
                  labels(endpoint) AS source_labels
-            WHERE src_start IS NOT NULL AND src_end IS NOT NULL
-            RETURN DISTINCT src_start, src_end, evt_start, evt_end,
+              WITH source_labels, src_start, src_end,
+                  coalesce(evt.start_tok, evt_tok_start) AS evt_start,
+                  coalesce(evt.end_tok, evt_tok_end) AS evt_end,
+                  r
+              WHERE src_start IS NOT NULL AND src_end IS NOT NULL
+                AND evt_start IS NOT NULL AND evt_end IS NOT NULL
+              RETURN DISTINCT src_start, src_end, evt_start, evt_end,
                    coalesce(r.type, '') AS sem_role,
                    source_labels
             UNION
@@ -562,11 +573,13 @@ def build_document_from_neo4j(
         src_kind = _node_kind_from_labels(row.get("source_labels", []))
         if src_kind != "entity":
             continue
+        evt_span = _span_from_bounds(int(row["evt_start"]), int(row["evt_end"]), token_index_alignment)
+        evt_span = _align_relation_event_span(evt_span, doc.event_mentions)
         doc.relations.add(
             Relation(
                 kind="has_participant",
                 source_kind="event",
-                source_span=_span_from_bounds(int(row["evt_start"]), int(row["evt_end"]), token_index_alignment),
+                source_span=evt_span,
                 target_kind="entity",
                 target_span=_span_from_bounds(int(row["src_start"]), int(row["src_end"]), token_index_alignment),
                 attrs=(("sem_role", str(row.get("sem_role") or "")),),
@@ -886,6 +899,24 @@ def _span_from_bounds(start_tok: int, end_tok: int, alignment: Dict[int, int]) -
     if mapped:
         return _sorted_span(mapped)
     return _sorted_span(range(start_tok, end_tok + 1))
+
+
+def _align_relation_event_span(span: TokenSpan, event_mentions: Set[Mention]) -> TokenSpan:
+    """Align relation-side event span to the nearest projected event mention span."""
+    if not span or not event_mentions:
+        return span
+
+    mention_spans = [m.span for m in event_mentions if m.kind == "event"]
+    if not mention_spans:
+        return span
+    if span in mention_spans:
+        return span
+
+    overlapping = [s for s in mention_spans if _span_iou(span, s) > 0.0]
+    if not overlapping:
+        return span
+
+    return max(overlapping, key=lambda s: (_span_iou(span, s), len(s)))
 
 
 def _span_iou(a: TokenSpan, b: TokenSpan) -> float:
