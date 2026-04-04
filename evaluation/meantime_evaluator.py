@@ -508,7 +508,19 @@ def build_document_from_neo4j(
             MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:PARTICIPATES_IN]->(f:Frame)
             WITH DISTINCT f, doc_id
                  MATCH (fa:FrameArgument)-[r:PARTICIPANT|HAS_FRAME_ARGUMENT]->(f)
-            WHERE fa.type IN ['ARG0', 'ARG1', 'ARG2', 'ARG3', 'ARG4']
+                        WHERE fa.type IN ['ARG0', 'ARG1', 'ARG2']
+                        OPTIONAL MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(head_tok:TagOccurrence)
+                        WHERE head_tok.tok_index_doc = coalesce(f.headTokenIndex, f.start_tok)
+                        WITH f, fa, r, doc_id, head(collect(head_tok)) AS head_tok
+                        WHERE (coalesce(head_tok.pos, '') STARTS WITH 'VB')
+                             OR EXISTS {
+                                     MATCH (ev:TEvent)
+                                     WHERE ev.start_tok = f.start_tok
+                                         AND ev.end_tok = f.end_tok
+                                         AND (ev.doc_id = doc_id OR EXISTS {
+                                                 MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS]->(ev)
+                                         })
+                             }
             OPTIONAL MATCH (fa)-[:REFERS_TO]->(src)
             OPTIONAL MATCH (mention:NamedEntity)-[:REFERS_TO]->(src)
                  OPTIONAL MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(fa_tok:TagOccurrence)-[:PARTICIPATES_IN]->(fa)
@@ -523,11 +535,23 @@ def build_document_from_neo4j(
             WHERE src_start IS NOT NULL AND src_end IS NOT NULL
               AND f.start_tok IS NOT NULL
               AND f.end_tok IS NOT NULL
-            RETURN DISTINCT src_start, src_end,
-                   f.start_tok AS evt_start,
-                   f.end_tok AS evt_end,
-                     coalesce(r.type, fa.type, '') AS sem_role,
-                   source_labels
+                        WITH f.start_tok AS evt_start,
+                                 f.end_tok AS evt_end,
+                                 coalesce(r.type, fa.type, '') AS sem_role,
+                                 src_start,
+                                 src_end,
+                                 source_labels,
+                                 (src_end - src_start) AS span_width
+                        ORDER BY evt_start, evt_end, sem_role, span_width ASC, src_start ASC
+                        WITH evt_start, evt_end, sem_role,
+                                 collect({src_start: src_start, src_end: src_end, source_labels: source_labels}) AS cands
+                        WITH evt_start, evt_end, sem_role, head(cands) AS best
+                        RETURN DISTINCT best.src_start AS src_start,
+                                     best.src_end AS src_end,
+                                     evt_start,
+                                     evt_end,
+                                     sem_role,
+                                     best.source_labels AS source_labels
         }
         RETURN DISTINCT src_start, src_end, evt_start, evt_end, sem_role, source_labels
         ORDER BY evt_start, src_start
