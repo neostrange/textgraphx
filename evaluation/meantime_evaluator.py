@@ -507,14 +507,16 @@ def build_document_from_neo4j(
             WITH $doc_id AS doc_id
             MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:PARTICIPATES_IN]->(f:Frame)
             WITH DISTINCT f, doc_id
-            MATCH (fa:FrameArgument)-[r:PARTICIPANT|HAS_FRAME_ARGUMENT]->(f)
+                 MATCH (fa:FrameArgument)-[r:PARTICIPANT|HAS_FRAME_ARGUMENT]->(f)
             WHERE fa.type IN ['ARG0', 'ARG1', 'ARG2', 'ARG3', 'ARG4']
             OPTIONAL MATCH (fa)-[:REFERS_TO]->(src)
             OPTIONAL MATCH (mention:NamedEntity)-[:REFERS_TO]->(src)
-            WITH f, r, coalesce(mention, src, fa) AS endpoint, doc_id
+                 OPTIONAL MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(fa_tok:TagOccurrence)-[:PARTICIPATES_IN]->(fa)
+                 OPTIONAL MATCH (fa_tok)-[:PARTICIPATES_IN]->(em:EntityMention)
+                 WITH f, fa, r, coalesce(mention, src, em) AS endpoint, doc_id
             WHERE endpoint IS NOT NULL
             OPTIONAL MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(src_tok:TagOccurrence)-[:PARTICIPATES_IN]->(endpoint)
-            WITH f, r,
+                 WITH f, fa, r,
                  min(src_tok.tok_index_doc) AS src_start,
                  max(src_tok.tok_index_doc) AS src_end,
                  labels(endpoint) AS source_labels
@@ -524,7 +526,7 @@ def build_document_from_neo4j(
             RETURN DISTINCT src_start, src_end,
                    f.start_tok AS evt_start,
                    f.end_tok AS evt_end,
-                   coalesce(r.type, '') AS sem_role,
+                     coalesce(r.type, fa.type, '') AS sem_role,
                    source_labels
         }
         RETURN DISTINCT src_start, src_end, evt_start, evt_end, sem_role, source_labels
@@ -556,7 +558,7 @@ def _node_kind_from_labels(labels: Iterable[str]) -> Optional[str]:
         return "timex"
     if "EventMention" in s or "TEvent" in s:
         return "event"
-    if "EntityMention" in s or "NamedEntity" in s or "FrameArgument" in s:
+    if "EntityMention" in s or "NamedEntity" in s:
         return "entity"
     return None
 
