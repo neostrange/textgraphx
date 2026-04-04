@@ -42,6 +42,17 @@ class EntityProcessor:
     def __init__(self, neo4j_repository):
         self.neo4j_repository = neo4j_repository
 
+    @staticmethod
+    def _syntactic_type_from_tag(tag):
+        tag = (tag or "").upper()
+        if tag in ("NN", "NNS"):
+            return "NOMINAL"
+        if tag in ("NNP", "NNPS"):
+            return "NAM"
+        if tag in ("PRP", "PRP$"):
+            return "PRO"
+        return "OTHER"
+
     def process_entities(self, doc, text_id):
         """Extract entities from a spaCy `Doc` and prepare them for storage.
 
@@ -66,6 +77,12 @@ class EntityProcessor:
             # spaCy Span.start is the first token index, Span.end is one-past-last.
             token_start = entity.start
             token_end = entity.end - 1
+            head_token = entity.root
+            head_text = head_token.text
+            head_token_index = head_token.i
+            syntactic_type = self._syntactic_type_from_tag(getattr(head_token, "tag_", ""))
+            start_char = entity.start_char
+            end_char = entity.end_char
 
             if getattr(entity, 'kb_id_', '') != '':
                 ne = {
@@ -73,6 +90,11 @@ class EntityProcessor:
                     'type': entity.label_,
                     'start_index': token_start,
                     'end_index': token_end,
+                    'start_char': start_char,
+                    'end_char': end_char,
+                    'head': head_text,
+                    'head_token_index': head_token_index,
+                    'syntactic_type': syntactic_type,
                     'kb_id': entity.kb_id_,
                     'url_wikidata': entity.kb_id_,
                     'score': entity._.dbpedia_raw_result['@similarityScore'],
@@ -84,7 +106,12 @@ class EntityProcessor:
                     'value': entity.text,
                     'type': entity.label_,
                     'start_index': token_start,
-                    'end_index': token_end
+                    'end_index': token_end,
+                    'start_char': start_char,
+                    'end_char': end_char,
+                    'head': head_text,
+                    'head_token_index': head_token_index,
+                    'syntactic_type': syntactic_type,
                 }
 
             nes.append(ne)
@@ -120,6 +147,10 @@ class EntityProcessor:
             SET ne.type = item.type, ne.value = item.value, ne.index = item.start_index, ne.end_index = item.end_index,
             ne.kb_id = item.kb_id, ne.url_wikidata = item.url_wikidata, ne.score = item.score, ne.normal_term = item.normal_term,
             ne.description = item.description,
+            ne.start_tok = item.start_index, ne.end_tok = item.end_index,
+            ne.start_char = item.start_char, ne.end_char = item.end_char,
+            ne.head = item.head, ne.headTokenIndex = item.head_token_index,
+            ne.syntacticType = item.syntactic_type, ne.syntactic_type = item.syntactic_type,
             ne.token_id = item.id, ne.token_start = item.start_index, ne.token_end = item.end_index
             WITH ne, item as neIndex
             MATCH (text:AnnotatedText)-[:CONTAINS_SENTENCE]->(sentence:Sentence)-[:HAS_TOKEN]->(tagOccurrence:TagOccurrence)

@@ -16,8 +16,9 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any, Dict, List, Optional
+
+from textgraphx.time_utils import utc_iso_now
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +48,16 @@ class PhaseThresholds:
     # --- temporal ---
     min_tevents: int = 0                      # TEvent nodes (0: temporal service optional)
     min_timex: int = 0                        # TIMEX nodes
+    min_signals: int = 0                      # Signal nodes
 
     # --- event_enrichment ---
     min_describes_rels: int = 0              # DESCRIBES relationships (Frame->TEvent)
     min_participant_rels: int = 0            # PARTICIPANT relationships
+    min_frame_describes_event_rels: int = 0  # FRAME_DESCRIBES_EVENT relationships
+    min_has_frame_argument_rels: int = 0     # HAS_FRAME_ARGUMENT relationships
+    min_event_participant_rels: int = 0      # EVENT_PARTICIPANT relationships
+    min_clink_rels: int = 0                  # CLINK relationships
+    min_slink_rels: int = 0                  # SLINK relationships
 
     # --- tlinks ---
     min_tlink_rels: int = 0                  # TLINK relationships
@@ -117,6 +124,10 @@ class PhaseAssertions:
     hard_fail :
         When ``True``, an ``AssertionError`` is raised on the first violated
         threshold.  When ``False`` (default) violations are only logged.
+    strict_transition_gate :
+        When ``True``, canonical transition telemetry checks in
+        ``after_event_enrichment`` are promoted from warning-only signals
+        to assertion failures when legacy edges outnumber canonical edges.
     """
 
     def __init__(
@@ -124,10 +135,12 @@ class PhaseAssertions:
         graph: Any,
         thresholds: Optional[PhaseThresholds] = None,
         hard_fail: bool = False,
+        strict_transition_gate: bool = False,
     ) -> None:
         self._graph = graph
         self._thresholds = thresholds or PhaseThresholds()
         self._hard_fail = hard_fail
+        self._strict_transition_gate = strict_transition_gate
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -212,6 +225,11 @@ class PhaseAssertions:
             self._count("MATCH (n:TIMEX) RETURN count(n) AS c"),
             t.min_timex,
         )
+        result.add_check(
+            "Signal nodes",
+            self._count("MATCH (n:Signal) RETURN count(n) AS c"),
+            t.min_signals,
+        )
 
         return self._finalize(result)
 
@@ -220,15 +238,92 @@ class PhaseAssertions:
         t = self._thresholds
         result = AssertionResult(phase="event_enrichment", passed=True)
 
+        legacy_describes = self._count("MATCH ()-[r:DESCRIBES]->() RETURN count(r) AS c")
+        canonical_describes = self._count(
+            "MATCH ()-[r:FRAME_DESCRIBES_EVENT]->() RETURN count(r) AS c"
+        )
+        legacy_participant = self._count(
+            """
+            MATCH ()-[r:PARTICIPANT]->(t)
+            WHERE t:TEvent OR t:EventMention
+            RETURN count(r) AS c
+            """
+        )
+        canonical_participant = self._count(
+            "MATCH ()-[r:EVENT_PARTICIPANT]->() RETURN count(r) AS c"
+        )
+
         result.add_check(
             "DESCRIBES relationships (Frame->TEvent)",
-            self._count("MATCH ()-[r:DESCRIBES]->() RETURN count(r) AS c"),
+            legacy_describes,
             t.min_describes_rels,
         )
         result.add_check(
             "PARTICIPANT relationships",
-            self._count("MATCH ()-[r:PARTICIPANT]->() RETURN count(r) AS c"),
+            legacy_participant,
             t.min_participant_rels,
+        )
+        result.add_check(
+            "FRAME_DESCRIBES_EVENT relationships",
+            canonical_describes,
+            t.min_frame_describes_event_rels,
+        )
+        result.add_check(
+            "HAS_FRAME_ARGUMENT relationships",
+            self._count("MATCH ()-[r:HAS_FRAME_ARGUMENT]->() RETURN count(r) AS c"),
+            t.min_has_frame_argument_rels,
+        )
+        result.add_check(
+            "EVENT_PARTICIPANT relationships",
+            canonical_participant,
+            t.min_event_participant_rels,
+        )
+        # Transition telemetry: always-pass checks that expose legacy/canonical balance.
+        result.add_check(
+            "Telemetry: Frame->TEvent canonical minus legacy",
+            canonical_describes - legacy_describes,
+            -10**9,
+        )
+        result.add_check(
+            "Telemetry: Participant canonical minus legacy",
+            canonical_participant - legacy_participant,
+            -10**9,
+        )
+        if legacy_describes > canonical_describes:
+            logger.warning(
+                "[phase-assert] legacy DESCRIBES edges dominate canonical FRAME_DESCRIBES_EVENT edges (%d > %d)",
+                legacy_describes,
+                canonical_describes,
+            )
+            if self._strict_transition_gate:
+                result.errors.append(
+                    "[event_enrichment] strict transition gate failed: "
+                    f"legacy DESCRIBES edges dominate canonical FRAME_DESCRIBES_EVENT edges "
+                    f"({legacy_describes} > {canonical_describes})"
+                )
+                result.passed = False
+        if legacy_participant > canonical_participant:
+            logger.warning(
+                "[phase-assert] legacy PARTICIPANT edges dominate canonical EVENT_PARTICIPANT edges (%d > %d)",
+                legacy_participant,
+                canonical_participant,
+            )
+            if self._strict_transition_gate:
+                result.errors.append(
+                    "[event_enrichment] strict transition gate failed: "
+                    f"legacy PARTICIPANT edges dominate canonical EVENT_PARTICIPANT edges "
+                    f"({legacy_participant} > {canonical_participant})"
+                )
+                result.passed = False
+        result.add_check(
+            "CLINK relationships",
+            self._count("MATCH ()-[r:CLINK]->() RETURN count(r) AS c"),
+            t.min_clink_rels,
+        )
+        result.add_check(
+            "SLINK relationships",
+            self._count("MATCH ()-[r:SLINK]->() RETURN count(r) AS c"),
+            t.min_slink_rels,
         )
 
         return self._finalize(result)
@@ -279,7 +374,7 @@ def record_phase_run(
         Any extra key/value pairs to store on the marker node.
     """
     try:
-        run_id = datetime.utcnow().isoformat()
+        run_id = utc_iso_now()
         props: Dict[str, Any] = {
             "phase": phase_name,
             "timestamp": run_id,

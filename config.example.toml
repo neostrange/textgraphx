@@ -21,9 +21,17 @@ tmp_dir = "/tmp"
 [features]
 create_refinement_run = true
 compute_token_ids = false
+enable_dbpedia_enrichment = false
 
 [runtime]
 mode = "production"
+strict_transition_gate = "auto"
+# NAF sentence normalization mode: auto|preserve|meantime|legacy
+# - auto: detect MEANTIME-style headline/date blocks and normalize only then
+# - preserve: keep original newlines (safer for unknown corpora)
+# - meantime: force MEANTIME paragraph->sentence normalization
+# - legacy: old behavior (strips newlines)
+naf_sentence_mode = "auto"
 
 [services]
 # External NLP service endpoints (override with env vars WSD_API_URL, COREF_SERVICE_URL, etc.)
@@ -33,3 +41,11 @@ temporal_url = "http://localhost:5050/annotate"
 heideltime_url = "http://localhost:5000/annotate"
 srl_url = "http://localhost:8000/predict"
 llm_url = "http://localhost:11434/api/generate"
+# Optional DBpedia endpoint enrichment phase (enable via features.enable_dbpedia_enrichment)
+dbpedia_sparql_url = "https://dbpedia.org/sparql"
+dbpedia_spotlight_url = "https://api.dbpedia-spotlight.org/en/annotate"
+dbpedia_timeout_sec = 8
+dbpedia_max_entities_per_run = 500
+dbpedia_spotlight_confidence = 0.5
+dbpedia_spotlight_support = 20
+dbpedia_spotlight_min_similarity = 0.8

@@ -120,6 +120,24 @@ Run any combination of these phases in order:
 - Neo4j database running on `localhost:7687`
 - Credentials: neo4j / neo4j (default)
 
+## NAF Sentence Segmentation Mode
+
+Ingestion supports configurable NAF raw-text normalization before spaCy sentence splitting:
+
+- `auto` (default): apply MEANTIME-style normalization only when header/date structure is detected.
+- `preserve`: keep newlines untouched.
+- `meantime`: force MEANTIME paragraph-to-sentence normalization.
+- `legacy`: old newline-stripping behavior.
+
+Set it via environment variable:
+
+```bash
+export TEXTGRAPHX_NAF_SENTENCE_MODE=meantime
+./run.sh --dataset /path/to/meantime_dataset
+```
+
+For mixed datasets, keep `auto`.
+
 ## Troubleshooting
 
 ### Clear Error Messages

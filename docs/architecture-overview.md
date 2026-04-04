@@ -1,6 +1,6 @@
 # textgraphx Architecture Overview
 
-This document summarizes the current repository state on branch `working2` and reflects the implementation in `GraphBasedNLP.py`, `RefinementPhase.py`, `TemporalPhase.py`, `EventEnrichmentPhase.py`, `TlinksRecognizer.py`, and the supporting components under `text_processing_components/`.
+This document summarizes the current repository state on the active schema-alignment workstream and reflects the implementation in `GraphBasedNLP.py`, `RefinementPhase.py`, `TemporalPhase.py`, `EventEnrichmentPhase.py`, `TlinksRecognizer.py`, and the supporting components under `text_processing_components/`.
 
 ## 1. What textgraphx is doing
 
@@ -15,6 +15,11 @@ The system is best understood as a pipeline of separate phases rather than a sin
 5. Temporal link recognition
 
 The shell runner [scripts/run_pipeline.sh](../scripts/run_pipeline.sh) executes those phases in that order.
+
+Schema ownership note:
+
+- migrations define the enforced schema
+- schema.md defines the maintained semantic contract
 
 ## 2. End-to-end pipeline
 
@@ -52,9 +57,14 @@ What happens here:
 
 - `GraphBasedNLP` loads spaCy, configures the tokenizer, adds the SRL pipe, creates Neo4j constraints, and checks connectivity.
 - `store_corpus()` imports MEANTIME XML documents into `AnnotatedText` nodes through `MeantimeXMLImporter`.
+- During `store_corpus()`, NAF raw text is normalized by `text_normalization.normalize_naf_raw_text` before spaCy sentence segmentation.
+    - Runtime control: `runtime.naf_sentence_mode` (`auto`, `preserve`, `meantime`, `legacy`).
+    - `auto` is the default and is recommended for mixed corpora.
+    - `meantime` is recommended when evaluating against MEANTIME gold where headline/date blocks are common.
 - `process_text()` sends documents through spaCy and orchestrates sentence/token persistence, WSD, WordNet enrichment, noun chunks, entity processing/fusion/disambiguation, coreference resolution, SRL persistence, and relationship extraction.
 - The token-level graph is created through `Sentence`, `TagOccurrence`, `HAS_TOKEN`, `HAS_NEXT`, and `IS_DEPENDENT` relationships.
 - Named entities, noun chunks, coreference nodes, semantic role frames, and token-level enrichment are written into Neo4j.
+- WordNet token enrichment now persists both synset identifiers and lexical-domain metadata so later refinement passes can roll token semantics up onto nominal mentions.
 
 Current implementation note:
 
@@ -75,6 +85,8 @@ What happens here:
 - Promotes numeric and value-like mentions into graph entities where appropriate.
 - Normalizes or corrects named-entity-linking results when KB IDs are present or missing.
 - Detects quantified entities and creates links from frame arguments to numeric entities.
+- Materializes explicit `EntityMention:NominalMention` nodes for frame-argument and noun-chunk nominals, with token anchoring for evaluation and graph inspection.
+- Derives noun-preferred nominal semantic heads and lexical-semantic profile fields without overwriting the original surface-head metadata.
 - Exposes diagnostic helpers that count node and relationship types to help explain empty query matches.
 
 Current implementation note:
@@ -82,6 +94,12 @@ Current implementation note:
 - The script entrypoint executes a long ordered sequence (roughly 28 refinement passes) and records a `RefinementRun` marker node with pass names and timestamp.
 
 This phase is the main rule-based canonicalization layer. It is where the graph starts moving from surface mentions toward reusable, normalized entities.
+
+Nominal enhancement track:
+
+- `ENH-NOM-01` semantic head resolution. Purpose: repair modifier-heavy nominal heads before semantic interpretation. Rationale: surface parse roots are often not the semantically informative noun.
+- `ENH-NOM-02` WordNet lexical-domain persistence. Purpose: keep coarse semantic classes queryable on the graph. Rationale: `wnLexname` is a more stable signal for eventive nominal analysis than ad hoc hypernym matching alone.
+- `ENH-NOM-03` additive nominal semantic/evaluation profiling. Purpose: support scorer projections and downstream KG queries without deleting or collapsing graph evidence. Rationale: evaluation scope and semantic richness must remain separable concerns.
 
 ### Stage 3: Temporal extraction
 
@@ -234,6 +252,14 @@ Useful environment variables include:
 - `SPACY_MODEL`, `SPACY_USE_GPU`
 - `TEXTGRAPHX_LOG_LEVEL`, `TEXTGRAPHX_LOG_JSON`, `TEXTGRAPHX_LOG_FILE`
 - `TEXTGRAPHX_DATA_DIR`, `TEXTGRAPHX_OUTPUT_DIR`, `TEXTGRAPHX_TMP_DIR`
+- `TEXTGRAPHX_NAF_SENTENCE_MODE` (`auto|preserve|meantime|legacy`)
+
+Sentence normalization guidance:
+
+- Use `auto` for general-purpose ingestion where document formatting may vary.
+- Use `meantime` when ingesting MEANTIME-like NAF files for evaluation; it improves sentence boundaries for headline/date paragraphs that lack terminal punctuation.
+- Use `preserve` when you want zero heuristic paragraph rewriting.
+- Use `legacy` only for backward compatibility with historical runs.
 
 ### Neo4j access
 
@@ -338,6 +364,14 @@ Current implementation status:
 - Done: fusion unit/regression tests in `tests/test_fusion.py` and integration checks in `tests/test_integration_fusion.py`.
 - Done: strict post-run materialization gate added in `orchestration/orchestrator.py` (review runs now fail fast if key layers like `TEvent`, `DESCRIBES`, or `TLINK` are missing).
 - Done: integration regression added in `tests/test_integration_pipeline_materialization.py` to ensure single-document review runs materialize temporal/event layers.
+- Done: MEANTIME evaluator supports `--discourse-only` as an entity-scope filter only (`:DiscourseEntity` labels); event projection remains unchanged, and report JSON now includes `evaluation_scope` metadata to make this explicit.
+- Done: event mention predicate canonicalization now prefers trigger-token lemma and preserves phrasal-verb particles (`VB*` + following `RP`) at mention level, improving strict event matching while keeping canonical `TEvent` semantics stable.
+- Done: event factuality defaults were tightened (`certainty` heuristic for future/infinitive/modal contexts, noun-event tense/aspect over-specification cleanup) to better align mention attributes with MEANTIME-style annotation practice.
+- Done: conservative low-confidence event gating was added for non-verbal mentions with no frame/participant/TLINK evidence; flags are stored as `EventMention.low_confidence` and rolled up to `TEvent.low_confidence` only when all mentions are low-confidence. Evaluator projection excludes low-confidence events without deleting graph evidence.
+- Done: an incremental change ledger with rationale and measured outcomes is now maintained in `docs/EVALUATION_IMPROVEMENT_LOG.md`.
+- Done: a targeted cognitive-participle normalization (`fearing that ...`) and fallback event projection de-duplication removed the last strict event type-mismatch on doc 76437 and improved strict event F1.
+- In progress: `ENH-NOM-01` and `ENH-NOM-02` are formalizing a nominal semantic-head layer plus `wnLexname` persistence so eventive-nominal reasoning can be based on noun semantics rather than modifier artifacts.
+- In progress: `ENH-NOM-03` now exposes evaluator-side nominal profile modes (`all`, `eventive`, `salient`, `candidate-gold`, `background`) so scoring policy remains a projection over persisted semantic attributes.
 
 ## 8. Enhancement backlog (prioritized list)
 
@@ -351,6 +385,7 @@ Current implementation status:
 8. Refinement rule catalog and test fixtures.
 9. Runtime diagnostics dashboard/query set.
 10. KG quality evaluation toolkit.
+11. `ENH-NOM-03` evaluator profile modes over persisted nominal semantic attributes.
 
 ## 9. Best starting points for future work
 

@@ -1,0 +1,9 @@
+f1,fn,fp,layer,mode,precision,recall,scope,tp
+0.0,17,0,entity,strict,0.0,0.0,micro,0
+0.0,17,65,event,strict,0.0,0.0,micro,0
+0.0,4,0,timex,strict,0.0,0.0,micro,0
+0.0,21,17,relation,strict,0.0,0.0,micro,0
+0.0,,,entity,strict,0.0,0.0,macro,
+0.0,,,event,strict,0.0,0.0,macro,
+0.0,,,timex,strict,0.0,0.0,macro,
+0.0,,,relation,strict,0.0,0.0,macro,

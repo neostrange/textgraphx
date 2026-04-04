@@ -4,13 +4,17 @@ Allows scheduling recurring pipeline runs using APScheduler.
 """
 
 import logging
-from typing import Optional, Dict, Any
-from datetime import datetime
+from typing import Any, Dict, Optional
+
+try:
+    from textgraphx.time_utils import utc_iso_now, utc_timestamp_now
+except ImportError:  # pragma: no cover - support script-style execution
+    from time_utils import utc_iso_now, utc_timestamp_now
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
-from PipelineOrchestrator import PipelineOrchestrator
+from textgraphx.orchestration.orchestrator import PipelineOrchestrator
 from execution_history import ExecutionHistory, ExecutionRecord
 
 logger = logging.getLogger(__name__)
@@ -59,7 +63,7 @@ class PipelineScheduler:
                 "hours": hours,
                 "dataset_path": dataset_path,
                 "phases": phases,
-                "created_at": datetime.utcnow().isoformat(),
+                "created_at": utc_iso_now(),
             }
             logger.info(f"Scheduled interval job: {job_id} (every {hours}h)")
             return True
@@ -107,7 +111,7 @@ class PipelineScheduler:
                 "cron_expression": cron_expression,
                 "dataset_path": dataset_path,
                 "phases": phases,
-                "created_at": datetime.utcnow().isoformat(),
+                "created_at": utc_iso_now(),
             }
             logger.info(f"Scheduled cron job: {job_id} ({cron_expression})")
             return True
@@ -142,7 +146,7 @@ class PipelineScheduler:
         model_name: str,
     ) -> None:
         """Run pipeline and store results. Called by scheduler."""
-        execution_id = f"scheduled-{datetime.utcnow().timestamp()}".replace(".", "-")
+        execution_id = f"scheduled-{utc_timestamp_now()}".replace(".", "-")
         logger.info(f"Running scheduled pipeline: {execution_id}")
 
         try:

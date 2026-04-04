@@ -31,7 +31,7 @@ def check_neo4j_connection(
         from neo4j import GraphDatabase
         
         try:
-            driver = GraphDatabase.driver(uri, auth=(user, password), database="neo4j")
+            driver = GraphDatabase.driver(uri, auth=(user, password))
             with driver.session() as session:
                 result = session.run("RETURN 1")
                 result.consume()
@@ -180,6 +180,8 @@ def run_health_checks(
     dataset_path: str,
     model_name: str = "en_core_web_sm",
     neo4j_uri: str = "bolt://localhost:7687",
+    neo4j_user: str = "neo4j",
+    neo4j_password: str = "neo4j",
     verbose: bool = False,
     check_services: bool = False,
 ) -> Tuple[bool, List[str]]:
@@ -200,7 +202,7 @@ def run_health_checks(
         ("Python modules", lambda: check_required_modules()),
         ("Dataset directory", lambda: check_dataset_directory(dataset_path)),
         ("spaCy model", lambda: check_spacy_model(model_name)),
-        ("Neo4j database", lambda: check_neo4j_connection(neo4j_uri)),
+        ("Neo4j database", lambda: check_neo4j_connection(neo4j_uri, neo4j_user, neo4j_password)),
     ]
     
     results = []

@@ -56,6 +56,21 @@ class MeantimeXMLImporter(DocumentImporter):
         # Return the parameters specific to MEANTIME XML documents
         return {"id": self.id, "data": self.data, "text": self.content}
 
+
+def resolve_document_id_from_naf_root(root, fallback_id):
+    """Resolve a stable AnnotatedText.id from a NAF root.
+
+    Prefer the public id when present so downstream graph ids align with
+    dataset-level identifiers and evaluation gold files.
+    """
+    public = root.find("./nafHeader/public")
+    public_id = None if public is None else (public.attrib.get("publicId") or "").strip()
+    if public_id:
+        if public_id.isdigit():
+            return int(public_id)
+        return public_id
+    return fallback_id
+
 # # Usage
 # driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password"))
 # neo4j_repository = Neo4jRepository(driver)

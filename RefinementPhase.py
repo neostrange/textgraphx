@@ -125,8 +125,19 @@ class RefinementPhase():
         ],
         "numeric_value": [
             "tag_value_entities",
+            "materialize_canonical_value_nodes",
             "tag_numeric_entities",
             "detect_quantified_entities_from_frameArgument",
+        ],
+        "nominal_mentions": [
+            "materialize_nominal_mentions_from_frame_arguments",
+            "materialize_nominal_mentions_from_noun_chunks",
+            "resolve_nominal_semantic_heads",
+            "annotate_nominal_semantic_profiles",
+        ],
+        "mention_cleanup": [
+            "trim_trailing_punctuation_from_entity_mentions",
+            "tag_discourse_relevant_entities",
         ],
     }
 
@@ -203,6 +214,89 @@ class RefinementPhase():
         self.username = None
         self.password = None
     logger.info("RefinementPhase initialized; using graph wrapper for query logging")
+
+    def trim_trailing_punctuation_from_entity_mentions(self):
+        """Remove trailing punctuation tokens from NamedEntity mention spans.
+
+        When spaCy tokenizes the normalized text, sentence-terminal punctuation
+        (period, comma, quotes) is sometimes included in the PARTICIPATES_IN
+        span of a NamedEntity. MEANTIME gold annotations never include trailing
+        punctuation in entity spans. This rule detects cases where the
+        highest-index token participating in a NamedEntity carries a
+        punctuation POS tag and removes just that PARTICIPATES_IN edge,
+        leaving at least one token in the span.
+
+        Side effects:
+        - Removes PARTICIPATES_IN relationships for trailing punct tokens.
+        - Does NOT modify NamedEntity.text (that property is not used by the
+          evaluator; span is recomputed from remaining token edges).
+        - Idempotent: safe to run multiple times.
+        """
+        query = """
+            MATCH (ne:NamedEntity)<-[:PARTICIPATES_IN]-(tok:TagOccurrence)
+            WITH ne, max(tok.tok_index_doc) AS max_idx
+            MATCH (ne)<-[r:PARTICIPATES_IN]-(pt:TagOccurrence {tok_index_doc: max_idx})
+            WHERE pt.pos IN ['.', ',', ':', "''", '``', '"', '-LRB-', '-RRB-']
+               OR pt.text IN ['.', ',', ':', '"', '\u201c', '\u201d', "'", ')', '(']
+            WITH ne, r, max_idx
+            MATCH (ne)<-[:PARTICIPATES_IN]-(other:TagOccurrence)
+            WHERE other.tok_index_doc < max_idx
+            WITH ne, r, count(other) AS remaining
+            WHERE remaining >= 1
+            DELETE r
+            RETURN count(ne) AS entities_trimmed
+        """
+        data = self.graph.run(query).data()
+        trimmed = data[0].get("entities_trimmed", 0) if data else 0
+        logger.info("trim_trailing_punctuation_from_entity_mentions: trimmed %d entity spans", trimmed)
+        return ""
+
+    def tag_discourse_relevant_entities(self):
+        """Label NamedEntity nodes that participate in a temporal event.
+
+        MEANTIME-style annotation focuses on proper named entities (ORG, GPE,
+        PERSON, FAC, LOC) and their nominal/pronominal coreference mentions.
+        It does NOT annotate numeric quantities (CARDINAL, MONEY, PERCENT,
+        ORDINAL, QUANTITY), temporal expressions (DATE, TIME) — those are
+        annotated as TIMEX3/VALUE — or adjectival nationality forms (NORP,
+        LANGUAGE).
+
+        This rule stamps :DiscourseEntity on entities whose spaCy NE type
+        maps to MEANTIME's ENTITY_MENTION layer, enabling the evaluator's
+        --discourse-only mode to compare against gold at the correct semantic
+        scope without altering the raw extraction.
+
+        Side effects:
+        - Adds the :DiscourseEntity label to qualifying NamedEntity nodes.
+        - Idempotent: safe to run multiple times.
+        """
+        query = """
+            MATCH (ne:NamedEntity)
+            WHERE ne.type IN ['ORG', 'GPE', 'PERSON', 'FAC', 'LOC',
+                              'PRODUCT', 'WORK_OF_ART', 'EVENT', 'LAW']
+            SET ne:DiscourseEntity
+            RETURN count(ne) AS tagged
+        """
+        data = self.graph.run(query).data()
+        tagged_ne = data[0].get("tagged", 0) if data else 0
+
+        nominal_query = """
+            MATCH (em:EntityMention:NominalMention)
+            MATCH (tok:TagOccurrence)-[:PARTICIPATES_IN]->(em)
+            MATCH (tok)-[:PARTICIPATES_IN]->(fa:FrameArgument)
+            WHERE fa.type IN ['ARG0', 'ARG1', 'ARG2']
+            SET em:DiscourseEntity
+            RETURN count(DISTINCT em) AS tagged
+        """
+        data_nom = self.graph.run(nominal_query).data()
+        tagged_nom = data_nom[0].get("tagged", 0) if data_nom else 0
+
+        logger.info(
+            "tag_discourse_relevant_entities: tagged %d NamedEntity + %d nominal mentions as :DiscourseEntity",
+            tagged_ne,
+            tagged_nom,
+        )
+        return ""
 
     def diagnostic_report(self):
         """Run small diagnostics that count important node/relationship types
@@ -318,7 +412,7 @@ class RefinementPhase():
         graph = self.graph
         query = """
                         match p= (a:TagOccurrence)-[:PARTICIPATES_IN]->(f:NamedEntity), q= (a)-[:IS_DEPENDENT]->()--(f)
-                        where not exists ((a)<-[:IS_DEPENDENT]-()--(f))
+                        where not exists ((a)<-[:IS_DEPENDENT]-()--(f)) and f.headTokenIndex is null
                         WITH f, a, p
                         set f.head = a.text, f.headTokenIndex = a.tok_index_doc,
                         (case when a.pos in ['NNS', 'NN'] then f END).syntacticType ='NOMINAL',
@@ -343,7 +437,7 @@ class RefinementPhase():
         graph = self.graph
         query = """
                         match p= (a:TagOccurrence)-[:PARTICIPATES_IN]->(c:NamedEntity)
-                        where not exists ((a)<-[:IS_DEPENDENT]-()--(c)) and not exists ((a)-[:IS_DEPENDENT]->()--(c))
+                        where not exists ((a)<-[:IS_DEPENDENT]-()--(c)) and not exists ((a)-[:IS_DEPENDENT]->()--(c)) and c.headTokenIndex is null
                         WITH c, a, p
                         set c.head = a.text, c.headTokenIndex = a.tok_index_doc,
                         (case when a.pos in ['NNS', 'NN'] then c END).syntacticType ='NOMINAL',
@@ -976,16 +1070,33 @@ class RefinementPhase():
         logger.debug("link_frameArgument_to_new_entity")
         graph = self.graph
 
-        query = """    
-                        MATCH p= (f:FrameArgument where f.type in ['ARG0','ARG1','ARG2','ARG3','ARG4'] and f.syntacticType <> 'PRO')
-                        -[:PARTICIPATES_IN]-(h:TagOccurrence where not  h.pos  in ['IN'])
-                        where f.headTokenIndex = h.tok_index_doc 
-                        and not exists ((h)-[]-(:NamedEntity {headTokenIndex: h.tok_index_doc}))
-                        merge (e:Entity {id:f.text, type:f.syntacticType, 
-                        syntacticType:f.syntacticType, head:f.head})
-                        merge (f)-[:REFERS_TO]->(e)
-                        RETURN p     
-        
+        query = """
+                        MATCH p= (f:FrameArgument where f.type IN ['ARG0','ARG1','ARG2','ARG3','ARG4'] and f.syntacticType <> 'PRO')
+                        -[:PARTICIPATES_IN]-(h:TagOccurrence where NOT (h.pos IN ['IN']))
+                        WHERE f.headTokenIndex = h.tok_index_doc
+                         AND NOT EXISTS ((h)-[]-(:NamedEntity {headTokenIndex: h.tok_index_doc}))
+                        OPTIONAL MATCH (d:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(h)
+                        WITH p, f, h, d,
+                            coalesce(f.start_tok, f.startIndex, h.tok_index_doc) AS start_tok,
+                            coalesce(f.end_tok, f.endIndex, h.tok_index_doc) AS end_tok,
+                            coalesce(f.headTokenIndex, h.tok_index_doc) AS head_tok,
+                            coalesce(toString(d.id), split(f.id, '_')[1], '0') AS doc_part
+                        WITH p, f, h, start_tok, end_tok, head_tok,
+                            'nominal_' + doc_part + '_' + toString(start_tok) + '_' + toString(end_tok) AS entity_id
+                        MERGE (e:Entity {id: entity_id, type: 'NOMINAL'})
+                        SET e.syntacticType = 'NOMINAL',
+                           e.head = coalesce(f.head, h.text),
+                           e.headTokenIndex = head_tok,
+                           e.start_tok = start_tok,
+                           e.end_tok = end_tok,
+                           e.start_char = coalesce(f.start_char, h.index),
+                           e.end_char = coalesce(f.end_char, h.end_index),
+                           e.text = coalesce(f.text, e.text),
+                           e.source = 'frame_argument_nominal',
+                           e.source_frame_argument_id = f.id,
+                           e.provenance_rule_id = 'refinement.link_frameArgument_to_new_entity'
+                        MERGE (f)-[:REFERS_TO]->(e)
+                        RETURN p
         """
         data= graph.run(query).data()
         
@@ -1058,6 +1169,85 @@ class RefinementPhase():
         """
         data= graph.run(query).data()
         
+        return ""
+
+
+    def materialize_canonical_value_nodes(self):
+        """Materialize canonical VALUE nodes from value-like NamedEntity mentions.
+
+        VALUE is the canonical schema node for value expressions (MONEY,
+        QUANTITY, PERCENT, CARDINAL, ORDINAL, etc). This method creates a
+        stable VALUE node keyed by (doc_id, id), links source NamedEntity
+        mentions via REFERS_TO, and propagates participant links so VALUE can
+        participate directly in event arguments.
+        """
+        logger.debug("materialize_canonical_value_nodes")
+        graph = self.graph
+
+        query_materialize = """
+                        MATCH (ne:NamedEntity:VALUE)
+                        OPTIONAL MATCH (ne)<-[:PARTICIPATES_IN]-(tok:TagOccurrence)
+                        WITH ne,
+                             min(tok.tok_index_doc) AS min_tok,
+                             max(tok.tok_index_doc) AS max_tok,
+                             split(ne.id, '_')[0] AS doc_part
+                        WITH ne,
+                             CASE WHEN doc_part =~ '^[0-9]+$' THEN toInteger(doc_part) ELSE 0 END AS doc_id,
+                             coalesce(min_tok, toInteger(ne.index), 0) AS start_tok,
+                             coalesce(max_tok, toInteger(ne.end_index), toInteger(ne.index), 0) AS end_tok,
+                             CASE
+                               WHEN ne.type IN ['PERCENT', 'MONEY', 'QUANTITY', 'CARDINAL', 'ORDINAL', 'DATE', 'DURATION', 'NUMERIC']
+                               THEN ne.type
+                               ELSE 'OTHER'
+                             END AS value_type
+                        MERGE (v:VALUE {doc_id: doc_id, id: ne.id})
+                        SET v.type = value_type,
+                            v.value = coalesce(ne.value, ne.text, ''),
+                            v.start_tok = start_tok,
+                            v.end_tok = end_tok,
+                            v.start_char = coalesce(ne.index, v.start_char),
+                            v.end_char = coalesce(ne.end_index, v.end_char),
+                            v.value_normalized = toLower(coalesce(ne.value, ne.text, '')),
+                            v.source = 'named_entity_value'
+                        MERGE (ne)-[:REFERS_TO]->(v)
+                        RETURN count(DISTINCT v) AS values_materialized
+        """
+        graph.run(query_materialize).data()
+
+        # Let FrameArguments resolve directly to VALUE nodes when they currently
+        # resolve through NamedEntity mentions.
+        query_link_fa = """
+                        MATCH (fa:FrameArgument)-[:REFERS_TO]->(ne:NamedEntity)-[:REFERS_TO]->(v:VALUE)
+                        MERGE (fa)-[:REFERS_TO]->(v)
+                        RETURN count(DISTINCT fa) AS frame_args_linked
+        """
+        graph.run(query_link_fa).data()
+
+        # Propagate event participant edges so VALUE appears as a first-class
+        # participant source in the evaluation graph.
+        query_participants = """
+                        MATCH (fa:FrameArgument)-[:REFERS_TO]->(v:VALUE)
+                        MATCH (fa)-[p:PARTICIPANT|EVENT_PARTICIPANT]->(ev)
+                        MERGE (v)-[vp:EVENT_PARTICIPANT]->(ev)
+                        SET vp.type = coalesce(p.type, fa.type),
+                            vp.prep = coalesce(p.prep, fa.head),
+                            vp.roleFrame = coalesce(vp.roleFrame, 'PROPBANK'),
+                            vp.confidence = coalesce(vp.confidence, 1.0)
+                        RETURN count(DISTINCT vp) AS value_participants_linked
+        """
+        graph.run(query_participants).data()
+
+        # VALUE label on NamedEntity was historically used as a convenience
+        # tag. Remove it to avoid mixed semantics now that canonical VALUE
+        # nodes are materialized explicitly.
+        query_cleanup_legacy_label = """
+                MATCH (ne:NamedEntity:VALUE)
+                REMOVE ne:VALUE
+                SET ne.value_tagged = true
+                RETURN count(ne) AS cleaned
+        """
+        graph.run(query_cleanup_legacy_label).data()
+
         return ""
 
 
@@ -1148,20 +1338,405 @@ class RefinementPhase():
         logger.debug("detect_quantified_entities_from_frameArgument")
         graph = self.graph
 
-        query = """    
-                            match p = (pobj:TagOccurrence where pobj.pos in ['NNS','NNP','NN', 'NNPS','PRP', 'PRP$'])<-[dep2:IS_DEPENDENT {type: 'pobj'}]
-                            -(prep:TagOccurrence where prep.text= 'of')<-[dep1:IS_DEPENDENT {type: 'prep'}]-(head:TagOccurrence {tok_index_doc : fa.headTokenIndex})-
-                            [:PARTICIPATES_IN]->(fa:FrameArgument), (pobj)--(fa)
-                            where exists ((head)-[:PARTICIPATES_IN]->(:NamedEntity {type: 'CARDINAL'})) OR head.lemma in ['all', 'some', 'many', 'group']
-                            merge (fa)-[:REFERS_TO]->(e:Entity {id: fa.text, type: 'NOMINAL'})
-                            with fa,p
-                            match (fa)-[r:REFERS_TO]->(ne:NamedEntity)
-                            delete r
-                            return p    
+        query = """
+                    match p = (pobj:TagOccurrence where pobj.pos in ['NNS','NNP','NN', 'NNPS','PRP', 'PRP$'])<-[dep2:IS_DEPENDENT {type: 'pobj'}]
+                    -(prep:TagOccurrence where prep.text= 'of')<-[dep1:IS_DEPENDENT {type: 'prep'}]-(head:TagOccurrence)-
+                    [:PARTICIPATES_IN]->(fa:FrameArgument), (pobj)--(fa)
+                    where head.tok_index_doc = fa.headTokenIndex
+                                            and (
+                                                exists ((head)-[:PARTICIPATES_IN]->(:NamedEntity {type: 'CARDINAL'}))
+                                                OR head.lemma in ['all', 'some', 'many', 'most', 'few', 'several', 'none', 'half', 'part', 'portion', 'group', 'majority', 'minority', 'rest', 'number', 'lot', 'lots']
+                                            )
+                    OPTIONAL MATCH (d:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(head)
+                    with distinct fa, p, head, d,
+                        coalesce(fa.start_tok, fa.startIndex, head.tok_index_doc) as start_tok,
+                        coalesce(fa.end_tok, fa.endIndex, head.tok_index_doc) as end_tok,
+                                                coalesce(toString(d.id), split(fa.id, '_')[1], '0') as doc_part,
+                                                pobj,
+                                                CASE
+                                                    WHEN head.lemma in ['all', 'some', 'many', 'most', 'few', 'several', 'none', 'half', 'part', 'portion', 'group', 'majority', 'minority', 'rest', 'number', 'lot', 'lots']
+                                                    THEN 'PARTITIVE'
+                                                    ELSE 'QUANTIFIED'
+                                                END as nominal_subtype
+                                        with distinct fa, p, head, pobj, start_tok, end_tok, nominal_subtype,
+                        'nominal_quant_' + doc_part + '_' + toString(start_tok) + '_' + toString(end_tok) as entity_id
+                    merge (e:Entity {id: entity_id, type: 'NOMINAL'})
+                    set e.syntacticType = 'NOMINAL',
+                                                e.nominalSubtype = nominal_subtype,
+                        e.head = coalesce(fa.head, head.text),
+                        e.headTokenIndex = coalesce(fa.headTokenIndex, head.tok_index_doc),
+                        e.start_tok = start_tok,
+                        e.end_tok = end_tok,
+                        e.start_char = coalesce(fa.start_char, head.index),
+                        e.end_char = coalesce(fa.end_char, head.end_index),
+                        e.text = coalesce(fa.text, e.text),
+                                                e.quantifier = coalesce(head.lemma, head.text),
+                                                e.partitivePrep = 'of',
+                                                e.partitiveObject = pobj.text,
+                                                e.partitiveObjectTokenIndex = pobj.tok_index_doc,
+                        e.source = 'quantified_frame_argument',
+                        e.source_frame_argument_id = fa.id,
+                        e.provenance_rule_id = 'refinement.detect_quantified_entities_from_frameArgument'
+                    merge (fa)-[:REFERS_TO]->(e)
+                    with distinct fa, p
+                                        match (fa)-[r:REFERS_TO]->(ne:NamedEntity)
+                                        where ne.type in ['CARDINAL', 'QUANTITY', 'PERCENT', 'MONEY', 'ORDINAL']
+                    delete r
+                    return p    
         
         """
         data= graph.run(query).data()
         
+        return ""
+
+
+    def materialize_nominal_mentions_from_frame_arguments(self):
+        """Materialize EntityMention nodes for nominal FrameArgument spans.
+
+        This creates explicit mention-layer nodes with deterministic ids and
+        complete span metadata for nominal entities discovered through SRL.
+        """
+        logger.debug("materialize_nominal_mentions_from_frame_arguments")
+        graph = self.graph
+
+        query = """
+                 MATCH (fa:FrameArgument)-[:REFERS_TO]->(e:Entity)
+                 WHERE coalesce(e.syntacticType, e.type, '') = 'NOMINAL'
+                 OPTIONAL MATCH (tok:TagOccurrence)-[:PARTICIPATES_IN]->(fa)
+                 OPTIONAL MATCH (d:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok)
+                 WITH fa, e, d,
+                     min(tok.tok_index_doc) AS min_tok,
+                     max(tok.tok_index_doc) AS max_tok,
+                     min(tok.index) AS min_char,
+                     max(tok.end_index) AS max_char
+                 WITH fa, e,
+                     CASE WHEN coalesce(toString(d.id), split(fa.id, '_')[1], '0') =~ '^[0-9]+$'
+                         THEN toInteger(coalesce(toString(d.id), split(fa.id, '_')[1], '0'))
+                         ELSE 0 END AS doc_id,
+                     coalesce(fa.start_tok, fa.startIndex, min_tok) AS start_tok,
+                     coalesce(fa.end_tok, fa.endIndex, max_tok) AS end_tok,
+                     coalesce(fa.start_char, min_char) AS start_char,
+                     coalesce(fa.end_char, max_char) AS end_char
+                 WHERE start_tok IS NOT NULL AND end_tok IS NOT NULL
+                 WITH fa, e, doc_id, start_tok, end_tok, start_char, end_char,
+                     'nom_mention_fa_' + toString(doc_id) + '_' + toString(start_tok) + '_' + toString(end_tok) AS mention_id
+                 MERGE (em:EntityMention {id: mention_id})
+                 SET em:NominalMention,
+                    em.doc_id = doc_id,
+                    em.value = coalesce(fa.text, e.text, e.head, ''),
+                    em.head = coalesce(fa.head, e.head),
+                    em.headTokenIndex = coalesce(fa.headTokenIndex, e.headTokenIndex, start_tok),
+                    em.syntacticType = 'NOMINAL',
+                    em.syntactic_type = 'NOMINAL',
+                    em.start_tok = start_tok,
+                    em.end_tok = end_tok,
+                    em.start_char = start_char,
+                    em.end_char = end_char,
+                    em.mention_source = 'frame_argument_nominal',
+                    em.confidence = coalesce(em.confidence, 0.90),
+                    em.provenance_rule_id = 'refinement.materialize_nominal_mentions_from_frame_arguments',
+                    em.source_frame_argument_id = fa.id
+                 MERGE (em)-[:REFERS_TO]->(e)
+                      WITH em, doc_id, start_tok, end_tok
+                      MATCH (d:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok:TagOccurrence)
+                      WHERE tok.tok_index_doc >= start_tok AND tok.tok_index_doc <= end_tok
+                      MERGE (tok)-[:PARTICIPATES_IN]->(em)
+                 RETURN count(DISTINCT em) AS mentions_materialized
+        """
+        graph.run(query).data()
+
+        return ""
+
+
+    def materialize_nominal_mentions_from_noun_chunks(self):
+        """Materialize EntityMention nodes for noun chunks not covered by NamedEntity.
+
+        This captures discourse nominals that may never appear as SRL arguments
+        while preserving deterministic ids and span metadata.
+        """
+        logger.debug("materialize_nominal_mentions_from_noun_chunks")
+        graph = self.graph
+
+        query = """
+                 MATCH (nc:NounChunk)
+                 OPTIONAL MATCH (tok:TagOccurrence)-[:PARTICIPATES_IN]->(nc)
+                 OPTIONAL MATCH (d:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok)
+                 WITH nc, d,
+                     min(tok.tok_index_doc) AS min_tok,
+                     max(tok.tok_index_doc) AS max_tok,
+                     min(tok.index) AS min_char,
+                                         max(tok.end_index) AS max_char,
+                                         toLower(trim(coalesce(nc.value, ''))) AS chunk_text_lc
+                 WHERE min_tok IS NOT NULL AND max_tok IS NOT NULL
+                 OPTIONAL MATCH (ne:NamedEntity)
+                 WHERE coalesce(ne.start_tok, ne.token_start, ne.index) = min_tok
+                   AND coalesce(ne.end_tok, ne.token_end, ne.end_index, ne.index) = max_tok
+                                 OPTIONAL MATCH (tok_fa:TagOccurrence)-[:PARTICIPATES_IN]->(nc)
+                                 OPTIONAL MATCH (tok_fa)-[:PARTICIPATES_IN]->(fa:FrameArgument)
+                                 WITH nc, d, min_tok, max_tok, min_char, max_char, chunk_text_lc,
+                                            count(ne) AS ne_count,
+                                            count(DISTINCT CASE WHEN fa.type IN ['ARG0', 'ARG1', 'ARG2'] THEN fa END) AS core_arg_hits
+                                 WHERE ne_count = 0
+                                     AND core_arg_hits > 0
+                                     AND chunk_text_lc <> ''
+                                     AND NOT chunk_text_lc IN ['yesterday', 'today', 'tomorrow']
+                                     AND NOT chunk_text_lc CONTAINS '%'
+                                     AND NOT chunk_text_lc CONTAINS '$'
+                                     AND NOT chunk_text_lc CONTAINS '€'
+                                     AND NOT chunk_text_lc CONTAINS '£'
+                                     AND NOT chunk_text_lc CONTAINS '¥'
+                                     AND NOT chunk_text_lc =~ '.*[0-9].*'
+                                     AND NOT (chunk_text_lc STARTS WITH 'this ' AND (chunk_text_lc CONTAINS ' day' OR chunk_text_lc CONTAINS ' week' OR chunk_text_lc CONTAINS ' month' OR chunk_text_lc CONTAINS ' year'))
+                                     AND NOT (chunk_text_lc STARTS WITH 'that ' AND (chunk_text_lc CONTAINS ' day' OR chunk_text_lc CONTAINS ' week' OR chunk_text_lc CONTAINS ' month' OR chunk_text_lc CONTAINS ' year'))
+                                     AND NOT (chunk_text_lc STARTS WITH 'last ' AND (chunk_text_lc CONTAINS ' day' OR chunk_text_lc CONTAINS ' week' OR chunk_text_lc CONTAINS ' month' OR chunk_text_lc CONTAINS ' year'))
+                                     AND NOT (chunk_text_lc STARTS WITH 'next ' AND (chunk_text_lc CONTAINS ' day' OR chunk_text_lc CONTAINS ' week' OR chunk_text_lc CONTAINS ' month' OR chunk_text_lc CONTAINS ' year'))
+                 WITH nc,
+                     CASE WHEN coalesce(toString(d.id), split(nc.id, '_')[1], '0') =~ '^[0-9]+$'
+                         THEN toInteger(coalesce(toString(d.id), split(nc.id, '_')[1], '0'))
+                         ELSE 0 END AS doc_id,
+                     min_tok AS start_tok,
+                     max_tok AS end_tok,
+                     min_char AS start_char,
+                     max_char AS end_char
+                 WITH nc, doc_id, start_tok, end_tok, start_char, end_char,
+                     'nominal_chunk_' + toString(doc_id) + '_' + toString(start_tok) + '_' + toString(end_tok) AS entity_id,
+                     'nom_mention_nc_' + toString(doc_id) + '_' + toString(start_tok) + '_' + toString(end_tok) AS mention_id
+                 MERGE (e:Entity {id: entity_id, type: 'NOMINAL'})
+                 SET e.syntacticType = 'NOMINAL',
+                    e.head = coalesce(e.head, nc.value),
+                    e.start_tok = start_tok,
+                    e.end_tok = end_tok,
+                    e.start_char = start_char,
+                    e.end_char = end_char,
+                    e.text = coalesce(e.text, nc.value),
+                    e.source = 'noun_chunk_nominal',
+                    e.source_noun_chunk_id = nc.id,
+                    e.provenance_rule_id = 'refinement.materialize_nominal_mentions_from_noun_chunks'
+                 MERGE (em:EntityMention {id: mention_id})
+                 SET em:NominalMention,
+                    em.doc_id = doc_id,
+                    em.value = coalesce(nc.value, ''),
+                    em.head = coalesce(em.head, nc.value),
+                    em.headTokenIndex = coalesce(em.headTokenIndex, start_tok),
+                    em.syntacticType = 'NOMINAL',
+                    em.syntactic_type = 'NOMINAL',
+                    em.start_tok = start_tok,
+                    em.end_tok = end_tok,
+                    em.start_char = start_char,
+                    em.end_char = end_char,
+                    em.mention_source = 'noun_chunk_nominal',
+                    em.confidence = coalesce(em.confidence, 0.75),
+                    em.provenance_rule_id = 'refinement.materialize_nominal_mentions_from_noun_chunks',
+                    em.source_noun_chunk_id = nc.id
+                 MERGE (em)-[:REFERS_TO]->(e)
+                      WITH em, doc_id, start_tok, end_tok
+                      MATCH (d:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok:TagOccurrence)
+                      WHERE tok.tok_index_doc >= start_tok AND tok.tok_index_doc <= end_tok
+                      MERGE (tok)-[:PARTICIPATES_IN]->(em)
+                 RETURN count(DISTINCT em) AS mentions_materialized
+        """
+        graph.run(query).data()
+
+        return ""
+
+
+    def resolve_nominal_semantic_heads(self):
+        """Resolve noun-preferred semantic heads for nominal mentions.
+
+        Surface heads from spaCy are preserved in the original `head` fields.
+        This pass adds a second, semantics-oriented head profile that prefers
+        noun-like tokens over modifiers, quantifiers, and determiners.
+        """
+        logger.debug("resolve_nominal_semantic_heads")
+        graph = self.graph
+
+        query = """
+                 MATCH (em:EntityMention:NominalMention)
+                 OPTIONAL MATCH (tok:TagOccurrence)-[:PARTICIPATES_IN]->(em)
+                 WITH em, tok,
+                      CASE
+                          WHEN tok IS NULL THEN 99
+                          WHEN coalesce(tok.upos, '') IN ['NOUN', 'PROPN', 'PRON'] THEN 0
+                          WHEN coalesce(tok.pos, '') IN ['NN', 'NNS', 'NNP', 'NNPS', 'PRP', 'PRP$'] THEN 1
+                          WHEN coalesce(tok.upos, '') = 'ADJ' OR coalesce(tok.pos, '') IN ['JJ', 'JJR', 'JJS'] THEN 4
+                          WHEN coalesce(tok.upos, '') = 'NUM' OR coalesce(tok.pos, '') = 'CD' THEN 5
+                          WHEN coalesce(tok.upos, '') = 'DET' OR coalesce(tok.pos, '') IN ['DT', 'PDT', 'WDT'] THEN 6
+                          ELSE 3
+                      END AS lexical_rank,
+                      abs(coalesce(tok.tok_index_doc, coalesce(em.end_tok, em.start_tok)) - coalesce(em.end_tok, em.start_tok)) AS right_edge_distance,
+                      CASE
+                          WHEN coalesce(tok.tok_index_doc, -1) = coalesce(em.headTokenIndex, em.end_tok, em.start_tok) THEN 0
+                          ELSE 1
+                      END AS surface_head_penalty
+                 ORDER BY em.id, lexical_rank ASC, right_edge_distance ASC, surface_head_penalty ASC, coalesce(tok.tok_index_doc, -1) DESC
+                 WITH em, head(collect(tok)) AS semantic_head
+                 OPTIONAL MATCH (em)-[:REFERS_TO]->(e:Entity)
+                 SET em.nominalSemanticHead = coalesce(semantic_head.lemma, semantic_head.text, em.head, em.value),
+                     em.nominalSemanticHeadLemma = coalesce(semantic_head.lemma, semantic_head.text, em.head),
+                     em.nominalSemanticHeadText = coalesce(semantic_head.text, em.head, em.value),
+                     em.nominalSemanticHeadPos = coalesce(semantic_head.pos, ''),
+                     em.nominalSemanticHeadUpos = coalesce(semantic_head.upos, ''),
+                     em.nominalSemanticHeadTokenIndex = coalesce(semantic_head.tok_index_doc, em.headTokenIndex, em.end_tok, em.start_tok),
+                     em.nominalSemanticHeadSource = CASE
+                         WHEN semantic_head IS NULL THEN 'fallback_existing_head'
+                         WHEN semantic_head.tok_index_doc = coalesce(em.headTokenIndex, em.end_tok, em.start_tok) THEN 'surface_head'
+                         ELSE 'noun_preferred_token'
+                     END
+                 SET e.nominalSemanticHead = coalesce(e.nominalSemanticHead, coalesce(semantic_head.lemma, semantic_head.text, em.head, em.value)),
+                     e.nominalSemanticHeadLemma = coalesce(e.nominalSemanticHeadLemma, coalesce(semantic_head.lemma, semantic_head.text, em.head)),
+                     e.nominalSemanticHeadText = coalesce(e.nominalSemanticHeadText, coalesce(semantic_head.text, em.head, em.value)),
+                     e.nominalSemanticHeadPos = coalesce(e.nominalSemanticHeadPos, coalesce(semantic_head.pos, '')),
+                     e.nominalSemanticHeadUpos = coalesce(e.nominalSemanticHeadUpos, coalesce(semantic_head.upos, '')),
+                     e.nominalSemanticHeadTokenIndex = coalesce(e.nominalSemanticHeadTokenIndex, coalesce(semantic_head.tok_index_doc, em.headTokenIndex, em.end_tok, em.start_tok)),
+                     e.nominalSemanticHeadSource = coalesce(e.nominalSemanticHeadSource,
+                         CASE
+                             WHEN semantic_head IS NULL THEN 'fallback_existing_head'
+                             WHEN semantic_head.tok_index_doc = coalesce(em.headTokenIndex, em.end_tok, em.start_tok) THEN 'surface_head'
+                             ELSE 'noun_preferred_token'
+                         END)
+                 RETURN count(DISTINCT em) AS nominals_resolved
+        """
+        graph.run(query).data()
+
+        return ""
+
+
+    def annotate_nominal_semantic_profiles(self):
+        """Annotate nominal mentions/entities with semantic and evaluation hints.
+
+        This is additive metadata only. It does not remove or relabel mentions.
+        The goal is to preserve semantic richness in the graph while making it
+        possible for evaluation to filter nominal views explicitly.
+        """
+        logger.debug("annotate_nominal_semantic_profiles")
+        graph = self.graph
+
+        query = """
+                 MATCH (em:EntityMention:NominalMention)
+                 OPTIONAL MATCH (head_tok:TagOccurrence)-[:PARTICIPATES_IN]->(em)
+                  WHERE head_tok.tok_index_doc = coalesce(em.nominalSemanticHeadTokenIndex, em.headTokenIndex, em.end_tok, em.start_tok)
+                 WITH em, head(collect(head_tok)) AS head_tok
+                 OPTIONAL MATCH (arg_tok:TagOccurrence)-[:PARTICIPATES_IN]->(em)
+                 OPTIONAL MATCH (arg_tok)-[:PARTICIPATES_IN]->(fa:FrameArgument)
+                 WITH em, head_tok,
+                      count(DISTINCT CASE WHEN fa.type IN ['ARG0', 'ARG1', 'ARG2'] THEN fa END) AS core_arg_hits
+                 OPTIONAL MATCH (head_tok)-[:TRIGGERS]->(evt:TEvent)
+                 WHERE evt.doc_id = em.doc_id
+                 WITH em, head_tok, core_arg_hits, count(DISTINCT evt) > 0 AS event_trigger
+                 OPTIONAL MATCH (em)-[:REFERS_TO]->(e:Entity)<-[:REFERS_TO]-(other:EntityMention)
+                 WHERE other <> em
+                 WITH em, head_tok, core_arg_hits, event_trigger,
+                      count(DISTINCT other) + 1 AS mention_cluster_size
+                 OPTIONAL MATCH (em)-[:REFERS_TO]->(e:Entity)<-[:REFERS_TO]-(ne:NamedEntity)
+                 WITH em, head_tok, core_arg_hits, event_trigger, mention_cluster_size,
+                      count(DISTINCT ne) > 0 AS has_named_link,
+                      coalesce(head_tok.wnLexname, '') AS head_wn_lexname,
+                                            toLower(coalesce(em.nominalSemanticHeadLemma, head_tok.lemma, head_tok.text, em.head, em.value, '')) AS head_lemma_lc,
+                      any(h IN coalesce(head_tok.hypernyms, [])
+                          WHERE toLower(h) STARTS WITH 'event.n.'
+                             OR toLower(h) STARTS WITH 'act.n.'
+                             OR toLower(h) STARTS WITH 'process.n.'
+                             OR toLower(h) STARTS WITH 'state.n.'
+                             OR toLower(h) STARTS WITH 'phenomenon.n.') AS wordnet_eventive,
+                      coalesce(head_tok.pos, '') IN ['NNP', 'NNPS'] AS proper_like
+                  WITH em, core_arg_hits, mention_cluster_size, has_named_link,
+                                            head_wn_lexname, head_lemma_lc,
+                      coalesce(head_tok.pos, '') AS head_pos,
+                      coalesce(head_tok.nltkSynset, '') AS head_nltk_synset,
+                      coalesce(head_tok.hypernyms, []) AS head_hypernyms,
+                                            event_trigger,
+                                            wordnet_eventive
+                                                OR head_wn_lexname IN ['noun.event', 'noun.act', 'noun.phenomenon', 'noun.process', 'noun.state'] AS eventive_by_wordnet,
+                                            (core_arg_hits > 0) AS eventive_by_argument,
+                                            head_lemma_lc =~ '.*(tion|sion|ment|ance|ence|al|ure|ing)$' AS eventive_by_morphology,
+                      proper_like
+                                 WITH em, core_arg_hits, mention_cluster_size, has_named_link, head_wn_lexname, head_pos, head_nltk_synset, head_hypernyms,
+                                            event_trigger, eventive_by_wordnet, eventive_by_argument, eventive_by_morphology,
+                                            (event_trigger OR eventive_by_wordnet OR eventive_by_argument OR eventive_by_morphology) AS eventive_head,
+                                            proper_like,
+                                            (CASE WHEN eventive_by_wordnet THEN 0.45 ELSE 0.0 END
+                                                + CASE WHEN event_trigger THEN 0.30 ELSE 0.0 END
+                                                + CASE WHEN eventive_by_argument THEN 0.15 ELSE 0.0 END
+                                                + CASE WHEN eventive_by_morphology THEN 0.10 ELSE 0.0 END) AS raw_eventive_confidence,
+                      CASE
+                                                    WHEN (event_trigger OR eventive_by_wordnet OR eventive_by_argument OR eventive_by_morphology) THEN 'EVENT'
+                          WHEN proper_like THEN 'NAM'
+                          ELSE 'NOM'
+                      END AS eval_layer,
+                      CASE
+                                                    WHEN (event_trigger OR eventive_by_wordnet OR eventive_by_argument OR eventive_by_morphology) THEN 'eventive_nominal'
+                          WHEN proper_like THEN 'proper_like_nominal'
+                          WHEN has_named_link OR core_arg_hits > 0 OR mention_cluster_size > 1 THEN 'salient_nominal'
+                          ELSE 'background_nominal'
+                      END AS eval_profile,
+                      CASE
+                                                    WHEN (event_trigger OR eventive_by_wordnet OR eventive_by_argument OR eventive_by_morphology) THEN false
+                          WHEN proper_like THEN false
+                          WHEN has_named_link OR core_arg_hits > 0 OR mention_cluster_size > 1 THEN true
+                          ELSE false
+                      END AS eval_candidate_gold,
+                                            CASE
+                                                    WHEN raw_eventive_confidence > 1.0 THEN 1.0
+                                                    ELSE raw_eventive_confidence
+                                            END AS eventive_confidence,
+                      [signal IN [
+                                                 CASE WHEN (event_trigger OR eventive_by_wordnet OR eventive_by_argument OR eventive_by_morphology) THEN 'eventive_head' ELSE null END,
+                                                 CASE WHEN eventive_by_wordnet THEN 'eventive_wordnet' ELSE null END,
+                                                 CASE WHEN eventive_by_argument THEN 'eventive_argument_structure' ELSE null END,
+                                                 CASE WHEN eventive_by_morphology THEN 'eventive_morphology' ELSE null END,
+                         CASE WHEN head_wn_lexname IN ['noun.event', 'noun.act', 'noun.phenomenon', 'noun.process', 'noun.state'] THEN 'wordnet_eventive_lexname' ELSE null END,
+                         CASE WHEN event_trigger THEN 'event_trigger' ELSE null END,
+                         CASE WHEN proper_like THEN 'proper_like' ELSE null END,
+                         CASE WHEN has_named_link THEN 'named_link' ELSE null END,
+                         CASE WHEN core_arg_hits > 0 THEN 'core_argument' ELSE null END,
+                         CASE WHEN mention_cluster_size > 1 THEN 'multi_mention_cluster' ELSE null END
+                      ] WHERE signal IS NOT NULL] AS semantic_signals
+                 OPTIONAL MATCH (em)-[:REFERS_TO]->(e:Entity)
+                 SET em.nominalHeadPos = head_pos,
+                     em.nominalHeadNltkSynset = head_nltk_synset,
+                     em.nominalHeadHypernyms = head_hypernyms,
+                     em.nominalHeadWnLexname = head_wn_lexname,
+                     em.nominalEventiveHead = eventive_head,
+                     em.nominalEventiveByWordNet = eventive_by_wordnet,
+                     em.nominalEventiveByTrigger = event_trigger,
+                     em.nominalEventiveByArgumentStructure = eventive_by_argument,
+                     em.nominalEventiveByMorphology = eventive_by_morphology,
+                     em.nominalEventiveConfidence = eventive_confidence,
+                     em.nominalProperLike = proper_like,
+                     em.nominalHasNamedLink = has_named_link,
+                     em.nominalCoreArgument = core_arg_hits > 0,
+                     em.nominalClusterSize = mention_cluster_size,
+                     em.nominalEvalLayerSuggestion = eval_layer,
+                     em.nominalEvalProfile = eval_profile,
+                     em.nominalEvalCandidateGold = eval_candidate_gold,
+                     em.nominalSemanticSignals = semantic_signals
+                 SET e.nominalHeadPos = coalesce(e.nominalHeadPos, head_pos),
+                     e.nominalHeadNltkSynset = coalesce(e.nominalHeadNltkSynset, head_nltk_synset),
+                     e.nominalHeadHypernyms = CASE WHEN size(coalesce(e.nominalHeadHypernyms, [])) > 0 THEN e.nominalHeadHypernyms ELSE head_hypernyms END,
+                     e.nominalHeadWnLexname = coalesce(e.nominalHeadWnLexname, head_wn_lexname),
+                     e.nominalEventiveHead = coalesce(e.nominalEventiveHead, false) OR eventive_head,
+                     e.nominalEventiveByWordNet = coalesce(e.nominalEventiveByWordNet, false) OR eventive_by_wordnet,
+                     e.nominalEventiveByTrigger = coalesce(e.nominalEventiveByTrigger, false) OR event_trigger,
+                     e.nominalEventiveByArgumentStructure = coalesce(e.nominalEventiveByArgumentStructure, false) OR eventive_by_argument,
+                     e.nominalEventiveByMorphology = coalesce(e.nominalEventiveByMorphology, false) OR eventive_by_morphology,
+                     e.nominalEventiveConfidence = CASE
+                         WHEN coalesce(e.nominalEventiveConfidence, 0.0) > eventive_confidence THEN e.nominalEventiveConfidence
+                         ELSE eventive_confidence
+                     END,
+                     e.nominalProperLike = coalesce(e.nominalProperLike, false) OR proper_like,
+                     e.nominalHasNamedLink = coalesce(e.nominalHasNamedLink, false) OR has_named_link,
+                     e.nominalCoreArgument = coalesce(e.nominalCoreArgument, false) OR core_arg_hits > 0,
+                     e.nominalClusterSize = CASE
+                         WHEN coalesce(e.nominalClusterSize, 0) > mention_cluster_size THEN e.nominalClusterSize
+                         ELSE mention_cluster_size
+                     END,
+                     e.nominalEvalLayerSuggestion = coalesce(e.nominalEvalLayerSuggestion, eval_layer),
+                     e.nominalEvalProfile = coalesce(e.nominalEvalProfile, eval_profile),
+                     e.nominalEvalCandidateGold = coalesce(e.nominalEvalCandidateGold, eval_candidate_gold)
+                 RETURN count(DISTINCT em) AS nominals_profiled
+        """
+        graph.run(query).data()
+
         return ""
 
 
@@ -1227,8 +1802,12 @@ if __name__ == '__main__':
     # single node with a timestamp and the list of passes we ran. It is safe
     # to run repeatedly (MERGE by id) and useful for audits / CI checks.
     try:
-        from datetime import datetime
-        run_id = datetime.utcnow().isoformat()
+        try:
+            from textgraphx.time_utils import utc_iso_now
+        except ImportError:  # pragma: no cover - support script-style execution
+            from time_utils import utc_iso_now
+
+        run_id = utc_iso_now()
         passes = [name for _, name in tp.iter_rule_names()]
 
         marker_q = """
@@ -1253,7 +1832,7 @@ if __name__ == '__main__':
 # 
 # 
 # MATCH (event:TEvent)<-[:DESCRIBES]-(f:Frame)<-[:PARTICIPANT]-(fa:FrameArgument)
-# WHERE not fa.type IN ['ARG0', 'ARG1', 'ARG2', 'ARG3', 'ARG4', 'ARGM-TMP']
+# WHERE NOT (fa.type IN ['ARG0', 'ARG1', 'ARG2', 'ARG3', 'ARG4', 'ARGM-TMP'])
 # WITH event, f, fa
 # SET fa.argumentType=
 #     CASE fa.type
@@ -1277,7 +1856,7 @@ if __name__ == '__main__':
 
 #VERSION 2 of the previous query with additional propbank arguments
 # MATCH (event:TEvent)<-[:DESCRIBES]-(f:Frame)<-[:PARTICIPANT]-(fa:FrameArgument)
-# WHERE NOT fa.type IN ['ARG0', 'ARG1', 'ARG2', 'ARG3', 'ARG4', 'ARGM-TMP']
+# WHERE NOT (fa.type IN ['ARG0', 'ARG1', 'ARG2', 'ARG3', 'ARG4', 'ARGM-TMP'])
 # WITH event, f, fa
 # SET fa.argumentType =
 #     CASE fa.type

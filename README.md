@@ -73,6 +73,39 @@ Centralized configuration
   - TEXTGRAPHX_LOG_LEVEL, TEXTGRAPHX_LOG_JSON, TEXTGRAPHX_LOG_FILE
   - SPACY_MODEL, SPACY_USE_GPU
   - TEXTGRAPHX_DATA_DIR, TEXTGRAPHX_OUTPUT_DIR, TEXTGRAPHX_TMP_DIR
+  - TEXTGRAPHX_RUNTIME_MODE, TEXTGRAPHX_STRICT_TRANSITION_GATE
+
+Runtime transition gate policy
+- Config key: `[runtime] strict_transition_gate = auto|true|false`.
+- Env override: `TEXTGRAPHX_STRICT_TRANSITION_GATE=auto|true|false`.
+- `auto` behavior: enabled in testing mode, disabled in production mode.
+- Recommended values:
+  - CI/review pipelines: `true` (fail fast on legacy-dominance assertion failures)
+  - Local development: `auto` (strict in testing runs, relaxed in production runs)
+
+Review profile (local)
+- Run the local review profile that mirrors CI strict settings:
+
+```bash
+bash scripts/run_review_profile.sh
+```
+
+- This script sets:
+  - `TEXTGRAPHX_RUNTIME_MODE=testing`
+  - `TEXTGRAPHX_STRICT_TRANSITION_GATE=true`
+- and executes the strict regression suite (`phase_assertions`, `orchestration`, `regression_phases`).
+
+CI enforcement
+- GitHub Actions workflow: `.github/workflows/strict-transition-gate.yml`
+- The workflow runs the same strict suite under testing mode with strict gate enabled.
+
+Pull request requirement
+- PRs should pass the `strict-transition-gate` workflow before merge.
+- Local preflight command:
+
+```bash
+make review
+```
 
 Usage example (programmatic):
 
@@ -102,6 +135,39 @@ If you prefer a config file: `python -m textgraphx.tools.schema_validation path/
 
 Note: The validation script uses the same compatibility wrapper as the rest of the code so it behaves like the application when opening sessions.
 
+Evaluation reports
+
+- The MEANTIME evaluation CLI writes generated reports to `textgraphx/datastore/evaluation/` by default.
+- Default artifacts:
+  - `eval_report.json`
+  - `eval_report.md`
+  - `eval_report_docs.csv`
+  - `eval_report_summary.csv`
+- This keeps `textgraphx/datastore/annotated/` reserved for annotated source files only.
+- You can still override output locations with `--out-json`, `--out-markdown`, and `--export-csv-prefix`.
+
+Example:
+
+```bash
+python -m textgraphx.tools.evaluate_meantime \
+  --gold-dir textgraphx/datastore/annotated \
+  --pred-xml-dir textgraphx/datastore/annotated
+```
+
+Dataset locations (source vs gold)
+----------------------------------
+
+- Source dataset directory used by pipeline runs in this workspace:
+  - /home/neo/environments/textgraphx/textgraphx/datastore/dataset
+  - Source files in this directory are NAF files (.naf).
+- Gold-standard dataset directory used for evaluation:
+  - textgraphx/datastore/annotated
+  - Gold files in this directory are XML files (.xml).
+
+This means the operational flow is:
+1. Run pipeline ingestion/extraction from the source NAF dataset directory.
+2. Run evaluator with gold XML files from the annotated directory.
+
 Quick CLI extras
 ----------------
 
@@ -122,6 +188,31 @@ Example (fail fast if Neo4j unreachable):
 ```bash
 python -m textgraphx.GraphBasedNLP --require-neo4j
 ```
+
+Pipeline runner and cleanup policy
+----------------------------------
+
+Use `textgraphx/run_pipeline.py` as the canonical entrypoint for local runs.
+It now delegates to the architecture-level orchestrator in
+`textgraphx/orchestration/orchestrator.py` and supports an explicit Neo4j
+cleanup policy for repeatable test runs on the same document.
+
+```bash
+python textgraphx/run_pipeline.py \
+  --dataset textgraphx/datastore/dataset \
+  --cleanup auto
+```
+
+Cleanup modes:
+- `auto` (recommended for testing): detect whether dataset documents already
+  exist in Neo4j and clear stale graph state before rerun when runtime mode is
+  `testing`.
+- `none`: never clear graph state automatically.
+- `full`: wipe all nodes in Neo4j before running selected phases.
+
+This prevents duplicate graph materialization during iterative
+development/evaluation loops while keeping production behavior guarded by
+runtime mode.
 
 ## Logging
 

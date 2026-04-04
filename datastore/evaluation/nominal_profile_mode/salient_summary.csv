@@ -1,0 +1,17 @@
+f1,fn,fp,layer,mode,precision,recall,scope,tp
+0.10738255033557047,9,124,entity,strict,0.06060606060606061,0.47058823529411764,micro,8
+0.0,17,0,event,strict,0.0,0.0,micro,0
+0.0,4,0,timex,strict,0.0,0.0,micro,0
+0.0,21,0,relation,strict,0.0,0.0,micro,0
+0.18791946308724833,3,118,entity,relaxed,0.10606060606060606,0.8235294117647058,micro,14
+0.0,17,0,event,relaxed,0.0,0.0,micro,0
+0.0,4,0,timex,relaxed,0.0,0.0,micro,0
+0.0,21,0,relation,relaxed,0.0,0.0,micro,0
+0.10738255033557047,,,entity,strict,0.06060606060606061,0.47058823529411764,macro,
+0.0,,,event,strict,0.0,0.0,macro,
+0.0,,,timex,strict,0.0,0.0,macro,
+0.0,,,relation,strict,0.0,0.0,macro,
+0.18791946308724833,,,entity,relaxed,0.10606060606060606,0.8235294117647058,macro,
+0.0,,,event,relaxed,0.0,0.0,macro,
+0.0,,,timex,relaxed,0.0,0.0,macro,
+0.0,,,relation,relaxed,0.0,0.0,macro,

@@ -37,6 +37,25 @@ class CoreferenceResolver:
         self.coreference_service_endpoint = coreference_service_endpoint
         logger.debug("CoreferenceResolver initialized with endpoint=%s", coreference_service_endpoint)
 
+    def _find_named_entity_by_span(self, start_index, end_index, doc_id):
+        """Return an existing NamedEntity id for an exact token span, if present.
+
+        This is used to avoid creating a parallel CorefMention node when the
+        NER pipeline has already materialized a mention for the same span.
+        """
+        query = """
+        MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:PARTICIPATES_IN]->(ne:NamedEntity)
+        WHERE coalesce(ne.start_tok, ne.token_start, ne.index) = $start
+          AND coalesce(ne.end_tok, ne.token_end, ne.end_index) = $end
+        RETURN ne.id AS node_id
+        LIMIT 1
+        """
+        params = {"doc_id": doc_id, "start": start_index, "end": end_index}
+        rows = self.graph.run(query, params).data()
+        if rows:
+            return rows[0].get("node_id")
+        return None
+
     def create_node(self, node_type, text, start_index, end_index, doc_id):
         """Create or merge a coreference-related node and return its generated id string.
 
@@ -54,10 +73,41 @@ class CoreferenceResolver:
         Returns:
             The string id assigned to the node (used as the node's `id` property).
         """
+        if node_type == "CorefMention":
+            existing_named_entity_id = self._find_named_entity_by_span(start_index, end_index, doc_id)
+            if existing_named_entity_id is not None:
+                query = """
+                MATCH (ne:NamedEntity {id: $node_id})
+                SET ne:CorefMention,
+                    ne.text = coalesce(ne.text, ne.value, $text),
+                    ne.start_tok = coalesce(ne.start_tok, $start),
+                    ne.end_tok = coalesce(ne.end_tok, $end),
+                    ne.startIndex = coalesce(ne.startIndex, $start),
+                    ne.endIndex = coalesce(ne.endIndex, $end)
+                RETURN ne.id
+                """
+                params = {
+                    "node_id": existing_named_entity_id,
+                    "text": text,
+                    "start": start_index,
+                    "end": end_index,
+                }
+                self.graph.run(query, params)
+                logger.debug(
+                    "create_node: re-used NamedEntity %s as CorefMention for doc=%s span=%s-%s",
+                    existing_named_entity_id,
+                    doc_id,
+                    start_index,
+                    end_index,
+                )
+                return existing_named_entity_id
+
         node_id = f"{node_type}_{doc_id}_{start_index}_{end_index}"
         query = """
         MERGE (n:%s {id: $node_id})
-        SET n.text = $text, n.startIndex = $start, n.endIndex = $end
+        SET n.text = $text,
+            n.start_tok = $start, n.end_tok = $end,
+            n.startIndex = $start, n.endIndex = $end
         RETURN n.id
         """ % node_type
         params = {"node_id": node_id, "text": text, "start": start_index, "end": end_index}

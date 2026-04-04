@@ -48,13 +48,15 @@ class PipelineSummary:
 class PipelineOrchestrator:
     """Orchestrates the execution of multi-phase NLP pipeline."""
 
+    MAINTENANCE_ONLY_PHASES = {"dbpedia_enrichment"}
+
     DEFAULT_MATERIALIZATION_THRESHOLDS = {
         "MATCH (n:AnnotatedText) RETURN count(n) AS c": 1,
         "MATCH (n:Sentence) RETURN count(n) AS c": 1,
         "MATCH (n:TagOccurrence) RETURN count(n) AS c": 1,
         "MATCH (n:TEvent) RETURN count(n) AS c": 1,
         "MATCH (n:TIMEX) RETURN count(n) AS c": 1,
-        "MATCH ()-[r:DESCRIBES]->() RETURN count(r) AS c": 1,
+        "MATCH ()-[r:FRAME_DESCRIBES_EVENT]->() WITH count(r) AS canonical MATCH ()-[l:DESCRIBES]->() RETURN CASE WHEN canonical > 0 THEN canonical ELSE count(l) END AS c": 1,
         "MATCH ()-[r:TLINK]->() RETURN count(r) AS c": 1,
     }
 
@@ -78,10 +80,19 @@ class PipelineOrchestrator:
         )
         self.start_time = None
         self.phases_executed = []
+        cfg = get_config()
+        self.runtime_mode = cfg.runtime.mode
+        self.strict_transition_gate = (
+            cfg.runtime.strict_transition_gate
+            if cfg.runtime.strict_transition_gate is not None
+            else self.runtime_mode == "testing"
+        )
         
         logger.info(f"Initialized PipelineOrchestrator (ID: {self.execution_id})")
         logger.debug(f"  Dataset directory: {self.directory}")
         logger.debug(f"  Model name: {self.model_name}")
+        logger.debug(f"  Runtime mode: {self.runtime_mode}")
+        logger.debug(f"  Strict transition gate: {self.strict_transition_gate}")
         logger.debug(f"  Config setup complete")
 
     def _dataset_files(self) -> List[Path]:
@@ -90,6 +101,21 @@ class PipelineOrchestrator:
         for pattern in patterns:
             files.extend(sorted(self.directory.glob(pattern)))
         return sorted({path.resolve() for path in files})
+
+    @staticmethod
+    def default_phases(cfg=None) -> List[str]:
+        """Return canonical phase order with optional DBpedia enrichment step."""
+        cfg = cfg or get_config()
+        phases = [
+            "ingestion",
+            "refinement",
+            "temporal",
+            "event_enrichment",
+        ]
+        if cfg.features.enable_dbpedia_enrichment:
+            phases.append("dbpedia_enrichment")
+        phases.append("tlinks")
+        return phases
 
     @staticmethod
     def _extract_document_identity(path: Path) -> Dict[str, Optional[str]]:
@@ -192,18 +218,48 @@ class PipelineOrchestrator:
                 if callable(close_fn):
                     close_fn()
 
+    @classmethod
+    def _normalized_phase_set(cls, phases: Optional[List[str]]) -> set[str]:
+        return {str(phase).strip().lower() for phase in (phases or []) if str(phase).strip()}
+
+    @classmethod
+    def phases_require_review_preparation(cls, phases: Optional[List[str]]) -> bool:
+        normalized = cls._normalized_phase_set(phases)
+        if not normalized:
+            return True
+        return not normalized.issubset(cls.MAINTENANCE_ONLY_PHASES)
+
+    @classmethod
+    def phases_require_materialization_gate(cls, phases: Optional[List[str]]) -> bool:
+        normalized = cls._normalized_phase_set(phases)
+        if not normalized:
+            return True
+        return not normalized.issubset(cls.MAINTENANCE_ONLY_PHASES)
+
     def run_for_review(self, phases: Optional[List[str]] = None) -> Dict[str, object]:
         """Prepare the graph and run the requested phases for Neo4j review."""
-        preparation = self.prepare_review_run()
-        phases = phases or [
-            "ingestion",
-            "refinement",
-            "temporal",
-            "event_enrichment",
-            "tlinks",
-        ]
+        phases = phases or self.default_phases()
+        if self.phases_require_review_preparation(phases):
+            preparation = self.prepare_review_run()
+        else:
+            preparation = {
+                "already_processed": False,
+                "database_cleared": False,
+                "cleared_node_count": 0,
+                "matched_documents": [],
+                "runtime_mode": self.runtime_mode,
+                "review_preparation_skipped": True,
+            }
         self.run_selected(phases)
-        preparation["materialization_gate"] = self.validate_materialization_gate()
+        if self.phases_require_materialization_gate(phases):
+            preparation["materialization_gate"] = self.validate_materialization_gate()
+        else:
+            preparation["materialization_gate"] = {
+                "passed": True,
+                "checks": [],
+                "skipped": True,
+                "reason": "maintenance_only_phases",
+            }
         return preparation
 
     def validate_materialization_gate(
@@ -278,6 +334,7 @@ class PipelineOrchestrator:
                     "refinement": self._run_refinement,
                     "temporal": self._run_temporal,
                     "event_enrichment": self._run_event_enrichment,
+                    "dbpedia_enrichment": self._run_dbpedia_enrichment,
                     "tlinks": self._run_tlinks,
                 }
 
@@ -330,6 +387,12 @@ class PipelineOrchestrator:
                                 f"{phase_duration:.2f}s{assertion_label}"
                             )
                             logger.debug(f"  Result: {result}")
+
+                            if self.strict_transition_gate and assertions_passed is False:
+                                raise RuntimeError(
+                                    "Strict transition gate failed: "
+                                    f"phase '{phase_name}' reported assertion failure in testing mode"
+                                )
 
                         except Exception as e:
                             phase_duration = time.time() - phase_start
@@ -415,7 +478,8 @@ class PipelineOrchestrator:
             
             wrapper = GraphBasedNLPWrapper(
                 model_name=self.model_name,
-                require_neo4j=True
+                require_neo4j=True,
+                strict_transition_gate=self.strict_transition_gate,
             )
             result = wrapper.execute(str(self.directory))
             logger.info(f"Ingestion phase: {result}")
@@ -432,7 +496,9 @@ class PipelineOrchestrator:
         try:
             from textgraphx.phase_wrappers import RefinementPhaseWrapper
             
-            wrapper = RefinementPhaseWrapper()
+            wrapper = RefinementPhaseWrapper(
+                strict_transition_gate=self.strict_transition_gate
+            )
             result = wrapper.execute()
             logger.info(f"Refinement phase: {result}")
             return result
@@ -447,7 +513,9 @@ class PipelineOrchestrator:
         try:
             from textgraphx.phase_wrappers import TemporalPhaseWrapper
             
-            wrapper = TemporalPhaseWrapper()
+            wrapper = TemporalPhaseWrapper(
+                strict_transition_gate=self.strict_transition_gate
+            )
             result = wrapper.execute()
             logger.info(f"Temporal phase: {result}")
             return result
@@ -462,7 +530,9 @@ class PipelineOrchestrator:
         try:
             from textgraphx.phase_wrappers import EventEnrichmentPhaseWrapper
             
-            wrapper = EventEnrichmentPhaseWrapper()
+            wrapper = EventEnrichmentPhaseWrapper(
+                strict_transition_gate=self.strict_transition_gate
+            )
             result = wrapper.execute()
             logger.info(f"Event enrichment phase: {result}")
             return result
@@ -477,13 +547,31 @@ class PipelineOrchestrator:
         try:
             from textgraphx.phase_wrappers import TlinksRecognizerWrapper
             
-            wrapper = TlinksRecognizerWrapper()
+            wrapper = TlinksRecognizerWrapper(
+                strict_transition_gate=self.strict_transition_gate
+            )
             result = wrapper.execute()
             logger.info(f"TLINKs phase: {result}")
             return result
         except Exception as e:
             logger.error(f"Error in TLINKs phase: {e}")
             # Fallback to stub mode on any error
+            return {"status": "error", "message": str(e)}
+
+    def _run_dbpedia_enrichment(self) -> Dict[str, any]:
+        """Run optional DBpedia enrichment phase."""
+        logger.info("Starting DBpedia enrichment phase...")
+        try:
+            from textgraphx.phase_wrappers import DBpediaEnrichmentPhaseWrapper
+
+            wrapper = DBpediaEnrichmentPhaseWrapper(
+                strict_transition_gate=self.strict_transition_gate
+            )
+            result = wrapper.execute()
+            logger.info(f"DBpedia enrichment phase: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error in DBpedia enrichment phase: {e}")
             return {"status": "error", "message": str(e)}
 
     def _count_documents(self) -> int:
@@ -657,12 +745,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument(
         "--phases",
         nargs="*",
-        default=["ingestion", "refinement", "temporal", "event_enrichment", "tlinks"],
+        default=None,
     )
     args = parser.parse_args(argv)
 
     orchestrator = PipelineOrchestrator(directory=args.directory, model_name=args.model_name)
-    result = orchestrator.run_for_review(phases=args.phases)
+    selected_phases = args.phases if args.phases else orchestrator.default_phases()
+    result = orchestrator.run_for_review(phases=selected_phases)
     logger.info("Review-run result: %s", result)
     return 0
 

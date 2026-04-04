@@ -60,8 +60,8 @@ class TlinksRecognizer:
 
     def create_tlinks_case1(self):
         logger.debug("create_tlinks_case1")
-        query = """ MATCH p= (e1:TEvent)-[:DESCRIBES]-(f1:Frame)<-[:PARTICIPANT]-(fa:FrameArgument where fa.type = 'ARGM-TMP')
-                    <-[:PARTICIPATES_IN]-(et:TagOccurrence where et.pos = 'VBD')-[:PARTICIPATES_IN]->(f2:Frame)-[:DESCRIBES]-(e2:TEvent)
+        query = """ MATCH p= (e1:TEvent)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(f1:Frame)<-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(fa:FrameArgument where fa.type = 'ARGM-TMP')
+                <-[:PARTICIPATES_IN]-(et:TagOccurrence where et.pos = 'VBD')-[:PARTICIPATES_IN]->(f2:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(e2:TEvent)
                     where fa.headTokenIndex = et.tok_index_doc and fa.signal = 'after'
                     with *
                     match (e1),(e2)
@@ -74,8 +74,8 @@ class TlinksRecognizer:
 
     def create_tlinks_case2(self):
         logger.debug("create_tlinks_case2")
-        query = """ MATCH p= (e1:TEvent)-[:DESCRIBES]-(f1:Frame)<-[:PARTICIPANT]-(fa:FrameArgument where fa.type = 'ARGM-TMP')
-                    <-[:PARTICIPATES_IN]-(et:TagOccurrence where et.pos = 'VBG')-[:PARTICIPATES_IN]->(f2:Frame)-[:DESCRIBES]-(e2:TEvent)
+        query = """ MATCH p= (e1:TEvent)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(f1:Frame)<-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(fa:FrameArgument where fa.type = 'ARGM-TMP')
+                <-[:PARTICIPATES_IN]-(et:TagOccurrence where et.pos = 'VBG')-[:PARTICIPATES_IN]->(f2:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(e2:TEvent)
                     where fa.complement = et.text and fa.syntacticType = 'EVENTIVE'
                     with *
                     merge (e1)-[tl:TLINK]-(e2)
@@ -88,8 +88,8 @@ class TlinksRecognizer:
 
     def create_tlinks_case3(self):
         logger.debug("create_tlinks_case3")
-        query = """ MATCH p= (e1:TEvent)-[:DESCRIBES]-(f1:Frame)<-[:PARTICIPANT]-(fa:FrameArgument where fa.type = 'ARGM-TMP')
-                    <-[:PARTICIPATES_IN]-(et:TagOccurrence where et.pos = 'VBG')-[:PARTICIPATES_IN]->(f2:Frame)-[:DESCRIBES]-(e2:TEvent)
+        query = """ MATCH p= (e1:TEvent)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(f1:Frame)<-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(fa:FrameArgument where fa.type = 'ARGM-TMP')
+                <-[:PARTICIPATES_IN]-(et:TagOccurrence where et.pos = 'VBG')-[:PARTICIPATES_IN]->(f2:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(e2:TEvent)
                     where fa.headTokenIndex = et.tok_index_doc and fa.syntacticType = 'EVENTIVE'
                     with *
                     merge (e1)-[tl:TLINK]-(e2)
@@ -105,7 +105,7 @@ class TlinksRecognizer:
     def create_tlinks_case4(self):
         logger.debug("create_tlinks_case4")
         query = """ MATCH p = (t:TIMEX)<-[:TRIGGERS]-(h:TagOccurrence where h.pos in ['NN','NNP'])-[:PARTICIPATES_IN]->
-                    (fa:FrameArgument {type: 'ARGM-TMP'})-[:PARTICIPANT]-(f:Frame)-[:DESCRIBES]->(e:TEvent)
+            (fa:FrameArgument {type: 'ARGM-TMP'})-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(f:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]->(e:TEvent)
                     WHERE fa.headTokenIndex = h.tok_index_doc
                     MERGE (e)-[tlink:TLINK]->(t)
                     SET tlink.source = 't2g', tlink.relType = 'IS_INCLUDED'
@@ -114,7 +114,7 @@ class TlinksRecognizer:
 
     def create_tlinks_case5(self):
         logger.debug("create_tlinks_case5")
-        query = """ MATCH p = (t:TIMEX)<-[:TRIGGERS]-(pobj:TagOccurrence where pobj.pos in ['NN','NNP'])-[:PARTICIPATES_IN]->(fa:FrameArgument {type: 'ARGM-TMP', syntacticType: 'IN'})-[:PARTICIPANT]-(f:Frame)-[:DESCRIBES]->(e:TEvent)
+        query = """ MATCH p = (t:TIMEX)<-[:TRIGGERS]-(pobj:TagOccurrence where pobj.pos in ['NN','NNP'])-[:PARTICIPATES_IN]->(fa:FrameArgument {type: 'ARGM-TMP', syntacticType: 'IN'})-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(f:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]->(e:TEvent)
                     WHERE fa.complementIndex = pobj.tok_index_doc
 
                     MERGE (e)-[tlink:TLINK]->(t)
@@ -144,7 +144,7 @@ class TlinksRecognizer:
     def create_tlinks_case6(self):
         logger.debug("create_tlinks_case6")
         query = """ MATCH p = (e:TEvent)<-[:TRIGGERS]-(t:TagOccurrence)<-[:HAS_TOKEN]-(s:Sentence)<-[:CONTAINS_SENTENCE]-(ann:AnnotatedText)-[:CREATED_ON]->(dct:TIMEX)
-                    WHERE e.modal IS NULL and NOT e.tense IN ['PRESPART', 'PASPART', 'INFINITIVE'] and NOT t.pos  IN ['NNP', 'NNS', 'NN'] 
+                    WHERE NOT (e.tense IN ['PRESPART', 'PASPART', 'INFINITIVE']) AND NOT (t.pos IN ['NNP', 'NNS', 'NN']) 
                     //AND NOT (e.tense IN ['PRESENT'] and e.aspect IN ['NONE'])
                     MERGE (e)-[tlink:TLINK]-(dct)
                     SET tlink.source = 't2g',

@@ -14,9 +14,10 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
+
+from textgraphx.time_utils import utc_iso_now
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +70,8 @@ class RunReport:
     """
 
     def __init__(self, execution_id: str = "") -> None:
-        self.execution_id = execution_id or datetime.utcnow().isoformat()
-        self.created_at: str = datetime.utcnow().isoformat()
+        self.execution_id = execution_id or utc_iso_now()
+        self.created_at: str = utc_iso_now()
         self._documents: List[DocumentStatus] = []
 
     # ------------------------------------------------------------------
@@ -96,7 +97,7 @@ class RunReport:
                 status="processed",
                 phases_completed=phases_completed,
                 duration_seconds=duration_seconds,
-                started_at=datetime.utcnow().isoformat(),
+                started_at=utc_iso_now(),
             )
         )
 
@@ -110,7 +111,7 @@ class RunReport:
                 filename=filename,
                 status="skipped",
                 reason=reason,
-                started_at=datetime.utcnow().isoformat(),
+                started_at=utc_iso_now(),
             )
         )
 
@@ -133,7 +134,7 @@ class RunReport:
                 failed_phase=failed_phase,
                 reason=reason,
                 duration_seconds=duration_seconds,
-                started_at=datetime.utcnow().isoformat(),
+                started_at=utc_iso_now(),
             )
         )
 

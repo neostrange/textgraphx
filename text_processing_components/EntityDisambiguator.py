@@ -31,7 +31,7 @@ class EntityDisambiguator:
             WHERE document.id = $documentId
             WITH document
             MATCH (document)-[*3..3]->(ne:NamedEntity)
-            WHERE NOT ne.type IN ['NP', 'TIME', 'ORDINAL', 'NUMBER', 'MONEY', 'DATE', 'CARDINAL', 'QUANTITY', 'PERCENT'] AND ne.kb_id IS NOT NULL
+            WHERE NOT (ne.type IN ['NP', 'TIME', 'ORDINAL', 'NUMBER', 'MONEY', 'DATE', 'CARDINAL', 'QUANTITY', 'PERCENT']) AND ne.kb_id IS NOT NULL
             WITH ne
             MERGE (entity:Entity {type: ne.type, kb_id:ne.kb_id, id: split(ne.kb_id, '/')[-1]})
             MERGE (ne)-[:REFERS_TO {type: "evoke"}]->(entity)
@@ -42,7 +42,7 @@ class EntityDisambiguator:
             WHERE document.id = $documentId
             WITH document
             MATCH (document)-[*3..3]->(ne:NamedEntity)
-            WHERE NOT ne.type IN ['NP', 'TIME', 'ORDINAL', 'MONEY', 'NUMBER', 'DATE', 'CARDINAL', 'QUANTITY', 'PERCENT'] AND ne.kb_id IS NULL
+            WHERE NOT (ne.type IN ['NP', 'TIME', 'ORDINAL', 'MONEY', 'NUMBER', 'DATE', 'CARDINAL', 'QUANTITY', 'PERCENT']) AND ne.kb_id IS NULL
             WITH ne
             MERGE (entity:Entity {type: ne.type, kb_id:ne.value, id:ne.value})
             MERGE (ne)-[:REFERS_TO {type: "evoke"}]->(entity)

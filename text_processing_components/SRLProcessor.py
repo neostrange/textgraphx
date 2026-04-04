@@ -46,6 +46,8 @@ class SRLProcessor:
         query = """
         MERGE (f:Frame {id: $frame_id})
         SET f.headword = $headword, f.headTokenIndex = $head_index, f.text = $text,
+            f.framework = 'PROPBANK',
+            f.start_tok = $start, f.end_tok = $end,
             f.startIndex = $start, f.endIndex = $end
         RETURN id(f) as frame_node_id
         """
@@ -95,6 +97,7 @@ class SRLProcessor:
         query = """
         MERGE (a:FrameArgument {id: $arg_id})
         SET a.head = $head, a.headTokenIndex = $head_index, a.type = $arg_type, a.text = $text,
+            a.start_tok = $start, a.end_tok = $end,
             a.startIndex = $start, a.endIndex = $end
         RETURN id(a) as arg_node_id
         """
@@ -151,6 +154,8 @@ class SRLProcessor:
                         MATCH (a:FrameArgument {id: $arg_id}), (f:Frame {id: $frame_id})
                         MERGE (a)-[r:PARTICIPANT]->(f)
                         SET r.type = $arg_type
+                        MERGE (a)-[cr:HAS_FRAME_ARGUMENT]->(f)
+                        SET cr.type = $arg_type
                         RETURN id(r)
                         """
                         params = {"arg_id": arg_id, "frame_id": sg_id, "arg_type": arg_type}

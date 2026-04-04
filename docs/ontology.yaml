@@ -150,6 +150,81 @@ relationships:
   HAS_EVIDENCE: Relationship -> Evidence
   FROM: entity <- Relationship
   TO: entity <- Relationship
+
+schema_tiers:
+  canonical:
+    node_labels:
+    - AnnotatedText
+    - Sentence
+    - TagOccurrence
+    - NamedEntity
+    - Entity
+    - Frame
+    - FrameArgument
+    - Antecedent
+    - CorefMention
+    - TIMEX
+    - TEvent
+    relationship_types:
+    - CONTAINS_SENTENCE
+    - HAS_TOKEN
+    - HAS_NEXT
+    - IS_DEPENDENT
+    - PARTICIPATES_IN
+    - REFERS_TO
+    - PARTICIPANT
+    - TRIGGERS
+    - DESCRIBES
+    - CREATED_ON
+    - TLINK
+    - COREF
+  optional:
+    node_labels:
+    - PhaseRun
+    - RefinementRun
+    relationship_types:
+    - CO_OCCURS_WITH
+    - SAME_AS
+  legacy:
+    node_labels:
+    - Keyword
+    - Evidence
+    - Relationship
+    relationship_types:
+    - IS_RELATED_TO
+    - SOURCE
+    - DESTINATION
+    - HAS_EVIDENCE
+    - FROM
+    - TO
+
+identity_policy:
+  doc_id_type: integer
+  doc_id_owner: AnnotatedText.id
+  notes: Temporal and event subgraphs should use the same doc_id type as AnnotatedText.id.
+
+span_contract:
+  token_fields:
+  - start_tok
+  - end_tok
+  char_fields:
+  - start_char
+  - end_char
+  legacy_aliases:
+    start_tok:
+    - startIndex
+    - index
+    - begin
+    end_tok:
+    - endIndex
+    - end_index
+    - end
+    start_char:
+    - index
+    - begin
+    end_char:
+    - end_index
+    - end
 diagnostics:
 - name: TagOccurrence
   query: MATCH (n:TagOccurrence) RETURN count(n) AS cnt

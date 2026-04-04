@@ -3,12 +3,16 @@ Execution history storage and retrieval for TextGraphX pipeline.
 Stores pipeline executions to SQLite database for auditing and analysis.
 """
 
+import logging
 import json
 import sqlite3
-from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Dict
-import logging
+from typing import Dict, List, Optional
+
+try:
+    from textgraphx.time_utils import utc_iso_now
+except ImportError:  # pragma: no cover - support script-style execution
+    from time_utils import utc_iso_now
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +41,8 @@ class ExecutionRecord:
         self.phase_timings = phase_timings
         self.documents_processed = documents_processed
         self.error_message = error_message
-        self.started_at = started_at or datetime.utcnow().isoformat()
-        self.completed_at = completed_at or datetime.utcnow().isoformat()
+        self.started_at = started_at or utc_iso_now()
+        self.completed_at = completed_at or utc_iso_now()
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""

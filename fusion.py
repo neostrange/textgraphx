@@ -28,9 +28,9 @@ def fuse_entities_cross_sentence(
     _validate_confidence(confidence)
 
     query = """
-    MATCH (d:AnnotatedText)-[:CONTAINS]->(s:Sentence)
-    MATCH (s)<-[:PARTICIPATES_IN]-(to1:TagOccurrence)-[:PARTICIPATES_IN]->(ne1:NamedEntity)-[:REFERS_TO]->(e1:Entity)
-    MATCH (s)<-[:PARTICIPATES_IN]-(to2:TagOccurrence)-[:PARTICIPATES_IN]->(ne2:NamedEntity)-[:REFERS_TO]->(e2:Entity)
+    MATCH (d:AnnotatedText)-[:CONTAINS_SENTENCE]->(s:Sentence)
+    MATCH (s)-[:HAS_TOKEN]->(to1:TagOccurrence)-[:PARTICIPATES_IN]->(ne1:NamedEntity)-[:REFERS_TO]->(e1:Entity)
+    MATCH (s)-[:HAS_TOKEN]->(to2:TagOccurrence)-[:PARTICIPATES_IN]->(ne2:NamedEntity)-[:REFERS_TO]->(e2:Entity)
     WHERE e1 <> e2
       AND id(e1) < id(e2)
       AND ($doc_id IS NULL OR d.id = $doc_id)
@@ -67,9 +67,9 @@ def fuse_entities_cross_document(
     _validate_confidence(confidence)
 
     query = """
-    MATCH (d1:AnnotatedText)-[:CONTAINS]->(:Sentence)<-[:PARTICIPATES_IN]-(:TagOccurrence)
+    MATCH (d1:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)
           -[:PARTICIPATES_IN]->(:NamedEntity)-[:REFERS_TO]->(e1:Entity)
-    MATCH (d2:AnnotatedText)-[:CONTAINS]->(:Sentence)<-[:PARTICIPATES_IN]-(:TagOccurrence)
+    MATCH (d2:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)
           -[:PARTICIPATES_IN]->(:NamedEntity)-[:REFERS_TO]->(e2:Entity)
     WHERE d1.id <> d2.id
       AND e1 <> e2

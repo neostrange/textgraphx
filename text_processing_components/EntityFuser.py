@@ -32,7 +32,9 @@ class EntityFuser:
             WITH ne, a, p
             set ne.head = a.text, ne.headTokenIndex = a.tok_index_doc, 
             (case when a.pos in ['NNS', 'NN'] then ne END).syntacticType ='NOMINAL' ,
-            (case when a.pos in ['NNP', 'NNPS'] then ne END).syntacticType ='NAM' 
+            (case when a.pos in ['NNP', 'NNPS'] then ne END).syntacticType ='NAM',
+            (case when a.pos in ['NNS', 'NN'] then ne END).syntactic_type ='NOM',
+            (case when a.pos in ['NNP', 'NNPS'] then ne END).syntactic_type ='NAM' 
         """
         self.logger.debug("assign_head_info_to_multitoken_entities: running for %s", document_id)
         self.execute_query(query, {'documentId': document_id})
@@ -52,7 +54,9 @@ class EntityFuser:
             WITH ne, a, p
             set ne.head = a.text, ne.headTokenIndex = a.tok_index_doc, 
             (case when a.pos in ['NNS', 'NN'] then ne END).syntacticType ='NOMINAL' ,
-            (case when a.pos in ['NNP', 'NNPS'] then ne END).syntacticType ='NAM'   
+            (case when a.pos in ['NNP', 'NNPS'] then ne END).syntacticType ='NAM',
+            (case when a.pos in ['NNS', 'NN'] then ne END).syntactic_type ='NOM',
+            (case when a.pos in ['NNP', 'NNPS'] then ne END).syntactic_type ='NAM'   
         """
         self.logger.debug("assign_head_info_to_singletoken_entities: running for %s", document_id)
         self.execute_query(query, {'documentId': document_id})

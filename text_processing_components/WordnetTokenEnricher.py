@@ -58,6 +58,7 @@ class WordnetTokenEnricher:
                         lemma, pos, sense_num = synset_identifier.split('.')
                         wn_synset_offset = synset.offset()
                         wn_synset_offset = str(wn_synset_offset) + pos
+                        wn_lexname = synset.lexname()
 
                         # Get hypernyms, synonyms, and domain labels for the synset
                         hypernyms = self.get_all_hypernyms(synset)
@@ -67,14 +68,16 @@ class WordnetTokenEnricher:
                         # Update the Token node in Neo4j with synset-related information
                         update_query = """
                         MATCH (t:TagOccurrence {id: $token_id})
-                        SET t.hypernyms = $hypernyms, t.wn31SynsetOffset = $wn31SynsetOffset, t.synonyms = $synonyms, t.domain_labels = $domain_labels
+                        SET t.hypernyms = $hypernyms, t.wn31SynsetOffset = $wn31SynsetOffset, t.synonyms = $synonyms, t.domain_labels = $domain_labels,
+                            t.wnLexname = $wnLexname
                         """
                         params = {
                             "token_id": token_id,
                             "hypernyms": hypernyms,
                             "synonyms": synonyms,
                             "domain_labels": domain_labels,
-                            "wn31SynsetOffset": wn_synset_offset
+                            "wn31SynsetOffset": wn_synset_offset,
+                            "wnLexname": wn_lexname
                         }
                         self.neo4j_executor.execute_query(update_query, params)
                     except Exception as e:

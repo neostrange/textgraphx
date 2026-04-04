@@ -3,17 +3,21 @@ REST API for TextGraphX pipeline orchestration.
 Provides HTTP endpoints for triggering runs, checking status, and retrieving results.
 """
 
-import uuid
 import logging
-from typing import List, Optional
-from datetime import datetime
+import uuid
 from pathlib import Path
+from typing import List, Optional
+
+try:
+    from textgraphx.time_utils import utc_iso_now
+except ImportError:  # pragma: no cover - support script-style execution
+    from time_utils import utc_iso_now
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from execution_history import ExecutionHistory, ExecutionRecord
 from execution_summary import ExecutionSummary
-from PipelineOrchestrator import PipelineOrchestrator
+from textgraphx.orchestration.orchestrator import PipelineOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +84,7 @@ async def health_check():
         stats = _execution_history.get_statistics()
         return {
             "status": "healthy",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": utc_iso_now(),
             "database": "connected" if stats else "unknown",
         }
     except Exception as e:

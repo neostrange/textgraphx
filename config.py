@@ -1,5 +1,7 @@
 """Central configuration loader for textgraphx.
 
+run command temporary: /home/neo/environments/textgraphx/.venv/bin/python /home/neo/environments/textgraphx/textgraphx/run_pipeline.py
+
 Supports INI and optional TOML configs and environment variable overrides.
 
 Usage:
@@ -47,20 +49,30 @@ class ServicesConfig:
     wsd_url: str = "http://localhost:81/api/model"
     coref_url: str = "http://localhost:9999/coreference_resolution"
     temporal_url: str = "http://localhost:5050/annotate"
-    heideltime_url: str = "http://localhost:5000/annotate"
+    heideltime_url: str = "http://localhost:5050/annotate"
     srl_url: str = "http://localhost:8000/predict"
     llm_url: str = "http://localhost:11434/api/generate"
+    dbpedia_sparql_url: str = "https://dbpedia.org/sparql"
+    dbpedia_spotlight_url: str = "https://api.dbpedia-spotlight.org/en/annotate"
+    dbpedia_timeout_sec: int = 8
+    dbpedia_max_entities_per_run: int = 500
+    dbpedia_spotlight_confidence: float = 0.5
+    dbpedia_spotlight_support: int = 20
+    dbpedia_spotlight_min_similarity: float = 0.8
 
 
 @dataclass
 class RuntimeConfig:
     mode: str = "production"
+    strict_transition_gate: Optional[bool] = None
+    naf_sentence_mode: str = "auto"
 
 
 @dataclass
 class FeatureFlags:
     create_refinement_run: bool = True
     compute_token_ids: bool = False
+    enable_dbpedia_enrichment: bool = False
 
 
 @dataclass
@@ -106,6 +118,32 @@ def _coerce_bool(val: Optional[str]) -> bool:
         return False
     v = str(val).lower()
     return v in ("1", "true", "yes", "on")
+
+
+def _coerce_optional_bool(val: Optional[str]) -> Optional[bool]:
+    if val is None:
+        return None
+    v = str(val).strip().lower()
+    if v in ("", "auto", "default"):
+        return None
+    if v in ("1", "true", "yes", "on"):
+        return True
+    if v in ("0", "false", "no", "off"):
+        return False
+    raise ValueError(
+        "runtime.strict_transition_gate must be one of: "
+        "auto/default/true/false/1/0/yes/no/on/off"
+    )
+
+
+def _coerce_naf_sentence_mode(val: Optional[str]) -> str:
+    mode = ("auto" if val is None else str(val)).strip().lower()
+    allowed = {"auto", "preserve", "meantime", "legacy"}
+    if mode not in allowed:
+        raise ValueError(
+            "runtime.naf_sentence_mode must be one of: auto/preserve/meantime/legacy"
+        )
+    return mode
 
 
 def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
@@ -177,8 +215,17 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
             if cp.has_section('features'):
                 features.create_refinement_run = _coerce_bool(cp.get('features', 'create_refinement_run', fallback=str(features.create_refinement_run)))
                 features.compute_token_ids = _coerce_bool(cp.get('features', 'compute_token_ids', fallback=str(features.compute_token_ids)))
+                features.enable_dbpedia_enrichment = _coerce_bool(
+                    cp.get('features', 'enable_dbpedia_enrichment', fallback=str(features.enable_dbpedia_enrichment))
+                )
             if cp.has_section('runtime'):
                 runtime.mode = cp.get('runtime', 'mode', fallback=runtime.mode).strip().lower()
+                runtime.strict_transition_gate = _coerce_optional_bool(
+                    cp.get('runtime', 'strict_transition_gate', fallback=None)
+                )
+                runtime.naf_sentence_mode = _coerce_naf_sentence_mode(
+                    cp.get('runtime', 'naf_sentence_mode', fallback=runtime.naf_sentence_mode)
+                )
             if cp.has_section('services'):
                 services.wsd_url = cp.get('services', 'wsd_url', fallback=services.wsd_url)
                 services.coref_url = cp.get('services', 'coref_url', fallback=services.coref_url)
@@ -186,6 +233,46 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
                 services.heideltime_url = cp.get('services', 'heideltime_url', fallback=services.heideltime_url)
                 services.srl_url = cp.get('services', 'srl_url', fallback=services.srl_url)
                 services.llm_url = cp.get('services', 'llm_url', fallback=services.llm_url)
+                services.dbpedia_sparql_url = cp.get('services', 'dbpedia_sparql_url', fallback=services.dbpedia_sparql_url)
+                services.dbpedia_spotlight_url = cp.get('services', 'dbpedia_spotlight_url', fallback=services.dbpedia_spotlight_url)
+                try:
+                    services.dbpedia_timeout_sec = int(
+                        cp.get('services', 'dbpedia_timeout_sec', fallback=str(services.dbpedia_timeout_sec))
+                    )
+                except Exception:
+                    pass
+                try:
+                    services.dbpedia_max_entities_per_run = int(
+                        cp.get('services', 'dbpedia_max_entities_per_run', fallback=str(services.dbpedia_max_entities_per_run))
+                    )
+                except Exception:
+                    pass
+                try:
+                    services.dbpedia_spotlight_support = int(
+                        cp.get('services', 'dbpedia_spotlight_support', fallback=str(services.dbpedia_spotlight_support))
+                    )
+                except Exception:
+                    pass
+                try:
+                    services.dbpedia_spotlight_confidence = float(
+                        cp.get(
+                            'services',
+                            'dbpedia_spotlight_confidence',
+                            fallback=str(services.dbpedia_spotlight_confidence),
+                        )
+                    )
+                except Exception:
+                    pass
+                try:
+                    services.dbpedia_spotlight_min_similarity = float(
+                        cp.get(
+                            'services',
+                            'dbpedia_spotlight_min_similarity',
+                            fallback=str(services.dbpedia_spotlight_min_similarity),
+                        )
+                    )
+                except Exception:
+                    pass
         else:
             tom = _read_toml(file_cfg)
             neo_map = tom.get('neo4j', {})
@@ -207,8 +294,23 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
             feat_map = tom.get('features', {})
             features.create_refinement_run = bool(feat_map.get('create_refinement_run', features.create_refinement_run))
             features.compute_token_ids = bool(feat_map.get('compute_token_ids', features.compute_token_ids))
+            features.enable_dbpedia_enrichment = bool(
+                feat_map.get('enable_dbpedia_enrichment', features.enable_dbpedia_enrichment)
+            )
             runtime_map = tom.get('runtime', {})
             runtime.mode = str(runtime_map.get('mode', runtime.mode)).strip().lower()
+            if 'strict_transition_gate' in runtime_map:
+                v = runtime_map.get('strict_transition_gate')
+                if v is None:
+                    runtime.strict_transition_gate = None
+                elif isinstance(v, bool):
+                    runtime.strict_transition_gate = v
+                else:
+                    runtime.strict_transition_gate = _coerce_optional_bool(str(v))
+            if 'naf_sentence_mode' in runtime_map:
+                runtime.naf_sentence_mode = _coerce_naf_sentence_mode(
+                    str(runtime_map.get('naf_sentence_mode'))
+                )
             svc_map = tom.get('services', {})
             services.wsd_url = svc_map.get('wsd_url', services.wsd_url)
             services.coref_url = svc_map.get('coref_url', services.coref_url)
@@ -216,6 +318,23 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
             services.heideltime_url = svc_map.get('heideltime_url', services.heideltime_url)
             services.srl_url = svc_map.get('srl_url', services.srl_url)
             services.llm_url = svc_map.get('llm_url', services.llm_url)
+            services.dbpedia_sparql_url = svc_map.get('dbpedia_sparql_url', services.dbpedia_sparql_url)
+            services.dbpedia_spotlight_url = svc_map.get('dbpedia_spotlight_url', services.dbpedia_spotlight_url)
+            services.dbpedia_timeout_sec = int(
+                svc_map.get('dbpedia_timeout_sec', services.dbpedia_timeout_sec)
+            )
+            services.dbpedia_max_entities_per_run = int(
+                svc_map.get('dbpedia_max_entities_per_run', services.dbpedia_max_entities_per_run)
+            )
+            services.dbpedia_spotlight_support = int(
+                svc_map.get('dbpedia_spotlight_support', services.dbpedia_spotlight_support)
+            )
+            services.dbpedia_spotlight_confidence = float(
+                svc_map.get('dbpedia_spotlight_confidence', services.dbpedia_spotlight_confidence)
+            )
+            services.dbpedia_spotlight_min_similarity = float(
+                svc_map.get('dbpedia_spotlight_min_similarity', services.dbpedia_spotlight_min_similarity)
+            )
 
     # environment overrides
     if allow_env:
@@ -243,8 +362,18 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
             features.create_refinement_run = _coerce_bool(os.getenv('TEXTGRAPHX_CREATE_REFINEMENT_RUN'))
         if os.getenv('TEXTGRAPHX_COMPUTE_TOKEN_IDS') is not None:
             features.compute_token_ids = _coerce_bool(os.getenv('TEXTGRAPHX_COMPUTE_TOKEN_IDS'))
+        if os.getenv('TEXTGRAPHX_ENABLE_DBPEDIA_ENRICHMENT') is not None:
+            features.enable_dbpedia_enrichment = _coerce_bool(
+                os.getenv('TEXTGRAPHX_ENABLE_DBPEDIA_ENRICHMENT')
+            )
 
         runtime.mode = (os.getenv('TEXTGRAPHX_RUNTIME_MODE') or runtime.mode).strip().lower()
+        env_strict = os.getenv('TEXTGRAPHX_STRICT_TRANSITION_GATE')
+        if env_strict is not None:
+            runtime.strict_transition_gate = _coerce_optional_bool(env_strict)
+        env_naf_mode = os.getenv('TEXTGRAPHX_NAF_SENTENCE_MODE')
+        if env_naf_mode is not None:
+            runtime.naf_sentence_mode = _coerce_naf_sentence_mode(env_naf_mode)
 
         services.wsd_url = os.getenv('WSD_API_URL') or services.wsd_url
         services.coref_url = os.getenv('COREF_SERVICE_URL') or services.coref_url
@@ -252,9 +381,47 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
         services.heideltime_url = os.getenv('HEIDELTIME_SERVICE_URL') or services.heideltime_url
         services.srl_url = os.getenv('SRL_SERVICE_URL') or services.srl_url
         services.llm_url = os.getenv('LLM_API_URL') or services.llm_url
+        services.dbpedia_sparql_url = os.getenv('DBPEDIA_SPARQL_URL') or services.dbpedia_sparql_url
+        services.dbpedia_spotlight_url = os.getenv('DBPEDIA_SPOTLIGHT_URL') or services.dbpedia_spotlight_url
+
+        dbpedia_timeout = os.getenv('DBPEDIA_TIMEOUT_SEC')
+        if dbpedia_timeout is not None:
+            try:
+                services.dbpedia_timeout_sec = int(dbpedia_timeout)
+            except Exception:
+                pass
+
+        dbpedia_limit = os.getenv('DBPEDIA_MAX_ENTITIES_PER_RUN')
+        if dbpedia_limit is not None:
+            try:
+                services.dbpedia_max_entities_per_run = int(dbpedia_limit)
+            except Exception:
+                pass
+
+        dbpedia_support = os.getenv('DBPEDIA_SPOTLIGHT_SUPPORT')
+        if dbpedia_support is not None:
+            try:
+                services.dbpedia_spotlight_support = int(dbpedia_support)
+            except Exception:
+                pass
+
+        dbpedia_confidence = os.getenv('DBPEDIA_SPOTLIGHT_CONFIDENCE')
+        if dbpedia_confidence is not None:
+            try:
+                services.dbpedia_spotlight_confidence = float(dbpedia_confidence)
+            except Exception:
+                pass
+
+        dbpedia_min_similarity = os.getenv('DBPEDIA_SPOTLIGHT_MIN_SIMILARITY')
+        if dbpedia_min_similarity is not None:
+            try:
+                services.dbpedia_spotlight_min_similarity = float(dbpedia_min_similarity)
+            except Exception:
+                pass
 
     if runtime.mode not in {"production", "testing"}:
         raise ValueError("runtime.mode must be either 'production' or 'testing'")
+    runtime.naf_sentence_mode = _coerce_naf_sentence_mode(runtime.naf_sentence_mode)
 
     cfg = Config(
         neo4j=neo,
@@ -295,9 +462,21 @@ output_dir = out
 [features]
 create_refinement_run = true
 compute_token_ids = false
+enable_dbpedia_enrichment = false
 
 [runtime]
 mode = production
+strict_transition_gate = auto
+naf_sentence_mode = auto
+
+[services]
+dbpedia_sparql_url = https://dbpedia.org/sparql
+dbpedia_spotlight_url = https://api.dbpedia-spotlight.org/en/annotate
+dbpedia_timeout_sec = 8
+dbpedia_max_entities_per_run = 500
+dbpedia_spotlight_confidence = 0.5
+dbpedia_spotlight_support = 20
+dbpedia_spotlight_min_similarity = 0.8
 """
 
     example_toml = """[neo4j]
@@ -319,9 +498,21 @@ output_dir = "out"
 [features]
 create_refinement_run = true
 compute_token_ids = false
+enable_dbpedia_enrichment = false
 
 [runtime]
 mode = "production"
+strict_transition_gate = "auto"
+naf_sentence_mode = "auto"
+
+[services]
+dbpedia_sparql_url = "https://dbpedia.org/sparql"
+dbpedia_spotlight_url = "https://api.dbpedia-spotlight.org/en/annotate"
+dbpedia_timeout_sec = 8
+dbpedia_max_entities_per_run = 500
+dbpedia_spotlight_confidence = 0.5
+dbpedia_spotlight_support = 20
+dbpedia_spotlight_min_similarity = 0.8
 """
 
     if fmt == 'ini':

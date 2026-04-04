@@ -21,7 +21,9 @@ from spacy.lang.char_classes import CONCAT_QUOTES, LIST_ELLIPSES, LIST_ICONS
 from spacy.util import compile_infix_regex
 from neo4j import GraphDatabase
 from textgraphx.TextProcessor import Neo4jRepository
-from textgraphx.text_processing_components.DocumentImporter import MeantimeXMLImporter
+from textgraphx.text_processing_components.DocumentImporter import MeantimeXMLImporter, resolve_document_id_from_naf_root
+from textgraphx.text_normalization import normalize_naf_raw_text
+from textgraphx.config import get_config
 # from spacy.util import load_config
 
 # from spacy_llm.util import assemble
@@ -105,6 +107,7 @@ class GraphBasedNLP(GraphDBBase):
         # Initialize the text processor
         t0 = time.time()
         self.__text_processor = TextProcessor(self.nlp, self._driver)
+        self._naf_sentence_mode = get_config().runtime.naf_sentence_mode
         logger.info("TextProcessor initialized in %.3fs", time.time() - t0)
         # expose the neo4j repository from the TextProcessor for backwards compatibility
         try:
@@ -244,15 +247,17 @@ class GraphBasedNLP(GraphDBBase):
                     tree = ET.parse(directory+'/' + filename)
                     root = tree.getroot()
                     
-                    # Extract the text from the XML file
-                    text = root[1].text
-                    # If there is no whitespace in between sentences, usually been observed in web scraped text, then add a whitespace
-                    # in between full stop and CRLF. 
-                    text = text.replace(".\n", ". \n")
-                    # we are replacing newlines with a single-space. It is due to fix incorrect sentence segmentation in spacy
-                    # which does not take into the consideration the double quotes as a sentence end. 
-                    text = text.replace('”\n', '” ') # some sentences end with a double quote and then there is no space between it and the next sentence. It result in incorrect result.
-                    text = text.replace('\n', '')
+                    resolved_text_id = resolve_document_id_from_naf_root(root, text_id)
+
+                    # Extract text and normalize it for robust sentence segmentation.
+                    text = root[1].text if len(root) > 1 else ""
+                    naf_sentence_mode = self._naf_sentence_mode
+                    text = normalize_naf_raw_text(text, mode=naf_sentence_mode)
+                    logger.debug(
+                        "Applied NAF sentence normalization mode='%s' for file=%s",
+                        naf_sentence_mode,
+                        filename,
+                    )
                     
                     # Read the text file
                     text_file = open(directory+'/'+filename, 'r')
@@ -271,7 +276,7 @@ class GraphBasedNLP(GraphDBBase):
 
                     # if document_importer:
                     #     document_importer.import_document()
-                    document_importer = MeantimeXMLImporter(text_id, data, text, self.neo4j_repository)
+                    document_importer = MeantimeXMLImporter(resolved_text_id, data, text, self.neo4j_repository)
                     document_importer.import_document()
                     #self.__text_processor.create_annotated_text(data, text, text_id)
                     
