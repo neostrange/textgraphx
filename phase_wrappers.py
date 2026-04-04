@@ -624,8 +624,11 @@ class TemporalPhaseWrapper:
                                 temporal.create_tevents2(doc_id)
                                 progress.update(1, f"Created temporal events for {doc_id}")
 
-                                temporal.create_event_mentions2(doc_id)
-                                progress.update(1, f"Created event mentions for {doc_id}")
+                                if hasattr(temporal, "create_event_mentions2"):
+                                    temporal.create_event_mentions2(doc_id)
+                                    progress.update(1, f"Created event mentions for {doc_id}")
+                                else:
+                                    progress.update(1, f"Skipped event mentions (unsupported) for {doc_id}")
 
                                 temporal.create_signals2(doc_id)
                                 progress.update(1, f"Created temporal signals for {doc_id}")

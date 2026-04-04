@@ -14,7 +14,6 @@ Important notes:
 """
 
 import os
-import spacy
 import sys
 
 if __name__ == '__main__' and __package__ is None:
@@ -22,9 +21,6 @@ if __name__ == '__main__' and __package__ is None:
         if repo_root not in sys.path:
                 sys.path.insert(0, repo_root)
 
-
-
-from spacy.tokens import Doc, Token, Span
 from textgraphx.util.GraphDbBase import GraphDBBase
 import xml.etree.ElementTree as ET
 # legacy py2neo imports removed; use bolt-driver wrapper via neo4j_client
@@ -74,6 +70,48 @@ def _iter_timex_elements(xml_text):
     for elem in root.iter():
         tag = elem.tag.split("}")[-1] if isinstance(elem.tag, str) else elem.tag
         if tag == "TIMEX3":
+            yield elem
+
+
+def _iter_event_elements(xml_text):
+    """Yield EVENT elements from TTK XML payloads."""
+    if not xml_text:
+        return
+
+    root = None
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        try:
+            root = ET.fromstring(f"<root>{xml_text}</root>")
+        except ET.ParseError:
+            logger.exception("Failed to parse temporal XML for EVENT extraction")
+            return
+
+    for elem in root.iter():
+        tag = elem.tag.split("}")[-1] if isinstance(elem.tag, str) else elem.tag
+        if tag == "EVENT":
+            yield elem
+
+
+def _iter_signal_elements(xml_text):
+    """Yield SIGNAL elements from TTK XML payloads."""
+    if not xml_text:
+        return
+
+    root = None
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        try:
+            root = ET.fromstring(f"<root>{xml_text}</root>")
+        except ET.ParseError:
+            logger.exception("Failed to parse temporal XML for SIGNAL extraction")
+            return
+
+    for elem in root.iter():
+        tag = elem.tag.split("}")[-1] if isinstance(elem.tag, str) else elem.tag
+        if tag == "SIGNAL":
             yield elem
 
 
@@ -307,6 +345,39 @@ class TemporalPhase():
             )
             created += 1
 
+        if created == 0:
+            fallback_query = """
+            MATCH (a:AnnotatedText {id: toInteger($doc_id)})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok:TagOccurrence)-[:PARTICIPATES_IN]->(fa:FrameArgument)
+            WHERE fa.type IN ['ARGM-TMP', 'TMP', 'TIME', 'DATE']
+            WITH fa, min(tok.tok_index_doc) AS min_tok, max(tok.tok_index_doc) AS max_tok,
+                 min(tok.index) AS min_char, max(tok.end_index) AS max_char,
+                 collect(tok) AS toks
+            WHERE min_tok IS NOT NULL AND max_tok IS NOT NULL
+            WITH fa, min_tok, max_tok, min_char, max_char, toks,
+                 'tmp_' + toString(toInteger($doc_id)) + '_' + toString(min_tok) + '_' + toString(max_tok) AS tid
+            MERGE (t:TIMEX {tid: tid, doc_id: toInteger($doc_id)})
+            SET t.origin = coalesce(t.origin, 'fallback_frameargument'),
+                t.type = coalesce(t.type, 'DATE'),
+                t.value = coalesce(t.value, ''),
+                t.text = coalesce(fa.text, t.text, ''),
+                t.quant = coalesce(t.quant, 'N/A'),
+                t.start_index = coalesce(t.start_index, toInteger(min_char)),
+                t.end_index = coalesce(t.end_index, toInteger(max_char)),
+                t.begin = coalesce(t.begin, toInteger(min_char)),
+                t.end = coalesce(t.end, toInteger(max_char)),
+                t.start_char = coalesce(t.start_char, toInteger(min_char)),
+                t.end_char = coalesce(t.end_char, toInteger(max_char)),
+                t.start_tok = coalesce(t.start_tok, min_tok),
+                t.end_tok = coalesce(t.end_tok, max_tok),
+                t.functionInDocument = coalesce(t.functionInDocument, 'NONE')
+            FOREACH (one IN toks | MERGE (one)-[:TRIGGERS]->(t))
+            RETURN count(DISTINCT t) AS timex_fallback_created
+            """
+            rows = graph.run(fallback_query, parameters={"doc_id": doc_id}).data()
+            fallback_created = rows[0].get("timex_fallback_created", 0) if rows else 0
+            if fallback_created:
+                logger.info("create_timexes2: fallback merged %d TIMEX nodes from FrameArgument spans", fallback_created)
+
         logger.info("create_timexes2: merged %d TIMEX nodes", created)
         
         return ""
@@ -315,21 +386,22 @@ class TemporalPhase():
     def callHeidelTimeService(self, parameters):
         dct = parameters.get("dct")
         text = parameters.get("text")
-        
-        #String.replace(split(ann.creationtime, 'T')[0],'-','')
 
+        if not dct or not text:
+            logger.warning("callHeidelTimeService: missing dct/text payload; returning empty response")
+            return ""
 
-        dct = dct.split('T')[0]
-
-
-        data = {"input":text, "dct": dct}
-
+        dct = str(dct).split('T')[0]
+        data = {"input": text, "dct": dct}
         headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
 
-        response = requests.post(self.heideltime_url, json=data, headers=headers)
-
-        # print(response.content)
-        return response.text
+        try:
+            response = requests.post(self.heideltime_url, json=data, headers=headers, timeout=20)
+            response.raise_for_status()
+            return response.text
+        except requests.RequestException as exc:
+            logger.warning("callHeidelTimeService failed: %s", exc)
+            return ""
 
 
 
@@ -357,22 +429,23 @@ class TemporalPhase():
     def callTtkService(self, parameters):
         dct = parameters.get("dct")
         text = parameters.get("text")
-        
-        #String.replace(split(ann.creationtime, 'T')[0],'-','')
 
+        if not dct or not text:
+            logger.warning("callTtkService: missing dct/text payload; returning empty response")
+            return ""
 
-        dct = dct.split('T')[0]
-
-        dct.replace('-','')
-
-        data = {"input":text, "dct": dct}
-
+        dct = str(dct).split('T')[0]
+        dct = dct.replace('-', '')
+        data = {"input": text, "dct": dct}
         headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
 
-        response = requests.post(self.temporal_url, json=data, headers=headers)
-
-        # print(response.content)
-        return response.text
+        try:
+            response = requests.post(self.temporal_url, json=data, headers=headers, timeout=20)
+            response.raise_for_status()
+            return response.text
+        except requests.RequestException as exc:
+            logger.warning("callTtkService failed: %s", exc)
+            return ""
 
 
     def _get_ttk_xml(self, doc_id):
@@ -385,67 +458,141 @@ class TemporalPhase():
         doc_id = str(doc_id)
         graph = self.graph
 
-        query = """WITH $result_xml AS xmlString
-                    WITH apoc.xml.parse(xmlString) AS result
-                    UNWIND [item in result._children where item._type ="tarsqi_tags"] AS tarsqi
-                    UNWIND [item in tarsqi._children where item._type ="SIGNAL"] AS signal
-                    WITH coalesce(signal.sid, 'sig_' + $doc_id + '_' + coalesce(signal.begin, signal.start_index, 'na') + '_' + coalesce(signal.end, signal.end_index, 'na')) AS sid,
-                         coalesce(signal.begin, signal.start_index) AS begin,
-                         coalesce(signal.end, signal.end_index) AS end,
-                         coalesce(signal._text, signal.text) AS text
-                    WHERE begin IS NOT NULL AND end IS NOT NULL
-                    MERGE (s:Signal {id: sid, doc_id: toInteger($doc_id)})
-                    SET s.type = 'SIGNAL',
-                        s.text = text,
-                        s.start_char = toInteger(begin),
-                        s.end_char = toInteger(end)
-                    WITH s
-                    MATCH (a:AnnotatedText {id:toInteger($doc_id)})-[*2]->(ta:TagOccurrence)
-                    WHERE ta.index >= toInteger(s.start_char) AND ta.end_index <= toInteger(s.end_char)
-                    WITH s, collect(ta) AS tas, min(ta.tok_index_doc) AS min_tok, max(ta.tok_index_doc) AS max_tok
-                    SET s.start_tok = min_tok,
-                        s.end_tok = max_tok
-                    FOREACH (one IN tas | MERGE (one)-[:TRIGGERS]->(s))
+        query = """
+                MERGE (s:Signal {id: $sid, doc_id: toInteger($doc_id)})
+                SET s.type = 'SIGNAL',
+                    s.text = $text,
+                    s.start_char = toInteger($start_char),
+                    s.end_char = toInteger($end_char)
+                WITH s
+                MATCH (a:AnnotatedText {id:toInteger($doc_id)})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(ta:TagOccurrence)
+                WHERE ta.index >= toInteger(s.start_char) AND ta.end_index <= toInteger(s.end_char)
+                WITH s, collect(ta) AS tas, min(ta.tok_index_doc) AS min_tok, max(ta.tok_index_doc) AS max_tok
+                SET s.start_tok = min_tok,
+                    s.end_tok = max_tok
+                FOREACH (one IN tas | MERGE (one)-[:TRIGGERS]->(s))
                 """
 
-        graph.run(query, parameters={"result_xml": result_xml, "doc_id": doc_id}).data()
+        created = 0
+        for signal in _iter_signal_elements(result_xml):
+            begin = signal.attrib.get("begin") or signal.attrib.get("start_index")
+            end = signal.attrib.get("end") or signal.attrib.get("end_index")
+            sid = signal.attrib.get("sid") or f"sig_{doc_id}_{begin or 'na'}_{end or 'na'}"
+            if begin is None or end is None:
+                continue
+            if not str(begin).isdigit() or not str(end).isdigit():
+                continue
+
+            graph.run(
+                query,
+                parameters={
+                    "doc_id": doc_id,
+                    "sid": sid,
+                    "text": (signal.text or "").strip() or signal.attrib.get("text") or "",
+                    "start_char": int(begin),
+                    "end_char": int(end),
+                },
+            )
+            created += 1
+
+        logger.info("create_signals2: merged %d Signal nodes", created)
         return ""
 
 
     def create_tevents2(self, doc_id):
         result_xml = self._get_ttk_xml(doc_id)
         doc_id = str(doc_id)
-
-        #print(result_xml)
         graph = self.graph
 
+        query = """
+                MERGE (event:TEvent {doc_id: toInteger($doc_id), eiid: $eiid})
+                SET event.begin = toInteger($begin),
+                    event.end = toInteger($end),
+                    event.start_char = toInteger($begin),
+                    event.end_char = toInteger($end),
+                    event.aspect = $aspect,
+                    event.class = $class,
+                    event.eid = $eid,
+                    event.epos = $epos,
+                    event.form = $form,
+                    event.modality = $modality,
+                    event.polarity = $polarity,
+                    event.pos = $pos,
+                    event.tense = $tense,
+                    event.pred = coalesce($pred, event.pred)
+                WITH event
+                MATCH (a:AnnotatedText {id: toInteger($doc_id)})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(ta:TagOccurrence)
+                WHERE ta.index >= toInteger($begin) AND ta.end_index <= toInteger($end)
+                WITH event, collect(ta) AS tas, min(ta.tok_index_doc) AS min_tok, max(ta.tok_index_doc) AS max_tok
+                SET event.start_tok = coalesce(event.start_tok, min_tok),
+                    event.end_tok = coalesce(event.end_tok, max_tok)
+                FOREACH (one IN tas | MERGE (one)-[:TRIGGERS]->(event))
+                """
 
-        query = """WITH $result_xml
-                    AS xmlString
-                    WITH apoc.xml.parse(xmlString) AS result
-                    UNWIND [item in result._children where item._type ="tarsqi_tags"] AS tarsqi
-                    UNWIND [item in tarsqi._children where item._type ="EVENT"] AS event
-                    WITH event.begin as begin, event.end as end, event.aspect as aspect, event.class as class, event.eid as eid, event.eiid as eiid, event.epos as epos, event.form as form, event.pos as pos, event.tense as tense, event.polarity as polarity, event.modality as modality
-                    MATCH (a:AnnotatedText {id: toInteger($doc_id)})-[*2]->(ta:TagOccurrence)
-                    WHERE ta.index = toInteger(begin)
-                    MERGE (event:TEvent {doc_id: toInteger($doc_id), eiid: eiid})
-                    SET event.begin = toInteger(begin),
-                        event.end = toInteger(end),
-                        event.start_char = toInteger(begin),
-                        event.end_char = toInteger(end),
-                        event.start_tok = ta.tok_index_doc,
-                        event.end_tok = coalesce(event.end_tok, ta.tok_index_doc),
-                        event.aspect = aspect,
-                        event.class = class,
-                        event.epos = epos,
-                        event.form = form,
-                        event.modality = modality,
-                        event.polarity = polarity,
-                        event.pos = pos,
-                        event.tense = tense
-                    MERGE (ta)-[:TRIGGERS]->(event)"""
-        
-        data= graph.run(query,parameters={'result_xml': result_xml, 'doc_id': doc_id}).data()
+        created = 0
+        for event in _iter_event_elements(result_xml):
+            begin = event.attrib.get("begin") or event.attrib.get("start_index")
+            end = event.attrib.get("end") or event.attrib.get("end_index")
+            if begin is None or end is None:
+                continue
+            if not str(begin).isdigit() or not str(end).isdigit():
+                continue
+            eiid = event.attrib.get("eiid") or event.attrib.get("eid")
+            if not eiid:
+                eiid = f"evt_{doc_id}_{begin}_{end}"
+
+            graph.run(
+                query,
+                parameters={
+                    "doc_id": doc_id,
+                    "begin": int(begin),
+                    "end": int(end),
+                    "aspect": event.attrib.get("aspect"),
+                    "class": event.attrib.get("class"),
+                    "eid": event.attrib.get("eid"),
+                    "eiid": eiid,
+                    "epos": event.attrib.get("epos"),
+                    "form": event.attrib.get("form"),
+                    "modality": event.attrib.get("modality"),
+                    "polarity": event.attrib.get("polarity"),
+                    "pos": event.attrib.get("pos"),
+                    "tense": event.attrib.get("tense"),
+                    "pred": event.attrib.get("form"),
+                },
+            )
+            created += 1
+
+        if created == 0:
+            fallback_query = """
+            MATCH (a:AnnotatedText {id: toInteger($doc_id)})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:PARTICIPATES_IN]->(f:Frame)
+            WITH DISTINCT f
+            WHERE f.start_tok IS NOT NULL AND f.end_tok IS NOT NULL
+            WITH f, 'frame_' + toString(toInteger($doc_id)) + '_' + toString(f.start_tok) + '_' + toString(f.end_tok) AS fallback_eiid
+            MERGE (event:TEvent {doc_id: toInteger($doc_id), eiid: fallback_eiid})
+            SET event.begin = coalesce(event.begin, toInteger(f.start_char), toInteger(f.startIndex)),
+                event.end = coalesce(event.end, toInteger(f.end_char), toInteger(f.endIndex)),
+                event.start_char = coalesce(event.start_char, toInteger(f.start_char), toInteger(f.startIndex)),
+                event.end_char = coalesce(event.end_char, toInteger(f.end_char), toInteger(f.endIndex)),
+                event.start_tok = coalesce(event.start_tok, f.start_tok),
+                event.end_tok = coalesce(event.end_tok, f.end_tok),
+                event.form = coalesce(event.form, f.text),
+                event.pred = coalesce(event.pred, f.headword),
+                event.pos = coalesce(event.pos, 'VERB'),
+                event.tense = coalesce(event.tense, ''),
+                event.aspect = coalesce(event.aspect, ''),
+                event.polarity = coalesce(event.polarity, ''),
+                event.modality = coalesce(event.modality, '')
+            WITH event, f
+            MATCH (a:AnnotatedText {id: toInteger($doc_id)})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(ta:TagOccurrence)-[:PARTICIPATES_IN]->(f)
+            MERGE (ta)-[:TRIGGERS]->(event)
+            RETURN count(DISTINCT event) AS tevent_fallback_created
+            """
+            rows = graph.run(fallback_query, parameters={"doc_id": doc_id}).data()
+            fallback_created = rows[0].get("tevent_fallback_created", 0) if rows else 0
+            if fallback_created:
+                logger.info("create_tevents2: fallback merged %d TEvent nodes from Frame spans", fallback_created)
+
+        logger.info("create_tevents2: merged %d TEvent nodes", created)
         
         return ""
 
