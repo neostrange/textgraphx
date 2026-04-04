@@ -324,9 +324,12 @@ def build_document_from_neo4j(
         """
          CALL {
              WITH $doc_id AS doc_id
-             MATCH (m:EventMention {doc_id: doc_id})
-                         WHERE m.start_tok IS NOT NULL AND m.end_tok IS NOT NULL
-                             AND coalesce(m.low_confidence, false) = false
+             MATCH (m:EventMention)
+             OPTIONAL MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(m_tok:TagOccurrence)-[:PARTICIPATES_IN]->(m)
+             WITH m, doc_id, count(m_tok) > 0 AS token_scoped
+             WHERE (m.doc_id = doc_id OR token_scoped)
+               AND m.start_tok IS NOT NULL AND m.end_tok IS NOT NULL
+               AND coalesce(m.low_confidence, false) = false
              RETURN DISTINCT m.start_tok AS start_tok, m.end_tok AS end_tok,
                  m.pos AS pos, m.tense AS tense, m.aspect AS aspect,
                  m.certainty AS certainty, m.polarity AS polarity,
@@ -334,12 +337,14 @@ def build_document_from_neo4j(
                  2 AS source_priority
              UNION
              WITH $doc_id AS doc_id
-             MATCH (tok:TagOccurrence)-[:TRIGGERS]->(m:TEvent {doc_id: doc_id})
+             MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok:TagOccurrence)-[:TRIGGERS]->(m:TEvent)
                          WHERE coalesce(m.low_confidence, false) = false
                              AND NOT EXISTS {
                                      MATCH (em:EventMention)-[:REFERS_TO]->(m)
-                                     WHERE em.doc_id = doc_id
-                                         AND em.start_tok IS NOT NULL
+                                                                         WHERE (em.doc_id = doc_id OR EXISTS {
+                                                                                         MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:PARTICIPATES_IN]->(em)
+                                                                                     })
+                                                                                 AND em.start_tok IS NOT NULL
                                          AND em.end_tok IS NOT NULL
                                          AND coalesce(em.low_confidence, false) = false
                              }
@@ -351,6 +356,26 @@ def build_document_from_neo4j(
                  m.certainty AS certainty, m.polarity AS polarity,
                  m.time AS time, pred AS pred,
                  1 AS source_priority
+                         UNION
+                         WITH $doc_id AS doc_id
+                         MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:PARTICIPATES_IN]->(f:Frame)
+                         WITH DISTINCT f
+                         WHERE f.start_tok IS NOT NULL AND f.end_tok IS NOT NULL
+                             AND NOT EXISTS {
+                                     MATCH (ev:TEvent)
+                                     WHERE ev.start_tok = f.start_tok
+                                         AND ev.end_tok = f.end_tok
+                             }
+                         RETURN DISTINCT f.start_tok AS start_tok,
+                                 f.end_tok AS end_tok,
+                                 'VERB' AS pos,
+                                 '' AS tense,
+                                 '' AS aspect,
+                                 '' AS certainty,
+                                 '' AS polarity,
+                                 '' AS time,
+                                 f.headword AS pred,
+                                 0 AS source_priority
          }
          WITH start_tok, end_tok, pos, tense, aspect, certainty, polarity, time, pred, source_priority
          WHERE start_tok IS NOT NULL AND end_tok IS NOT NULL
@@ -392,6 +417,9 @@ def build_document_from_neo4j(
         """
         MATCH (m:TIMEX)
         WHERE m.doc_id = $doc_id
+           OR EXISTS {
+               MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS]->(m)
+           }
         OPTIONAL MATCH (tok:TagOccurrence)-[:TRIGGERS]->(m)
         WITH m, min(tok.tok_index_doc) AS trig_start, max(tok.tok_index_doc) AS trig_end
         OPTIONAL MATCH (a:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok2:TagOccurrence)
@@ -432,8 +460,13 @@ def build_document_from_neo4j(
     tlink_rows = graph.run(
         """
                 MATCH (a)-[r:TLINK]-(b)
-        WHERE a.doc_id = $doc_id AND b.doc_id = $doc_id
-          AND a.start_tok IS NOT NULL AND a.end_tok IS NOT NULL
+                WHERE (a.doc_id = $doc_id OR EXISTS {
+                                 MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN]->(a)
+                            })
+                    AND (b.doc_id = $doc_id OR EXISTS {
+                                 MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN]->(b)
+                            })
+                    AND a.start_tok IS NOT NULL AND a.end_tok IS NOT NULL
           AND b.start_tok IS NOT NULL AND b.end_tok IS NOT NULL
         RETURN labels(a) AS source_labels,
                a.start_tok AS a_start, a.end_tok AS a_end,
@@ -461,21 +494,52 @@ def build_document_from_neo4j(
 
     participant_rows = graph.run(
         """
-        MATCH (src)-[r:EVENT_PARTICIPANT|PARTICIPANT]->(evt:TEvent {doc_id: $doc_id})
-        OPTIONAL MATCH (mention:NamedEntity)-[:REFERS_TO]->(src)
-        WITH coalesce(mention, src) AS endpoint, evt, r
-        MATCH (evt_tok:TagOccurrence)-[:TRIGGERS]->(evt)
-        OPTIONAL MATCH (src_tok:TagOccurrence)-[:PARTICIPATES_IN]->(endpoint)
-        WITH endpoint, r,
-             min(src_tok.tok_index_doc) AS src_start,
-             max(src_tok.tok_index_doc) AS src_end,
-             min(evt_tok.tok_index_doc) AS evt_start,
-             max(evt_tok.tok_index_doc) AS evt_end,
-             labels(endpoint) AS source_labels
-        WHERE src_start IS NOT NULL AND src_end IS NOT NULL
-        RETURN DISTINCT src_start, src_end, evt_start, evt_end,
-               coalesce(r.type, '') AS sem_role,
-               source_labels
+        CALL {
+            WITH $doc_id AS doc_id
+            MATCH (src)-[r:EVENT_PARTICIPANT|PARTICIPANT]->(evt:TEvent)
+            WHERE evt.doc_id = doc_id
+               OR EXISTS {
+                   MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS]->(evt)
+               }
+            OPTIONAL MATCH (mention:NamedEntity)-[:REFERS_TO]->(src)
+            WITH coalesce(mention, src) AS endpoint, evt, r, doc_id
+            MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(evt_tok:TagOccurrence)-[:TRIGGERS]->(evt)
+            OPTIONAL MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(src_tok:TagOccurrence)-[:PARTICIPATES_IN]->(endpoint)
+            WITH endpoint, r,
+                 min(src_tok.tok_index_doc) AS src_start,
+                 max(src_tok.tok_index_doc) AS src_end,
+                 min(evt_tok.tok_index_doc) AS evt_start,
+                 max(evt_tok.tok_index_doc) AS evt_end,
+                 labels(endpoint) AS source_labels
+            WHERE src_start IS NOT NULL AND src_end IS NOT NULL
+            RETURN DISTINCT src_start, src_end, evt_start, evt_end,
+                   coalesce(r.type, '') AS sem_role,
+                   source_labels
+            UNION
+            WITH $doc_id AS doc_id
+            MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:PARTICIPATES_IN]->(f:Frame)
+            WITH DISTINCT f, doc_id
+            MATCH (fa:FrameArgument)-[r:PARTICIPANT|HAS_FRAME_ARGUMENT]->(f)
+            WHERE fa.type IN ['ARG0', 'ARG1', 'ARG2', 'ARG3', 'ARG4']
+            OPTIONAL MATCH (fa)-[:REFERS_TO]->(src)
+            OPTIONAL MATCH (mention:NamedEntity)-[:REFERS_TO]->(src)
+            WITH f, r, coalesce(mention, src, fa) AS endpoint, doc_id
+            WHERE endpoint IS NOT NULL
+            OPTIONAL MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(src_tok:TagOccurrence)-[:PARTICIPATES_IN]->(endpoint)
+            WITH f, r,
+                 min(src_tok.tok_index_doc) AS src_start,
+                 max(src_tok.tok_index_doc) AS src_end,
+                 labels(endpoint) AS source_labels
+            WHERE src_start IS NOT NULL AND src_end IS NOT NULL
+              AND f.start_tok IS NOT NULL
+              AND f.end_tok IS NOT NULL
+            RETURN DISTINCT src_start, src_end,
+                   f.start_tok AS evt_start,
+                   f.end_tok AS evt_end,
+                   coalesce(r.type, '') AS sem_role,
+                   source_labels
+        }
+        RETURN DISTINCT src_start, src_end, evt_start, evt_end, sem_role, source_labels
         ORDER BY evt_start, src_start
         """,
         {"doc_id": doc_id_int},
@@ -504,7 +568,7 @@ def _node_kind_from_labels(labels: Iterable[str]) -> Optional[str]:
         return "timex"
     if "EventMention" in s or "TEvent" in s:
         return "event"
-    if "EntityMention" in s or "NamedEntity" in s:
+    if "EntityMention" in s or "NamedEntity" in s or "FrameArgument" in s:
         return "entity"
     return None
 
