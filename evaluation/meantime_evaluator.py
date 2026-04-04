@@ -162,7 +162,13 @@ def parse_meantime_xml(xml_path: str) -> NormalizedDocument:
             mention = Mention(
                 kind="timex",
                 span=span,
-                attrs=_attrs_from_element(el, ("type", "value", "functionInDocument")),
+                attrs=_canonicalize_timex_attrs(
+                    {
+                        "type": el.get("type"),
+                        "value": el.get("value"),
+                        "functionInDocument": el.get("functionInDocument"),
+                    }
+                ),
             )
             doc.timex_mentions.add(mention)
             mention_by_id[m_id] = mention
@@ -430,16 +436,12 @@ def build_document_from_neo4j(
     ).data()
     for row in timex_rows:
         span = _span_from_bounds(int(row["start_tok"]), int(row["end_tok"]), token_index_alignment)
-        attrs = tuple(
-            sorted(
-                (k, str(v))
-                for k, v in {
-                    "type": row.get("type"),
-                    "value": row.get("value"),
-                    "functionInDocument": row.get("functionInDocument"),
-                }.items()
-                if v not in (None, "")
-            )
+        attrs = _canonicalize_timex_attrs(
+            {
+                "type": row.get("type"),
+                "value": row.get("value"),
+                "functionInDocument": row.get("functionInDocument"),
+            }
         )
         doc.timex_mentions.add(Mention(kind="timex", span=span, attrs=attrs))
 
@@ -610,6 +612,30 @@ def _canonicalize_event_attrs(row: Dict[str, Any]) -> Tuple[Tuple[str, str], ...
     attrs_map["certainty"] = certainty
     attrs_map["polarity"] = polarity
     attrs_map["time"] = time
+    return tuple(sorted(attrs_map.items()))
+
+
+def _canonicalize_timex_attrs(row: Dict[str, Any]) -> Tuple[Tuple[str, str], ...]:
+    """Normalize TIMEX attrs toward MEANTIME strict comparison semantics."""
+    typ = str(row.get("type") or "").strip().upper()
+    value = str(row.get("value") or "").strip()
+    function_in_document = str(row.get("functionInDocument") or "").strip() or "NONE"
+
+    if typ == "DATE":
+        if len(value) == 8 and value.isdigit():
+            value = f"{value[0:4]}-{value[4:6]}-{value[6:8]}"
+        elif len(value) == 6 and value.isdigit():
+            value = f"{value[0:4]}-{value[4:6]}"
+        elif len(value) == 7 and value.isdigit():
+            value = f"{value[0:4]}-{value[4:6]}-{value[6]}"
+
+    attrs_map: Dict[str, str] = {}
+    if typ:
+        attrs_map["type"] = typ
+    if value:
+        attrs_map["value"] = value
+    if function_in_document:
+        attrs_map["functionInDocument"] = function_in_document
     return tuple(sorted(attrs_map.items()))
 
 
