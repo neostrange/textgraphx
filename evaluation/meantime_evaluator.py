@@ -447,7 +447,7 @@ def build_document_from_neo4j(
 
     tlink_rows = graph.run(
         """
-                MATCH (a)-[r:TLINK]-(b)
+            MATCH (a)-[r:TLINK]->(b)
                 WHERE (a.doc_id = $doc_id OR EXISTS {
                                  MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN]->(a)
                             })
