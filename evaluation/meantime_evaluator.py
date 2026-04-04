@@ -390,21 +390,7 @@ def build_document_from_neo4j(
     event_by_span: Dict[TokenSpan, Tuple[int, Mention]] = {}
     for row in event_rows:
         span = _span_from_bounds(int(row["start_tok"]), int(row["end_tok"]), token_index_alignment)
-        attrs = tuple(
-            sorted(
-                (k, str(v))
-                for k, v in {
-                    "pos": _normalize_event_pos(row.get("pos")),
-                    "tense": row.get("tense"),
-                    "aspect": row.get("aspect"),
-                    "certainty": row.get("certainty"),
-                    "polarity": row.get("polarity"),
-                    "time": row.get("time"),
-                    "pred": row.get("pred"),
-                }.items()
-                if v not in (None, "")
-            )
-        )
+        attrs = _canonicalize_event_attrs(row)
         mention = Mention(kind="event", span=span, attrs=attrs)
         priority = int(row.get("source_priority") or 0)
         current = event_by_span.get(span)
@@ -584,6 +570,47 @@ def _normalize_event_pos(value: Any) -> str:
     if raw.startswith("NN"):
         return "NOUN"
     return "OTHER"
+
+
+def _canonicalize_event_attrs(row: Dict[str, Any]) -> Tuple[Tuple[str, str], ...]:
+    """Normalize event attrs toward MEANTIME strict comparison semantics.
+
+    The graph frequently omits certainty/polarity/time for otherwise valid
+    events, while noun-like events often carry placeholder tense/aspect values
+    that are absent in gold. Canonicalization keeps strict matching from being
+    dominated by representation defaults rather than extraction quality.
+    """
+    pos = _normalize_event_pos(row.get("pos"))
+    tense = str(row.get("tense") or "").strip().upper()
+    aspect = str(row.get("aspect") or "").strip().upper()
+    certainty = str(row.get("certainty") or "").strip().upper() or "CERTAIN"
+    polarity = str(row.get("polarity") or "").strip().upper() or "POS"
+    time = str(row.get("time") or "").strip().upper() or "NON_FUTURE"
+    pred = str(row.get("pred") or "").strip().lower()
+
+    attrs_map: Dict[str, str] = {}
+    if pos:
+        attrs_map["pos"] = pos
+    if pred:
+        attrs_map["pred"] = pred
+
+    # Gold noun events typically omit tense/aspect when they are semantically
+    # unexpressed. Preserve those attrs only when informative.
+    if pos == "NOUN":
+        if tense and tense not in {"NONE", "O"}:
+            attrs_map["tense"] = tense
+        if aspect and aspect not in {"NONE", "O"}:
+            attrs_map["aspect"] = aspect
+    else:
+        if tense:
+            attrs_map["tense"] = tense
+        if aspect:
+            attrs_map["aspect"] = aspect
+
+    attrs_map["certainty"] = certainty
+    attrs_map["polarity"] = polarity
+    attrs_map["time"] = time
+    return tuple(sorted(attrs_map.items()))
 
 
 def _resolve_graph_doc_id(graph: Any, doc_id: int | str) -> int | str:
