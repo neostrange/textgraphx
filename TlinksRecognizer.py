@@ -222,14 +222,14 @@ class TlinksRecognizer:
             logger.info("normalize_tlink_reltypes: normalized %d TLINK relationships", normalized)
         return rows
 
-    def suppress_tlink_conflicts(self):
+    def suppress_tlink_conflicts(self, shadow_only: bool = False):
         """Suppress lower-confidence TLINKs for contradictory relation pairs.
 
         Contradictions are not deleted; they are marked with suppression
         metadata so diagnostics can report retained vs. suppressed links.
         """
         logger.debug("suppress_tlink_conflicts")
-        query = """
+        query_prefix = """
         MATCH (a)-[r1:TLINK]->(b), (a)-[r2:TLINK]->(b)
         WHERE id(r1) < id(r2)
           AND coalesce(r1.suppressed, false) = false
@@ -265,6 +265,18 @@ class TlinksRecognizer:
         WITH r1, loser, winner, t1, t2,
              CASE WHEN id(loser) = id(r1) THEN t1 ELSE t2 END AS loser_type,
              CASE WHEN id(winner) = id(r1) THEN t1 ELSE t2 END AS winner_type
+        """
+        if shadow_only:
+            query = (
+                query_prefix
+                + """
+                RETURN count(DISTINCT loser) AS would_suppress
+                """
+            )
+        else:
+            query = (
+                query_prefix
+                + """
         SET loser.suppressed = true,
             loser.suppressedBy = 'tlink_consistency_filter',
             loser.suppressedAt = datetime().epochMillis,
@@ -273,10 +285,18 @@ class TlinksRecognizer:
             loser.suppressionReason = 'contradiction:' + loser_type + '_vs_' + winner_type
         RETURN count(DISTINCT loser) AS suppressed
         """
+            )
         rows = self._run_query(query)
         if rows:
-            suppressed = rows[0].get("suppressed", 0)
-            logger.info("suppress_tlink_conflicts: suppressed %d TLINK relationships", suppressed)
+            if shadow_only:
+                would_suppress = rows[0].get("would_suppress", 0)
+                logger.info(
+                    "suppress_tlink_conflicts: shadow mode identified %d contradictory TLINKs",
+                    would_suppress,
+                )
+            else:
+                suppressed = rows[0].get("suppressed", 0)
+                logger.info("suppress_tlink_conflicts: suppressed %d TLINK relationships", suppressed)
         return rows
 
 

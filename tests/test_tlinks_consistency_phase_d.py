@@ -28,5 +28,21 @@ def test_tlinks_wrapper_source_includes_conflict_suppression_call():
 
     src = Path("/home/neo/environments/textgraphx/textgraphx/phase_wrappers.py").read_text(encoding="utf-8")
     assert "Suppress contradictory TLINKs" in src
-    assert "recognizer.suppress_tlink_conflicts()" in src
+    assert "recognizer.suppress_tlink_conflicts(shadow_only=tlink_shadow_mode)" in src
     assert "suppressed_tlinks" in src
+
+
+@pytest.mark.unit
+def test_tlinks_recognizer_runs_shadow_conflict_query():
+    from textgraphx.TlinksRecognizer import TlinksRecognizer
+
+    obj = TlinksRecognizer.__new__(TlinksRecognizer)
+    obj.graph = MagicMock()
+    obj.graph.run.return_value.data.return_value = [{"would_suppress": 2}]
+
+    rows = obj.suppress_tlink_conflicts(shadow_only=True)
+
+    assert rows[0]["would_suppress"] == 2
+    query = obj.graph.run.call_args[0][0]
+    assert "would_suppress" in query
+    assert "suppressedBy = 'tlink_consistency_filter'" not in query

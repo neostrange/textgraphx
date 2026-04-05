@@ -22,3 +22,14 @@ def test_services_timeout_defaults_positive():
     loaded = cfg.load_config(path=None, allow_env=False)
 
     assert loaded.services.service_timeout_sec >= 1
+
+
+@pytest.mark.unit
+def test_runtime_tlink_shadow_mode_env_override(monkeypatch):
+    import textgraphx.config as cfg
+
+    monkeypatch.setenv("TEXTGRAPHX_TLINK_SHADOW_MODE", "true")
+    cfg._CACHED = None
+    loaded = cfg.load_config(path=None, allow_env=True)
+
+    assert loaded.runtime.tlink_shadow_mode is True

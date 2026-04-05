@@ -67,6 +67,7 @@ class RuntimeConfig:
     mode: str = "production"
     strict_transition_gate: Optional[bool] = None
     naf_sentence_mode: str = "auto"
+    tlink_shadow_mode: bool = False
 
 
 @dataclass
@@ -227,6 +228,9 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
                 runtime.naf_sentence_mode = _coerce_naf_sentence_mode(
                     cp.get('runtime', 'naf_sentence_mode', fallback=runtime.naf_sentence_mode)
                 )
+                runtime.tlink_shadow_mode = _coerce_bool(
+                    cp.get('runtime', 'tlink_shadow_mode', fallback=str(runtime.tlink_shadow_mode))
+                )
             if cp.has_section('services'):
                 try:
                     services.service_timeout_sec = int(
@@ -318,6 +322,8 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
                 runtime.naf_sentence_mode = _coerce_naf_sentence_mode(
                     str(runtime_map.get('naf_sentence_mode'))
                 )
+            if 'tlink_shadow_mode' in runtime_map:
+                runtime.tlink_shadow_mode = bool(runtime_map.get('tlink_shadow_mode', runtime.tlink_shadow_mode))
             svc_map = tom.get('services', {})
             services.service_timeout_sec = int(
                 svc_map.get('service_timeout_sec', services.service_timeout_sec)
@@ -384,6 +390,9 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
         env_naf_mode = os.getenv('TEXTGRAPHX_NAF_SENTENCE_MODE')
         if env_naf_mode is not None:
             runtime.naf_sentence_mode = _coerce_naf_sentence_mode(env_naf_mode)
+        env_tlink_shadow = os.getenv('TEXTGRAPHX_TLINK_SHADOW_MODE')
+        if env_tlink_shadow is not None:
+            runtime.tlink_shadow_mode = _coerce_bool(env_tlink_shadow)
 
         services.wsd_url = os.getenv('WSD_API_URL') or services.wsd_url
         service_timeout = os.getenv('SERVICE_TIMEOUT_SEC')
@@ -484,6 +493,7 @@ enable_dbpedia_enrichment = false
 mode = production
 strict_transition_gate = auto
 naf_sentence_mode = auto
+tlink_shadow_mode = false
 
 [services]
 service_timeout_sec = 20
@@ -521,6 +531,7 @@ enable_dbpedia_enrichment = false
 mode = "production"
 strict_transition_gate = "auto"
 naf_sentence_mode = "auto"
+tlink_shadow_mode = false
 
 [services]
 service_timeout_sec = 20

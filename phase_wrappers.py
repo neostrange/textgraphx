@@ -1413,6 +1413,14 @@ class TlinksRecognizerWrapper:
                 with log_subsection(self.logger, "Initializing TlinksRecognizer"):
                     recognizer = TlinksRecognizer(argv=[])
                     self.logger.debug("TlinksRecognizer initialized")
+
+                tlink_shadow_mode = False
+                try:
+                    from textgraphx.config import get_config
+
+                    tlink_shadow_mode = bool(get_config().runtime.tlink_shadow_mode)
+                except Exception:
+                    self.logger.debug("Runtime config unavailable for tlink_shadow_mode", exc_info=True)
                 
                 # Run all TLINK recognition cases
                 tlink_cases = [
@@ -1437,11 +1445,21 @@ class TlinksRecognizerWrapper:
                     self.logger.debug("✓ Completed: TLINK relType normalization")
 
                 suppressed_tlinks = 0
+                shadow_conflicts = 0
                 with log_subsection(self.logger, "Suppress contradictory TLINKs"):
-                    suppression_rows = recognizer.suppress_tlink_conflicts()
+                    suppression_rows = recognizer.suppress_tlink_conflicts(shadow_only=tlink_shadow_mode)
                     if suppression_rows:
-                        suppressed_tlinks = suppression_rows[0].get("suppressed", 0)
-                    self.logger.debug("✓ Completed: TLINK conflict suppression (%d suppressed)", suppressed_tlinks)
+                        if tlink_shadow_mode:
+                            shadow_conflicts = suppression_rows[0].get("would_suppress", 0)
+                        else:
+                            suppressed_tlinks = suppression_rows[0].get("suppressed", 0)
+                    if tlink_shadow_mode:
+                        self.logger.debug(
+                            "✓ Completed: TLINK shadow consistency scan (%d potential suppressions)",
+                            shadow_conflicts,
+                        )
+                    else:
+                        self.logger.debug("✓ Completed: TLINK conflict suppression (%d suppressed)", suppressed_tlinks)
                 
                 self.logger.info("TLINK recognition completed successfully")
 
@@ -1476,6 +1494,8 @@ class TlinksRecognizerWrapper:
                     "status": "success",
                     "tlinks_created": self.tlinks_created,
                     "suppressed_tlinks": suppressed_tlinks,
+                    "tlink_shadow_mode": tlink_shadow_mode,
+                    "shadow_conflicts": shadow_conflicts,
                     "assertions_passed": assertions_passed,
                     "provenance_violations": provenance_violations,
                 }
