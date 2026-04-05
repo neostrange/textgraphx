@@ -527,6 +527,35 @@ class EventEnrichmentPhase():
         """
         rows = graph.run(query_special).data()
         special_count = rows[0].get("special_cases_initialized", 0) if rows else 0
+
+        # Foundational linguistic layer: clause/scope cues from argument structure.
+        # This stays additive and serves as support evidence for downstream TLINK logic.
+        query_clause_scope = """
+        MATCH (f:Frame)-[:INSTANTIATES]->(em:EventMention)
+        OPTIONAL MATCH (f)<-[:PARTICIPANT|HAS_FRAME_ARGUMENT]-(fa:FrameArgument)
+        WITH em,
+             collect(DISTINCT fa.type) AS arg_types,
+             [h IN collect(DISTINCT toLower(coalesce(fa.head, ''))) WHERE h <> ''] AS fa_heads
+        WITH em, arg_types, fa_heads,
+             [h IN fa_heads WHERE h IN ['before','after','since','until','during','while','when','if','because','although']] AS temporal_cues
+        SET em.clauseType = CASE
+                WHEN 'ARGM-DSP' IN arg_types THEN 'COMPLEMENT'
+                WHEN 'ARGM-ADV' IN arg_types OR 'ARGM-PRP' IN arg_types OR 'ARGM-CAU' IN arg_types THEN 'SUBORDINATE'
+                ELSE coalesce(em.clauseType, 'MAIN')
+            END,
+            em.scopeType = CASE
+                WHEN 'ARGM-DSP' IN arg_types THEN 'REPORTED_SCOPE'
+                WHEN 'ARGM-NEG' IN arg_types THEN 'NEGATION_SCOPE'
+                WHEN size(temporal_cues) > 0 THEN 'TEMPORAL_SCOPE'
+                ELSE coalesce(em.scopeType, 'LOCAL_SCOPE')
+            END,
+            em.temporalCueHeads = temporal_cues,
+            em.scopeSource = coalesce(em.scopeSource, 'event_enrichment_clause_scope'),
+            em.scopeConfidence = coalesce(em.scopeConfidence, 0.60)
+        RETURN count(em) AS clause_scope_enriched
+        """
+        rows = graph.run(query_clause_scope).data()
+        clause_scope_count = rows[0].get("clause_scope_enriched", 0) if rows else 0
         
         # Formalize aspect classification
         query_aspect = """
@@ -657,11 +686,11 @@ class EventEnrichmentPhase():
         graph.run(query_doc_id).data()
         
         # Log enrichment summary
-        total = certainty_count + time_count + special_count + aspect_count + polarity_count
+        total = certainty_count + time_count + special_count + aspect_count + polarity_count + clause_scope_count
         logger.info(
             "enrich_event_mention_properties: enriched %d event mentions "
-            "(certainty=%d, time=%d, special_cases=%d, aspect=%d, polarity=%d)",
-            total, certainty_count, time_count, special_count, aspect_count, polarity_count
+            "(certainty=%d, time=%d, special_cases=%d, aspect=%d, polarity=%d, clause_scope=%d)",
+            total, certainty_count, time_count, special_count, aspect_count, polarity_count, clause_scope_count
         )
         
         return total
