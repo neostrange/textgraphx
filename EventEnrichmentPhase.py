@@ -31,6 +31,7 @@ import logging
 
 from textgraphx.neo4j_client import make_graph_from_config
 from textgraphx.config import get_config
+from textgraphx.merge_utils import resolve_attribute_conflict
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,99 @@ class EventEnrichmentPhase():
         #self.__text_processor = TextProcessor(self.nlp, self._driver)
         #self.create_constraints()
     logger.info("EventEnrichmentPhase initialized; graph session ready")
+
+    @staticmethod
+    def _tevent_field_defaults(field_name):
+        defaults = {
+            "certainty": ("temporal_phase", 0.90),
+            "aspect": ("temporal_phase", 0.90),
+            "polarity": ("temporal_phase", 0.90),
+            "time": ("temporal_phase", 0.90),
+        }
+        return defaults.get(field_name, ("temporal_phase", 0.90))
+
+    def _resolve_tevent_field_conflicts(self, field_name, incoming_source="event_enrichment", incoming_confidence=0.65):
+        """Resolve TEvent field conflicts using authority-aware merge policy.
+
+        Existing canonical TEvent values (typically temporal-phase primary)
+        are preferred over secondary mention-level backfills. Conflicting
+        values are retained as explicit conflict metadata for auditability.
+        """
+        if field_name not in {"certainty", "aspect", "polarity", "time"}:
+            raise ValueError("Unsupported TEvent field for conflict resolution")
+
+        default_existing_source, default_existing_conf = self._tevent_field_defaults(field_name)
+        graph = self.graph
+        query = f"""
+        MATCH (em:EventMention)-[:REFERS_TO]->(te:TEvent)
+        WHERE em.{field_name} IS NOT NULL
+        RETURN id(te) AS te_id,
+               te.{field_name} AS existing_value,
+               em.{field_name} AS incoming_value,
+               te.{field_name}Source AS existing_source,
+               te.{field_name}Confidence AS existing_confidence,
+               te.{field_name}AuthorityTier AS existing_tier
+        """
+        rows = graph.run(query).data()
+        if not rows:
+            return 0
+
+        updates = []
+        for row in rows:
+            existing_value = row.get("existing_value")
+            incoming_value = row.get("incoming_value")
+            if incoming_value is None:
+                continue
+            resolved = resolve_attribute_conflict(
+                existing_value,
+                incoming_value,
+                existing_source=row.get("existing_source") or default_existing_source,
+                incoming_source=incoming_source,
+                existing_confidence=float(row.get("existing_confidence") or default_existing_conf),
+                incoming_confidence=float(incoming_confidence),
+                existing_tier=row.get("existing_tier") or None,
+                incoming_tier="secondary",
+                conflict_policy="additive",
+            )
+            updates.append({"te_id": row.get("te_id"), "resolved": resolved})
+
+        if not updates:
+            return 0
+
+        for item in updates:
+            te_id = item["te_id"]
+            resolved = item["resolved"]
+            update_query = f"""
+            MATCH (te:TEvent)
+            WHERE id(te) = $te_id
+            SET te.{field_name} = $value,
+                te.{field_name}Source = $source,
+                te.{field_name}Confidence = $confidence,
+                te.{field_name}AuthorityTier = $authority_tier,
+                te.{field_name}ConflictPolicy = 'additive',
+                te.{field_name}ConflictValue = $conflict_value,
+                te.{field_name}ConflictSource = $conflict_source,
+                te.{field_name}ConflictConfidence = $conflict_confidence,
+                te.{field_name}ConflictAuthorityTier = $conflict_tier,
+                te.{field_name}ConflictFlag = $has_conflict
+            """
+            graph.run(
+                update_query,
+                {
+                    "te_id": te_id,
+                    "value": resolved.get("value"),
+                    "source": resolved.get("source"),
+                    "confidence": resolved.get("confidence"),
+                    "authority_tier": resolved.get("authority_tier"),
+                    "conflict_value": resolved.get("conflict_value"),
+                    "conflict_source": resolved.get("conflict_source"),
+                    "conflict_confidence": resolved.get("conflict_confidence"),
+                    "conflict_tier": resolved.get("conflict_tier"),
+                    "has_conflict": bool(resolved.get("has_conflict")),
+                },
+            ).data()
+
+        return len(updates)
 
          
 
@@ -509,19 +603,11 @@ class EventEnrichmentPhase():
         rows = graph.run(query_polarity).data()
         polarity_count = rows[0].get("polarity_formalized", 0) if rows else 0
 
-        # Sync certainty/aspect/polarity/time back to TEvent when missing.
-        query_sync_tevent = """
-        MATCH (em:EventMention)-[:REFERS_TO]->(te:TEvent)
-        SET te.certainty = coalesce(te.certainty, em.certainty),
-            te.aspect = CASE
-                WHEN te.aspect IN ['PROGRESSIVE', 'PERFECTIVE', 'INCEPTIVE', 'HABITUAL', 'ITERATIVE'] THEN te.aspect
-                ELSE em.aspect
-            END,
-            te.polarity = coalesce(te.polarity, em.polarity),
-            te.time = coalesce(te.time, em.time)
-        RETURN count(*) AS tevent_synced
-        """
-        graph.run(query_sync_tevent).data()
+        # Authority-aware sync for canonical event attributes.
+        self._resolve_tevent_field_conflicts("certainty", incoming_source="event_enrichment", incoming_confidence=0.70)
+        self._resolve_tevent_field_conflicts("aspect", incoming_source="event_enrichment", incoming_confidence=0.65)
+        self._resolve_tevent_field_conflicts("polarity", incoming_source="event_enrichment", incoming_confidence=0.65)
+        self._resolve_tevent_field_conflicts("time", incoming_source="event_enrichment", incoming_confidence=0.70)
 
         # Mark low-confidence event mentions using conservative linguistic evidence.
         # We only down-rank non-verbal mentions that have no supporting frame,
