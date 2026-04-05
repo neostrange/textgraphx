@@ -677,6 +677,8 @@ class TemporalPhaseWrapper:
                         confidence=0.75,
                         evidence_source="temporal_phase",
                         rule_id="temporal_xml_tlinks",
+                        source_kind="service",
+                        conflict_policy="merge",
                     )
                     assertion_result = PhaseAssertions(
                         temporal.graph,
@@ -754,6 +756,8 @@ class EventEnrichmentPhaseWrapper:
                         confidence=0.70,
                         evidence_source="event_enrichment",
                         rule_id="frame_to_event",
+                        source_kind="rule",
+                        conflict_policy="additive",
                     )
                     stamp_inferred_relationships(
                         enricher.graph,
@@ -761,6 +765,8 @@ class EventEnrichmentPhaseWrapper:
                         confidence=0.70,
                         evidence_source="event_enrichment",
                         rule_id="frame_to_event",
+                        source_kind="rule",
+                        conflict_policy="additive",
                     )
                     stamp_inferred_relationships(
                         enricher.graph,
@@ -768,6 +774,8 @@ class EventEnrichmentPhaseWrapper:
                         confidence=0.65,
                         evidence_source="event_enrichment",
                         rule_id="participant_linking",
+                        source_kind="rule",
+                        conflict_policy="additive",
                     )
                     stamp_inferred_relationships(
                         enricher.graph,
@@ -775,6 +783,8 @@ class EventEnrichmentPhaseWrapper:
                         confidence=0.65,
                         evidence_source="event_enrichment",
                         rule_id="participant_linking",
+                        source_kind="rule",
+                        conflict_policy="additive",
                     )
                     assertion_result = PhaseAssertions(
                         enricher.graph,
@@ -1377,6 +1387,8 @@ class TlinksRecognizerWrapper:
                         confidence=0.80,
                         evidence_source="tlinks_recognizer",
                         rule_id="case_rules",
+                        source_kind="rule",
+                        conflict_policy="additive",
                     )
                     assertion_result = PhaseAssertions(
                         recognizer.graph,

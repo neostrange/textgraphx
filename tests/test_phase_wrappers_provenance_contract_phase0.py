@@ -18,6 +18,8 @@ def test_temporal_wrapper_stamps_before_assertions_and_enforces_contracts():
     assert assert_idx != -1
     assert enforce_idx != -1
     assert stamp_idx < assert_idx
+    assert 'source_kind="service"' in src
+    assert 'conflict_policy="merge"' in src
 
 
 def test_event_wrapper_stamps_before_assertions_and_enforces_contracts():
@@ -31,6 +33,8 @@ def test_event_wrapper_stamps_before_assertions_and_enforces_contracts():
     assert assert_idx != -1
     assert enforce_idx != -1
     assert stamp_idx < assert_idx
+    assert 'source_kind="rule"' in src
+    assert 'conflict_policy="additive"' in src
 
 
 def test_tlinks_wrapper_stamps_before_assertions_and_enforces_contracts():
@@ -44,3 +48,5 @@ def test_tlinks_wrapper_stamps_before_assertions_and_enforces_contracts():
     assert assert_idx != -1
     assert enforce_idx != -1
     assert stamp_idx < assert_idx
+    assert 'source_kind="rule"' in src
+    assert 'conflict_policy="additive"' in src
