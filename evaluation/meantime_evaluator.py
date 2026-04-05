@@ -569,12 +569,17 @@ def build_document_from_neo4j(
         """,
         {"doc_id": doc_id_int},
     ).data()
+    # Only keep participant relations whose event anchor is in the projected event mention set.
+    # Relations anchored to low-confidence or frame-only events not in the projection are spurious.
+    projected_event_spans = frozenset(m.span for m in doc.event_mentions)
     for row in participant_rows:
         src_kind = _node_kind_from_labels(row.get("source_labels", []))
         if src_kind != "entity":
             continue
         evt_span = _span_from_bounds(int(row["evt_start"]), int(row["evt_end"]), token_index_alignment)
         evt_span = _align_relation_event_span(evt_span, doc.event_mentions)
+        if evt_span not in projected_event_spans:
+            continue
         doc.relations.add(
             Relation(
                 kind="has_participant",
@@ -628,6 +633,14 @@ def _canonicalize_event_attrs(row: Dict[str, Any]) -> Tuple[Tuple[str, str], ...
     polarity = str(row.get("polarity") or "").strip().upper() or "POS"
     time = str(row.get("time") or "").strip().upper() or "NON_FUTURE"
     pred = str(row.get("pred") or "").strip().lower()
+
+    # MEANTIME convention: INFINITIVE-tense events signal future/possible actions.
+    # When certainty/time are not explicitly set in the graph, apply these defaults.
+    if tense == "INFINITIVE":
+        if certainty == "CERTAIN":
+            certainty = "POSSIBLE"
+        if time == "NON_FUTURE":
+            time = "FUTURE"
 
     attrs_map: Dict[str, str] = {}
     if pos:
@@ -1085,8 +1098,15 @@ def _bucket_relation_errors(gold_keys: Set[Tuple[Any, ...]], pred_keys: Set[Tupl
     remaining_pred = set(pred_keys)
     endpoint_mismatch = 0
     type_mismatch = 0
+    tp_count = 0
 
     for g in gold_keys:
+        # Skip exact matches (TPs) — they don't need error categorization.
+        if g in remaining_pred:
+            remaining_pred.discard(g)
+            tp_count += 1
+            continue
+
         same_endpoint = [
             p
             for p in remaining_pred
@@ -1110,8 +1130,8 @@ def _bucket_relation_errors(gold_keys: Set[Tuple[Any, ...]], pred_keys: Set[Tupl
             endpoint_mismatch += 1
             remaining_pred.remove(overlap_endpoint[0])
 
-    missing = max(0, len(gold_keys) - type_mismatch - endpoint_mismatch)
-    spurious = max(0, len(pred_keys) - type_mismatch - endpoint_mismatch)
+    missing = max(0, len(gold_keys) - tp_count - type_mismatch - endpoint_mismatch)
+    spurious = max(0, len(pred_keys) - tp_count - type_mismatch - endpoint_mismatch)
     return {
         "endpoint_mismatch": int(endpoint_mismatch),
         "type_mismatch": int(type_mismatch),
@@ -1133,6 +1153,12 @@ def _collect_relation_examples(
     for g in sorted(gold_keys, key=lambda x: str(x)):
         if len(endpoint_examples) >= max_examples and len(type_examples) >= max_examples:
             break
+
+        # Skip exact matches (TPs) — they don't belong in error examples.
+        if g in remaining_pred:
+            remaining_pred.discard(g)
+            used_gold.add(g)
+            continue
 
         same_endpoint = [
             p
