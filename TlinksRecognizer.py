@@ -163,6 +163,31 @@ class TlinksRecognizer:
         """
         return self._run_query(query)
 
+    def create_tlinks_case7(self):
+        logger.debug("create_tlinks_case7")
+        query = """
+        MATCH (f_main:Frame)-[:INSTANTIATES]->(em_main:EventMention)-[:REFERS_TO]->(e_main:TEvent)
+        MATCH (fa:FrameArgument {type: 'ARGM-TMP'})-[:HAS_FRAME_ARGUMENT|PARTICIPANT]->(f_main)
+        MATCH (f_sub:Frame)-[:INSTANTIATES]->(em_sub:EventMention)-[:REFERS_TO]->(e_sub:TEvent)
+        MATCH (e_sub)<-[:TRIGGERS]-(tok_sub:TagOccurrence)
+        WHERE id(e_main) <> id(e_sub)
+          AND em_sub.clauseType IN ['SUBORDINATE', 'COMPLEMENT']
+          AND em_sub.scopeType IN ['TEMPORAL_SCOPE', 'LOCAL_SCOPE']
+          AND fa.syntacticType = 'EVENTIVE'
+          AND toLower(coalesce(fa.signal, '')) IN ['before', 'after']
+          AND toLower(coalesce(fa.complement, '')) = toLower(coalesce(tok_sub.text, ''))
+          AND any(cue IN coalesce(em_sub.temporalCueHeads, []) WHERE cue IN ['before', 'after'])
+        MERGE (e_main)-[tl:TLINK]->(e_sub)
+        SET tl.source = 't2g',
+            tl.confidence = 0.83,
+            tl.rule_id = 'case7_clause_scope_connective',
+            tl.evidence_source = 'tlinks_recognizer',
+            (CASE WHEN toLower(fa.signal) = 'before' THEN tl END).relType = 'BEFORE',
+            (CASE WHEN toLower(fa.signal) = 'after' THEN tl END).relType = 'AFTER'
+        RETURN count(tl) AS created
+        """
+        return self._run_query(query)
+
     def normalize_tlink_reltypes(self):
         """Normalize TLINK relType values to canonical TimeML inventory.
 
@@ -265,6 +290,7 @@ if __name__ == '__main__':
     tp.create_tlinks_case4()
     tp.create_tlinks_case5()
     tp.create_tlinks_case6()
+    tp.create_tlinks_case7()
     tp.normalize_tlink_reltypes()
     tp.suppress_tlink_conflicts()
     _phase_duration = _time.time() - _phase_start

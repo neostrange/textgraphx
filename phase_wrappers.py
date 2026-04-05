@@ -1422,6 +1422,7 @@ class TlinksRecognizerWrapper:
                     (4, recognizer.create_tlinks_case4, "Case 4: Complex TLINK Patterns"),
                     (5, recognizer.create_tlinks_case5, "Case 5: Special Cases"),
                     (6, recognizer.create_tlinks_case6, "Case 6: Final TLINK Patterns"),
+                    (7, recognizer.create_tlinks_case7, "Case 7: Clause/Scope Connective TLINKs"),
                 ]
                 
                 self.logger.info(f"Starting {len(tlink_cases)} TLINK recognition cases")
