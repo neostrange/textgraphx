@@ -132,9 +132,25 @@ class EventEnrichmentPhase():
                                         MATCH (f:Frame)<-[:PARTICIPANT]-(fa:FrameArgument)-[:REFERS_TO]->(e)
                                         WHERE fa.type IN ['ARG0','ARG1','ARG2','ARG3','ARG4']
                                             AND (e:Entity OR e:NUMERIC OR e:VALUE)
-                                        OPTIONAL MATCH (f)-[:FRAME_DESCRIBES_EVENT]->(event_c:TEvent)
-                                        OPTIONAL MATCH (f)-[:DESCRIBES]->(event_l:TEvent)
-                                        WITH fa, e, coalesce(event_c, event_l) AS event
+                                        CALL {
+                                            WITH f
+                                            MATCH (f)-[:FRAME_DESCRIBES_EVENT]->(event:TEvent)
+                                            RETURN event, 0 AS rel_priority
+                                            UNION
+                                            WITH f
+                                            MATCH (f)-[:DESCRIBES]->(event:TEvent)
+                                            RETURN event, 1 AS rel_priority
+                                        }
+                                        WITH fa, e, f, event, rel_priority,
+                                             abs(
+                                                 toFloat(coalesce(f.headTokenIndex, f.start_tok, 0))
+                                                 - (
+                                                     toFloat(coalesce(event.start_tok, 0))
+                                                     + toFloat(coalesce(event.end_tok, coalesce(event.start_tok, 0)))
+                                                   ) / 2.0
+                                             ) AS distance
+                                        ORDER BY rel_priority ASC, distance ASC
+                                        WITH fa, e, head(collect(event)) AS event
                                         WHERE event IS NOT NULL
                     merge (e)-[r:PARTICIPANT]->(event)
                     set r.type = fa.type, (case when fa.syntacticType in ['IN'] then r END).prep = fa.head
@@ -177,9 +193,25 @@ class EventEnrichmentPhase():
 
         query = """    
                     MATCH (f:Frame)<-[:PARTICIPANT]-(fa:FrameArgument)
-                    OPTIONAL MATCH (f)-[:FRAME_DESCRIBES_EVENT]->(event_c:TEvent)
-                    OPTIONAL MATCH (f)-[:DESCRIBES]->(event_l:TEvent)
-                                        WITH fa, coalesce(event_c, event_l) AS event
+                                        CALL {
+                                            WITH f
+                                            MATCH (f)-[:FRAME_DESCRIBES_EVENT]->(event:TEvent)
+                                            RETURN event, 0 AS rel_priority
+                                            UNION
+                                            WITH f
+                                            MATCH (f)-[:DESCRIBES]->(event:TEvent)
+                                            RETURN event, 1 AS rel_priority
+                                        }
+                                        WITH fa, f, event, rel_priority,
+                                             abs(
+                                                 toFloat(coalesce(f.headTokenIndex, f.start_tok, 0))
+                                                 - (
+                                                     toFloat(coalesce(event.start_tok, 0))
+                                                     + toFloat(coalesce(event.end_tok, coalesce(event.start_tok, 0)))
+                                                   ) / 2.0
+                                             ) AS distance
+                                        ORDER BY rel_priority ASC, distance ASC
+                                        WITH fa, head(collect(event)) AS event
                                         WHERE event IS NOT NULL
                                             AND NOT (fa.type IN ['ARG0', 'ARG1', 'ARG2', 'ARG3', 'ARG4', 'ARGM-TMP'])
                     SET fa.argumentType =
