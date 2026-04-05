@@ -44,6 +44,7 @@ class PhaseThresholds:
     # --- refinement ---
     min_named_entities_with_head: int = 0     # NamedEntity nodes that have head assigned
     min_refers_to_rels: int = 0               # REFERS_TO relationships created
+    min_nominal_semantic_heads: int = 0       # EntityMention nominal semantic heads populated
 
     # --- temporal ---
     min_tevents: int = 0                      # TEvent nodes (0: temporal service optional)
@@ -206,6 +207,18 @@ class PhaseAssertions:
                 "MATCH ()-[r:REFERS_TO]->() RETURN count(r) AS c"
             ),
             t.min_refers_to_rels,
+        )
+        result.add_check(
+            "EntityMention nodes with nominal semantic head",
+            self._count(
+                """
+                MATCH (m:EntityMention)
+                WHERE m.nominalSemanticHead IS NOT NULL
+                   OR m.nominalSemanticHeadTokenIndex IS NOT NULL
+                RETURN count(m) AS c
+                """
+            ),
+            t.min_nominal_semantic_heads,
         )
 
         return self._finalize(result)

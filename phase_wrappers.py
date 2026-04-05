@@ -503,6 +503,13 @@ class RefinementPhaseWrapper:
                     refiner.run_rule_family("numeric_value")
                     self.logger.debug("✓ Completed: numeric_value family")
 
+                # Nominal semantic-head materialization/profile passes. These
+                # populate nominalSemanticHead* fields used by evaluation and
+                # downstream semantic analysis.
+                with log_subsection(self.logger, "Nominal semantic-head and profile enrichment"):
+                    refiner.run_rule_family("nominal_mentions")
+                    self.logger.debug("✓ Completed: nominal_mentions family")
+
                 # Mention boundary cleanup: trim trailing punctuation tokens
                 # from entity spans, then label discourse-relevant entities.
                 # These run after numeric_value so VALUE nodes are already set.
