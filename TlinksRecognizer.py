@@ -18,6 +18,7 @@ if __package__ is None and __name__ == '__main__':
         sys.path.insert(0, repo_root)
 
 from textgraphx.neo4j_client import make_graph_from_config
+from textgraphx.timeml_relations import CANONICAL_TLINK_RELTYPES
 
 logger = logging.getLogger(__name__)
 logger.info("TlinksRecognizer module imported")
@@ -158,6 +159,40 @@ class TlinksRecognizer:
         """
         return self._run_query(query)
 
+    def normalize_tlink_reltypes(self):
+        """Normalize TLINK relType values to canonical TimeML inventory.
+
+        Keeps original values in `relTypeOriginal` and records canonical value
+        in `relTypeCanonical` for auditability.
+        """
+        logger.debug("normalize_tlink_reltypes")
+        query = """
+        MATCH ()-[r:TLINK]-()
+        WITH r, toUpper(coalesce(r.relType, '')) AS raw
+        WITH r, raw,
+             CASE
+                WHEN raw IN $canonical THEN raw
+                WHEN raw = 'INCLUDE' THEN 'INCLUDES'
+                WHEN raw = 'INCLUDED' THEN 'IS_INCLUDED'
+                WHEN raw = 'SIMULTANEOUSLY' THEN 'SIMULTANEOUS'
+                WHEN raw = 'OVERLAP' THEN 'SIMULTANEOUS'
+                WHEN raw = 'EQUAL' THEN 'IDENTITY'
+                WHEN raw = 'SAMEAS' THEN 'IDENTITY'
+                WHEN raw = 'MEASURE' THEN 'DURING'
+                WHEN raw = '' THEN 'VAGUE'
+                ELSE 'VAGUE'
+             END AS canonical
+        SET r.relTypeOriginal = coalesce(r.relTypeOriginal, r.relType),
+            r.relTypeCanonical = canonical,
+            r.relType = canonical
+        RETURN count(r) AS normalized
+        """
+        rows = self._run_query(query, {"canonical": list(CANONICAL_TLINK_RELTYPES)})
+        if rows:
+            normalized = rows[0].get("normalized", 0)
+            logger.info("normalize_tlink_reltypes: normalized %d TLINK relationships", normalized)
+        return rows
+
 
 if __name__ == '__main__':
     import time as _time
@@ -169,6 +204,7 @@ if __name__ == '__main__':
     tp.create_tlinks_case4()
     tp.create_tlinks_case5()
     tp.create_tlinks_case6()
+    tp.normalize_tlink_reltypes()
     _phase_duration = _time.time() - _phase_start
 
     # Record a PhaseRun marker for restart visibility (Item 7)

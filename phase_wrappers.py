@@ -1398,6 +1398,10 @@ class TlinksRecognizerWrapper:
                     with log_subsection(self.logger, case_desc):
                         case_func()
                         self.logger.debug(f"✓ Completed: Case {case_num}")
+
+                with log_subsection(self.logger, "Normalize TLINK relation inventory"):
+                    recognizer.normalize_tlink_reltypes()
+                    self.logger.debug("✓ Completed: TLINK relType normalization")
                 
                 self.logger.info("TLINK recognition completed successfully")
 
