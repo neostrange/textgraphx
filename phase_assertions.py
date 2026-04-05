@@ -51,6 +51,10 @@ class PhaseThresholds:
     min_tevents: int = 0                      # TEvent nodes (0: temporal service optional)
     min_timex: int = 0                        # TIMEX nodes
     min_signals: int = 0                      # Signal nodes
+    max_tevents_missing_timeml_core: int = 10**9   # TEvent nodes missing core TimeML fields
+    max_timex_missing_timeml_core: int = 10**9     # TIMEX nodes missing core TimeML fields
+    max_signals_missing_text_span: int = 10**9     # Signal nodes missing text/span fields
+    max_tlinks_missing_reltype_canonical: int = 10**9  # TLINK rels missing relTypeCanonical
 
     # --- event_enrichment ---
     min_describes_rels: int = 0              # DESCRIBES relationships (Frame->TEvent)
@@ -101,9 +105,24 @@ class AssertionResult:
         logger.info("[phase-assert] %s phase assertions: %s", self.phase, status)
         for c in self.checks:
             sym = "✓" if c["passed"] else "✗"
-            logger.debug(
-                "  %s %s: %s (min %s)", sym, c["label"], c["actual"], c["minimum"]
-            )
+            if "minimum" in c:
+                logger.debug(
+                    "  %s %s: %s (min %s)",
+                    sym,
+                    c["label"],
+                    c["actual"],
+                    c["minimum"],
+                )
+            elif "maximum" in c:
+                logger.debug(
+                    "  %s %s: %s (max %s)",
+                    sym,
+                    c["label"],
+                    c["actual"],
+                    c["maximum"],
+                )
+            else:
+                logger.debug("  %s %s: %s", sym, c.get("label", "check"), c.get("actual"))
         for err in self.errors:
             logger.warning(err)
 
@@ -183,6 +202,28 @@ class PhaseAssertions:
         if missing != 0:
             result.errors.append(
                 f"[{result.phase}] {label}: got {missing}, expected == 0"
+            )
+            result.passed = False
+
+    def _add_upper_bound_check(
+        self,
+        result: AssertionResult,
+        label: str,
+        actual: int,
+        maximum: int,
+    ) -> None:
+        ok = actual <= maximum
+        result.checks.append(
+            {
+                "label": label,
+                "actual": actual,
+                "maximum": maximum,
+                "passed": ok,
+            }
+        )
+        if not ok:
+            result.errors.append(
+                f"[{result.phase}] {label}: got {actual}, expected <= {maximum}"
             )
             result.passed = False
 
@@ -266,6 +307,62 @@ class PhaseAssertions:
             "Signal nodes",
             self._count("MATCH (n:Signal) RETURN count(n) AS c"),
             t.min_signals,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="TEvent nodes missing core TimeML fields",
+            actual=self._count(
+                """
+                MATCH (e:TEvent)
+                WHERE e.eid IS NULL
+                   OR e.tense IS NULL
+                   OR e.aspect IS NULL
+                   OR e.polarity IS NULL
+                   OR e.pos IS NULL
+                RETURN count(e) AS c
+                """
+            ),
+            maximum=t.max_tevents_missing_timeml_core,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="TIMEX nodes missing core TimeML fields",
+            actual=self._count(
+                """
+                MATCH (x:TIMEX)
+                WHERE x.tid IS NULL
+                   OR x.type IS NULL
+                   OR x.value IS NULL
+                RETURN count(x) AS c
+                """
+            ),
+            maximum=t.max_timex_missing_timeml_core,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="Signal nodes missing text/span fields",
+            actual=self._count(
+                """
+                MATCH (s:Signal)
+                WHERE s.text IS NULL
+                   OR s.start_tok IS NULL
+                   OR s.end_tok IS NULL
+                RETURN count(s) AS c
+                """
+            ),
+            maximum=t.max_signals_missing_text_span,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="TLINK relationships missing relTypeCanonical",
+            actual=self._count(
+                """
+                MATCH ()-[r:TLINK]->()
+                WHERE r.relTypeCanonical IS NULL
+                RETURN count(r) AS c
+                """
+            ),
+            maximum=t.max_tlinks_missing_reltype_canonical,
         )
         if self._enforce_provenance_contracts:
             self._add_provenance_contract_check(
