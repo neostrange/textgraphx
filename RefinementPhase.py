@@ -1676,8 +1676,14 @@ class RefinementPhase():
                           ELSE false
                       END AS eval_candidate_gold,
                                             CASE
-                                                    WHEN raw_eventive_confidence > 1.0 THEN 1.0
-                                                    ELSE raw_eventive_confidence
+                                                    WHEN ((CASE WHEN eventive_by_wordnet THEN 0.45 ELSE 0.0 END
+                                                        + CASE WHEN event_trigger THEN 0.30 ELSE 0.0 END
+                                                        + CASE WHEN eventive_by_argument THEN 0.15 ELSE 0.0 END
+                                                        + CASE WHEN eventive_by_morphology THEN 0.10 ELSE 0.0 END)) > 1.0 THEN 1.0
+                                                    ELSE (CASE WHEN eventive_by_wordnet THEN 0.45 ELSE 0.0 END
+                                                        + CASE WHEN event_trigger THEN 0.30 ELSE 0.0 END
+                                                        + CASE WHEN eventive_by_argument THEN 0.15 ELSE 0.0 END
+                                                        + CASE WHEN eventive_by_morphology THEN 0.10 ELSE 0.0 END)
                                             END AS eventive_confidence,
                       [signal IN [
                                                  CASE WHEN (event_trigger OR eventive_by_wordnet OR eventive_by_argument OR eventive_by_morphology) THEN 'eventive_head' ELSE null END,
