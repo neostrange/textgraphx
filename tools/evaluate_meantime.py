@@ -21,9 +21,12 @@ from pathlib import Path
 from textgraphx.evaluation.meantime_evaluator import (
     EvaluationMapping,
     aggregate_reports,
+    build_dual_scorecards_from_aggregate,
+    build_dual_scorecards_from_report,
     build_document_from_neo4j,
     build_dataset_diagnostics,
     build_document_diagnostics,
+    check_projection_determinism,
     evaluate_documents,
     flatten_aggregate_rows_for_csv,
     flatten_report_rows_for_csv,
@@ -162,6 +165,7 @@ def _evaluate_single(args: argparse.Namespace, mapping: EvaluationMapping) -> di
 
     if args.pred_xml:
         predicted_doc = parse_meantime_xml(args.pred_xml)
+        projection_determinism = None
     else:
         if args.doc_id is None:
             raise ValueError("--doc-id is required when using --pred-neo4j")
@@ -177,6 +181,16 @@ def _evaluate_single(args: argparse.Namespace, mapping: EvaluationMapping) -> di
                     normalize_nominal_boundaries=getattr(args, "normalize_nominal_boundaries", True),
                     gold_like_nominal_filter=getattr(args, "gold_like_nominal_filter", False),
                     nominal_profile_mode=getattr(args, "nominal_profile_mode", "all"),
+            )
+            projection_determinism = check_projection_determinism(
+                graph=graph,
+                doc_id=args.doc_id,
+                runs=int(getattr(args, "projection_determinism_runs", 2)),
+                gold_token_sequence=gold_doc.token_sequence,
+                discourse_only=getattr(args, "discourse_only", False),
+                normalize_nominal_boundaries=getattr(args, "normalize_nominal_boundaries", True),
+                gold_like_nominal_filter=getattr(args, "gold_like_nominal_filter", False),
+                nominal_profile_mode=getattr(args, "nominal_profile_mode", "all"),
             )
         finally:
             if hasattr(graph, "close"):
@@ -194,6 +208,9 @@ def _evaluate_single(args: argparse.Namespace, mapping: EvaluationMapping) -> di
         mode=args.analysis_mode,
         f1_threshold=float(args.f1_threshold),
     )
+    base["scorecards"] = build_dual_scorecards_from_report(base)
+    if projection_determinism is not None:
+        base["projection_determinism"] = projection_determinism
     base["evaluation_scope"] = {
         "discourse_only": bool(getattr(args, "discourse_only", False)),
         "entity_filter": "DiscourseEntity label" if getattr(args, "discourse_only", False) else "none",
@@ -257,6 +274,7 @@ def _evaluate_batch(args: argparse.Namespace, mapping: EvaluationMapping) -> dic
         mode=args.analysis_mode,
         f1_threshold=float(args.f1_threshold),
     )
+    scorecards = build_dual_scorecards_from_aggregate(aggregate)
     return {
         "mode": "batch",
         "documents_evaluated": len(reports),
@@ -269,6 +287,7 @@ def _evaluate_batch(args: argparse.Namespace, mapping: EvaluationMapping) -> dic
             "gold_like_nominal_filter": bool(getattr(args, "gold_like_nominal_filter", False)),
         },
         "aggregate": aggregate,
+        "scorecards": scorecards,
         "diagnostics": diagnostics,
         "reports": reports,
     }

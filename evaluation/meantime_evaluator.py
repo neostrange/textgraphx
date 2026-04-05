@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from functools import lru_cache
+import hashlib
 from typing import Any, Dict, Iterable, Optional, Set, Tuple
 import xml.etree.ElementTree as ET
 
@@ -975,6 +976,57 @@ def _pair_mentions(
     return matched, unmatched_gold, unmatched_pred
 
 
+def projection_signature(doc: NormalizedDocument) -> str:
+    """Return a deterministic content signature for a projected document."""
+    payload = (
+        doc.doc_id,
+        tuple(sorted((m.kind, m.span, tuple(sorted(m.attrs))) for m in doc.entity_mentions)),
+        tuple(sorted((m.kind, m.span, tuple(sorted(m.attrs))) for m in doc.event_mentions)),
+        tuple(sorted((m.kind, m.span, tuple(sorted(m.attrs))) for m in doc.timex_mentions)),
+        tuple(
+            sorted(
+                (
+                    r.kind,
+                    r.source_kind,
+                    r.source_span,
+                    r.target_kind,
+                    r.target_span,
+                    tuple(sorted(r.attrs)),
+                )
+                for r in doc.relations
+            )
+        ),
+    )
+    return hashlib.sha256(repr(payload).encode("utf-8")).hexdigest()
+
+
+def check_projection_determinism(
+    graph: Any,
+    doc_id: int | str,
+    runs: int = 2,
+    **projection_kwargs: Any,
+) -> Dict[str, Any]:
+    """Build projection repeatedly and report determinism signal.
+
+    Deterministic means all projection runs produce the same content signature.
+    """
+    run_count = max(2, int(runs))
+    signatures: list[str] = []
+    for _ in range(run_count):
+        doc = build_document_from_neo4j(graph=graph, doc_id=doc_id, **projection_kwargs)
+        signatures.append(projection_signature(doc))
+
+    baseline = signatures[0]
+    mismatch_runs = [i for i, sig in enumerate(signatures) if sig != baseline]
+    return {
+        "doc_id": str(doc_id),
+        "runs": run_count,
+        "deterministic": len(mismatch_runs) == 0,
+        "baseline_signature": baseline,
+        "mismatch_runs": mismatch_runs,
+    }
+
+
 def _bucket_mention_errors(
     unmatched_gold: Set[Mention],
     unmatched_pred: Set[Mention],
@@ -1323,6 +1375,65 @@ def aggregate_reports(reports: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
     return out
 
 
+def build_dual_scorecards_from_aggregate(aggregate: Dict[str, Any]) -> Dict[str, Any]:
+    """Build TimeML and beyond-TimeML scorecards from aggregate metrics."""
+    strict_micro = dict(aggregate.get("micro", {}).get("strict", {}))
+    relaxed_micro = dict(aggregate.get("micro", {}).get("relaxed", {}))
+
+    strict_event = float(strict_micro.get("event", {}).get("f1", 0.0))
+    strict_timex = float(strict_micro.get("timex", {}).get("f1", 0.0))
+    strict_relation = float(strict_micro.get("relation", {}).get("f1", 0.0))
+    relaxed_event = float(relaxed_micro.get("event", {}).get("f1", 0.0))
+    relaxed_relation = float(relaxed_micro.get("relation", {}).get("f1", 0.0))
+
+    compliance_composite = (
+        0.40 * strict_event
+        + 0.30 * strict_timex
+        + 0.30 * strict_relation
+    )
+
+    relation_gain = max(0.0, relaxed_relation - strict_relation)
+    event_gain = max(0.0, relaxed_event - strict_event)
+    reasoning_composite = (0.70 * relation_gain) + (0.30 * event_gain)
+
+    return {
+        "time_ml_compliance": {
+            "strict_event_f1": strict_event,
+            "strict_timex_f1": strict_timex,
+            "strict_relation_f1": strict_relation,
+            "composite": compliance_composite,
+            "weights": {"event": 0.40, "timex": 0.30, "relation": 0.30},
+        },
+        "beyond_timeml_reasoning": {
+            "strict_event_f1": strict_event,
+            "relaxed_event_f1": relaxed_event,
+            "strict_relation_f1": strict_relation,
+            "relaxed_relation_f1": relaxed_relation,
+            "event_gain": event_gain,
+            "relation_gain": relation_gain,
+            "composite": reasoning_composite,
+            "weights": {"relation_gain": 0.70, "event_gain": 0.30},
+        },
+    }
+
+
+def build_dual_scorecards_from_report(report: Dict[str, Any]) -> Dict[str, Any]:
+    """Build dual scorecards from a single-document report payload."""
+    pseudo_aggregate = {
+        "micro": {
+            "strict": {
+                layer: report.get("strict", {}).get(layer, {})
+                for layer in ("entity", "event", "timex", "relation")
+            },
+            "relaxed": {
+                layer: report.get("relaxed", {}).get(layer, {})
+                for layer in ("entity", "event", "timex", "relation")
+            },
+        }
+    }
+    return build_dual_scorecards_from_aggregate(pseudo_aggregate)
+
+
 def _avg_f1_for_doc(report: Dict[str, Any], mode: str) -> float:
     layers = ("entity", "event", "timex", "relation")
     vals = [float(report.get(mode, {}).get(layer, {}).get("f1", 0.0)) for layer in layers]
@@ -1543,6 +1654,36 @@ def render_markdown_report(report: Dict[str, Any]) -> str:
                 f"| {row.get('scope','')} | {row.get('mode','')} | {row.get('layer','')} | "
                 f"{float(row.get('precision',0.0)):.3f} | {float(row.get('recall',0.0)):.3f} | {float(row.get('f1',0.0)):.3f} |"
             )
+        lines.append("")
+
+    scorecards = report.get("scorecards") or {}
+    if scorecards:
+        tm = dict(scorecards.get("time_ml_compliance", {}))
+        bt = dict(scorecards.get("beyond_timeml_reasoning", {}))
+        lines.append("## Scorecards")
+        lines.append("")
+        lines.append("### TimeML Compliance")
+        lines.append("")
+        lines.append(f"- Strict Event F1: {float(tm.get('strict_event_f1', 0.0)):.3f}")
+        lines.append(f"- Strict TIMEX F1: {float(tm.get('strict_timex_f1', 0.0)):.3f}")
+        lines.append(f"- Strict Relation F1: {float(tm.get('strict_relation_f1', 0.0)):.3f}")
+        lines.append(f"- Composite: {float(tm.get('composite', 0.0)):.3f}")
+        lines.append("")
+        lines.append("### Beyond-TimeML Reasoning")
+        lines.append("")
+        lines.append(f"- Event Gain (relaxed - strict): {float(bt.get('event_gain', 0.0)):.3f}")
+        lines.append(f"- Relation Gain (relaxed - strict): {float(bt.get('relation_gain', 0.0)):.3f}")
+        lines.append(f"- Composite: {float(bt.get('composite', 0.0)):.3f}")
+        lines.append("")
+
+    determinism = report.get("projection_determinism") or {}
+    if determinism:
+        lines.append("## Projection Determinism")
+        lines.append("")
+        lines.append(f"- Deterministic: {bool(determinism.get('deterministic', False))}")
+        lines.append(f"- Runs: {int(determinism.get('runs', 0))}")
+        mismatch_runs = determinism.get("mismatch_runs") or []
+        lines.append(f"- Mismatch runs: {mismatch_runs if mismatch_runs else 'none'}")
         lines.append("")
 
     diagnostics = report.get("diagnostics", {})
