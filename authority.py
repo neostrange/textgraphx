@@ -63,6 +63,14 @@ class EvidenceRecord:
     confidence: float = 0.0
 
 
+@dataclass(frozen=True)
+class ConflictDecision:
+    action: str
+    winner: Optional[EvidenceRecord]
+    loser: Optional[EvidenceRecord]
+    has_conflict: bool
+
+
 def choose_authoritative_evidence(records: Iterable[EvidenceRecord]) -> Optional[EvidenceRecord]:
     """Choose the best evidence record deterministically.
 
@@ -84,3 +92,42 @@ def choose_authoritative_evidence(records: Iterable[EvidenceRecord]) -> Optional
         )
 
     return sorted(items, key=_key, reverse=True)[0]
+
+
+def decide_conflict(
+    existing: Optional[EvidenceRecord],
+    incoming: Optional[EvidenceRecord],
+    conflict_policy: str = "additive",
+) -> ConflictDecision:
+    """Return deterministic action for conflicting evidence records.
+
+    Policies:
+    - additive: keep both values and expose a preferred winner.
+    - overwrite: replace only if incoming outranks existing.
+    - merge: keep both and expose a preferred winner (alias of additive for now).
+    """
+    policy = str(conflict_policy or "additive").strip().lower()
+    if policy not in {"additive", "overwrite", "merge"}:
+        raise ValueError("conflict_policy must be one of: additive, overwrite, merge")
+
+    if existing is None and incoming is None:
+        return ConflictDecision(action="noop", winner=None, loser=None, has_conflict=False)
+    if existing is None:
+        return ConflictDecision(action="insert", winner=incoming, loser=None, has_conflict=False)
+    if incoming is None:
+        return ConflictDecision(action="keep", winner=existing, loser=None, has_conflict=False)
+
+    has_conflict = str(existing.value) != str(incoming.value)
+    winner = choose_authoritative_evidence([existing, incoming])
+    loser = incoming if winner == existing else existing
+
+    if not has_conflict:
+        return ConflictDecision(action="noop", winner=winner, loser=None, has_conflict=False)
+
+    if policy in {"additive", "merge"}:
+        return ConflictDecision(action="coexist", winner=winner, loser=loser, has_conflict=True)
+
+    # overwrite policy: only replace if incoming wins.
+    if winner == incoming:
+        return ConflictDecision(action="replace", winner=winner, loser=loser, has_conflict=True)
+    return ConflictDecision(action="keep", winner=winner, loser=loser, has_conflict=True)

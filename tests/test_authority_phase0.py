@@ -49,3 +49,68 @@ def test_choose_authoritative_evidence_is_deterministic_for_ties():
 
     assert winner is not None
     assert winner.evidence_source == "src_b"
+
+
+@pytest.mark.unit
+def test_decide_conflict_additive_keeps_both_with_winner():
+    from textgraphx.authority import EvidenceRecord, decide_conflict
+
+    existing = EvidenceRecord(
+        value="PAST",
+        evidence_source="spacy_support",
+        authority_tier="support",
+        confidence=0.9,
+    )
+    incoming = EvidenceRecord(
+        value="PRESENT",
+        evidence_source="allen_nlp_srl",
+        authority_tier="primary",
+        confidence=0.2,
+    )
+
+    decision = decide_conflict(existing, incoming, conflict_policy="additive")
+    assert decision.has_conflict is True
+    assert decision.action == "coexist"
+    assert decision.winner == incoming
+
+
+@pytest.mark.unit
+def test_decide_conflict_overwrite_replaces_only_when_incoming_wins():
+    from textgraphx.authority import EvidenceRecord, decide_conflict
+
+    existing = EvidenceRecord(
+        value="PRESENT",
+        evidence_source="allen_nlp_srl",
+        authority_tier="primary",
+        confidence=0.9,
+    )
+    incoming = EvidenceRecord(
+        value="PAST",
+        evidence_source="spacy_support",
+        authority_tier="support",
+        confidence=0.99,
+    )
+
+    decision = decide_conflict(existing, incoming, conflict_policy="overwrite")
+    assert decision.has_conflict is True
+    assert decision.action == "keep"
+    assert decision.winner == existing
+
+
+@pytest.mark.unit
+def test_decide_conflict_handles_missing_records_and_invalid_policy():
+    from textgraphx.authority import EvidenceRecord, decide_conflict
+
+    incoming = EvidenceRecord(
+        value="X",
+        evidence_source="event_enrichment",
+        authority_tier="secondary",
+        confidence=0.5,
+    )
+
+    inserted = decide_conflict(None, incoming)
+    assert inserted.action == "insert"
+    assert inserted.winner == incoming
+
+    with pytest.raises(ValueError):
+        decide_conflict(incoming, incoming, conflict_policy="invalid")
