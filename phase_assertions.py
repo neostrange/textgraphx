@@ -67,6 +67,7 @@ class PhaseThresholds:
 
     # --- tlinks ---
     min_tlink_rels: int = 0                  # TLINK relationships
+    max_tlink_consistency_violations: int = 10**9  # Contradictory unsuppressed TLINK pairs
 
 
 @dataclass
@@ -498,6 +499,30 @@ class PhaseAssertions:
             "TLINK relationships",
             self._count("MATCH ()-[r:TLINK]->() RETURN count(r) AS c"),
             t.min_tlink_rels,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="Unsuppressed contradictory TLINK pairs",
+            actual=self._count(
+                """
+                MATCH (a)-[r1:TLINK]->(b), (a)-[r2:TLINK]->(b)
+                WHERE id(r1) < id(r2)
+                  AND coalesce(r1.suppressed, false) = false
+                  AND coalesce(r2.suppressed, false) = false
+                WITH coalesce(r1.relTypeCanonical, r1.relType, 'VAGUE') AS rel1,
+                     coalesce(r2.relTypeCanonical, r2.relType, 'VAGUE') AS rel2
+                WHERE (rel1 = 'BEFORE' AND rel2 = 'AFTER')
+                   OR (rel1 = 'AFTER' AND rel2 = 'BEFORE')
+                   OR (rel1 = 'INCLUDES' AND rel2 = 'IS_INCLUDED')
+                   OR (rel1 = 'IS_INCLUDED' AND rel2 = 'INCLUDES')
+                   OR (rel1 = 'BEGINS' AND rel2 = 'BEGUN_BY')
+                   OR (rel1 = 'BEGUN_BY' AND rel2 = 'BEGINS')
+                   OR (rel1 = 'ENDS' AND rel2 = 'ENDED_BY')
+                   OR (rel1 = 'ENDED_BY' AND rel2 = 'ENDS')
+                RETURN count(*) AS c
+                """
+            ),
+            maximum=t.max_tlink_consistency_violations,
         )
         if self._enforce_provenance_contracts:
             self._add_provenance_contract_check(

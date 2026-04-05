@@ -67,8 +67,8 @@ class TlinksRecognizer:
                     with *
                     match (e1),(e2)
                     merge (e1)-[tl:TLINK]-(e2)
-                    on create set tl.relType = 'AFTER', tl.source = 't2g'
-                    on match set tl.relType = 'AFTER'
+                    on create set tl.relType = 'AFTER', tl.source = 't2g', tl.confidence = 0.90, tl.rule_id = 'case1_after_eventive', tl.evidence_source = 'tlinks_recognizer'
+                    on match set tl.relType = 'AFTER', tl.confidence = coalesce(tl.confidence, 0.90), tl.rule_id = coalesce(tl.rule_id, 'case1_after_eventive'), tl.evidence_source = coalesce(tl.evidence_source, 'tlinks_recognizer')
                     RETURN p
         """
         return self._run_query(query)
@@ -81,7 +81,8 @@ class TlinksRecognizer:
                     with *
                     merge (e1)-[tl:TLINK]-(e2)
                     with *
-                    set tl.source = 't2g', (case when fa.signal in ['after'] then tl END).relType = 'AFTER',
+                    set tl.source = 't2g', tl.confidence = 0.85, tl.rule_id = 'case2_eventive_complement', tl.evidence_source = 'tlinks_recognizer',
+                    (case when fa.signal in ['after'] then tl END).relType = 'AFTER',
                     (case when fa.signal in ['before'] then tl END).relType = 'BEFORE'
                     RETURN p
         """
@@ -95,7 +96,7 @@ class TlinksRecognizer:
                     with *
                     merge (e1)-[tl:TLINK]-(e2)
                     with *
-                    set tl.source = 't2g', 
+                    set tl.source = 't2g', tl.confidence = 0.80, tl.rule_id = 'case3_eventive_head', tl.evidence_source = 'tlinks_recognizer',
                     (case when fa.signal in ['after'] then tl END).relType = 'AFTER',
                     (case when fa.signal in ['before'] then tl END).relType = 'BEFORE',
                     (case when fa.signal in ['following'] then tl END).relType = 'SIMULTANEOUS'
@@ -109,7 +110,8 @@ class TlinksRecognizer:
             (fa:FrameArgument {type: 'ARGM-TMP'})-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(f:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]->(e:TEvent)
                     WHERE fa.headTokenIndex = h.tok_index_doc
                     MERGE (e)-[tlink:TLINK]->(t)
-                    SET tlink.source = 't2g', tlink.relType = 'IS_INCLUDED'
+                    SET tlink.source = 't2g', tlink.relType = 'IS_INCLUDED',
+                        tlink.confidence = 0.88, tlink.rule_id = 'case4_timex_head_match', tlink.evidence_source = 'tlinks_recognizer'
         """
         return self._run_query(query)
 
@@ -120,6 +122,7 @@ class TlinksRecognizer:
 
                     MERGE (e)-[tlink:TLINK]->(t)
                     SET tlink.source = 't2g',
+                    tlink.confidence = 0.72, tlink.rule_id = 'case5_timex_preposition', tlink.evidence_source = 'tlinks_recognizer',
                     (CASE WHEN t.type = 'DURATION' and toLower(fa.head) = 'for' and e.tense in ['PAST', 'PRESENT'] THEN tlink END).relType = 'MEASURE',
                     (CASE WHEN t.type = 'DURATION' and toLower(fa.head) IN ['in', 'during'] THEN tlink END).relType = 'IS_INCLUDED',
                     (CASE WHEN t.type = 'DURATION' and t.quant <> 'N/A' and fa.head IN ['in'] THEN tlink END).relType = 'AFTER',
@@ -149,6 +152,7 @@ class TlinksRecognizer:
                     //AND NOT (e.tense IN ['PRESENT'] and e.aspect IN ['NONE'])
                     MERGE (e)-[tlink:TLINK]-(dct)
                     SET tlink.source = 't2g',
+                    tlink.confidence = 0.78, tlink.rule_id = 'case6_dct_anchor', tlink.evidence_source = 'tlinks_recognizer',
                     (CASE WHEN e.tense in ['FUTURE'] THEN tlink END).relType = 'AFTER',
                     (CASE WHEN e.tense in ['PRESENT'] and e.aspect = 'PROGRESSIVE' THEN tlink END).relType = 'IS_INCLUDED',
                     (CASE WHEN e.tense in ['PAST'] THEN tlink END).relType = 'IS_INCLUDED',
@@ -193,6 +197,63 @@ class TlinksRecognizer:
             logger.info("normalize_tlink_reltypes: normalized %d TLINK relationships", normalized)
         return rows
 
+    def suppress_tlink_conflicts(self):
+        """Suppress lower-confidence TLINKs for contradictory relation pairs.
+
+        Contradictions are not deleted; they are marked with suppression
+        metadata so diagnostics can report retained vs. suppressed links.
+        """
+        logger.debug("suppress_tlink_conflicts")
+        query = """
+        MATCH (a)-[r1:TLINK]->(b), (a)-[r2:TLINK]->(b)
+        WHERE id(r1) < id(r2)
+          AND coalesce(r1.suppressed, false) = false
+          AND coalesce(r2.suppressed, false) = false
+        WITH r1, r2,
+             coalesce(r1.relTypeCanonical, r1.relType, 'VAGUE') AS t1,
+             coalesce(r2.relTypeCanonical, r2.relType, 'VAGUE') AS t2
+        WITH r1, r2, t1, t2,
+             CASE
+                WHEN (t1 = 'BEFORE' AND t2 = 'AFTER') OR (t1 = 'AFTER' AND t2 = 'BEFORE') THEN true
+                WHEN (t1 = 'INCLUDES' AND t2 = 'IS_INCLUDED') OR (t1 = 'IS_INCLUDED' AND t2 = 'INCLUDES') THEN true
+                WHEN (t1 = 'BEGINS' AND t2 = 'BEGUN_BY') OR (t1 = 'BEGUN_BY' AND t2 = 'BEGINS') THEN true
+                WHEN (t1 = 'ENDS' AND t2 = 'ENDED_BY') OR (t1 = 'ENDED_BY' AND t2 = 'ENDS') THEN true
+                ELSE false
+             END AS is_conflict
+        WHERE is_conflict
+        WITH r1, r2, t1, t2,
+             coalesce(r1.confidence, 0.0) AS c1,
+             coalesce(r2.confidence, 0.0) AS c2
+        WITH r1, r2, t1, t2,
+             CASE
+                WHEN c1 > c2 THEN r2
+                WHEN c2 > c1 THEN r1
+                WHEN id(r1) < id(r2) THEN r2
+                ELSE r1
+             END AS loser,
+             CASE
+                WHEN c1 > c2 THEN r1
+                WHEN c2 > c1 THEN r2
+                WHEN id(r1) < id(r2) THEN r1
+                ELSE r2
+             END AS winner
+        WITH r1, loser, winner, t1, t2,
+             CASE WHEN id(loser) = id(r1) THEN t1 ELSE t2 END AS loser_type,
+             CASE WHEN id(winner) = id(r1) THEN t1 ELSE t2 END AS winner_type
+        SET loser.suppressed = true,
+            loser.suppressedBy = 'tlink_consistency_filter',
+            loser.suppressedAt = datetime().epochMillis,
+            loser.suppressionPolicy = 'confidence_then_id_tiebreak',
+            loser.suppressedAgainstRelType = winner_type,
+            loser.suppressionReason = 'contradiction:' + loser_type + '_vs_' + winner_type
+        RETURN count(DISTINCT loser) AS suppressed
+        """
+        rows = self._run_query(query)
+        if rows:
+            suppressed = rows[0].get("suppressed", 0)
+            logger.info("suppress_tlink_conflicts: suppressed %d TLINK relationships", suppressed)
+        return rows
+
 
 if __name__ == '__main__':
     import time as _time
@@ -205,6 +266,7 @@ if __name__ == '__main__':
     tp.create_tlinks_case5()
     tp.create_tlinks_case6()
     tp.normalize_tlink_reltypes()
+    tp.suppress_tlink_conflicts()
     _phase_duration = _time.time() - _phase_start
 
     # Record a PhaseRun marker for restart visibility (Item 7)

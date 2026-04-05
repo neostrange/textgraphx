@@ -32,6 +32,37 @@ def _provenance_violations_from_assertion(assertion_result) -> int:
     )
 
 
+def _phase_thresholds_for_mode(phase_name: str):
+    """Build phase assertion thresholds based on runtime mode.
+
+    In review/testing-like modes we enforce strict upper bounds for newly
+    introduced TimeML completeness and TLINK consistency checks.
+    """
+    from textgraphx.phase_assertions import PhaseThresholds
+
+    thresholds = PhaseThresholds()
+    try:
+        from textgraphx.config import get_config
+
+        mode = str(get_config().runtime.mode or "production").strip().lower()
+    except Exception:
+        mode = "production"
+
+    strict_modes = {"review", "testing", "test", "ci"}
+    if mode not in strict_modes:
+        return thresholds
+
+    if phase_name == "temporal":
+        thresholds.max_tevents_missing_timeml_core = 0
+        thresholds.max_timex_missing_timeml_core = 0
+        thresholds.max_signals_missing_text_span = 0
+        thresholds.max_tlinks_missing_reltype_canonical = 0
+    elif phase_name == "tlinks":
+        thresholds.max_tlink_consistency_violations = 0
+
+    return thresholds
+
+
 class DBpediaResolver:
     """Precision-first resolver for converting plain-text entity labels into DBpedia URIs."""
 
@@ -693,6 +724,7 @@ class TemporalPhaseWrapper:
                     )
                     assertion_result = PhaseAssertions(
                         temporal.graph,
+                        thresholds=_phase_thresholds_for_mode("temporal"),
                         strict_transition_gate=self.strict_transition_gate,
                         enforce_provenance_contracts=True,
                     ).after_temporal()
@@ -1402,6 +1434,13 @@ class TlinksRecognizerWrapper:
                 with log_subsection(self.logger, "Normalize TLINK relation inventory"):
                     recognizer.normalize_tlink_reltypes()
                     self.logger.debug("✓ Completed: TLINK relType normalization")
+
+                suppressed_tlinks = 0
+                with log_subsection(self.logger, "Suppress contradictory TLINKs"):
+                    suppression_rows = recognizer.suppress_tlink_conflicts()
+                    if suppression_rows:
+                        suppressed_tlinks = suppression_rows[0].get("suppressed", 0)
+                    self.logger.debug("✓ Completed: TLINK conflict suppression (%d suppressed)", suppressed_tlinks)
                 
                 self.logger.info("TLINK recognition completed successfully")
 
@@ -1422,6 +1461,7 @@ class TlinksRecognizerWrapper:
                     )
                     assertion_result = PhaseAssertions(
                         recognizer.graph,
+                        thresholds=_phase_thresholds_for_mode("tlinks"),
                         strict_transition_gate=self.strict_transition_gate,
                         enforce_provenance_contracts=True,
                     ).after_tlinks()
@@ -1434,6 +1474,7 @@ class TlinksRecognizerWrapper:
                 return {
                     "status": "success",
                     "tlinks_created": self.tlinks_created,
+                    "suppressed_tlinks": suppressed_tlinks,
                     "assertions_passed": assertions_passed,
                     "provenance_violations": provenance_violations,
                 }
