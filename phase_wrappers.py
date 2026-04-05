@@ -22,6 +22,16 @@ from textgraphx.logging_utils import (
 logger = get_logger(__name__)
 
 
+def _provenance_violations_from_assertion(assertion_result) -> int:
+    if assertion_result is None:
+        return 0
+    return sum(
+        int(check.get("actual", 0))
+        for check in getattr(assertion_result, "checks", [])
+        if "missing provenance contract fields" in str(check.get("label", ""))
+    )
+
+
 class DBpediaResolver:
     """Precision-first resolver for converting plain-text entity labels into DBpedia URIs."""
 
@@ -668,6 +678,7 @@ class TemporalPhaseWrapper:
 
                 # Phase assertions (Item 5) and run marker (Item 7)
                 assertions_passed = None
+                provenance_violations = 0
                 try:
                     from textgraphx.phase_assertions import PhaseAssertions, record_phase_run
                     from textgraphx.provenance import stamp_inferred_relationships
@@ -686,6 +697,7 @@ class TemporalPhaseWrapper:
                         enforce_provenance_contracts=True,
                     ).after_temporal()
                     assertions_passed = assertion_result.passed
+                    provenance_violations = _provenance_violations_from_assertion(assertion_result)
                     record_phase_run(
                         temporal.graph, "temporal",
                         duration_seconds=0.0,
@@ -694,7 +706,13 @@ class TemporalPhaseWrapper:
                 except Exception:
                     self.logger.debug("Phase assertions/marker unavailable", exc_info=True)
 
-                return {"status": "success", "temporal_entities": self.temporal_entities, "documents": len(document_ids), "assertions_passed": assertions_passed}
+                return {
+                    "status": "success",
+                    "temporal_entities": self.temporal_entities,
+                    "documents": len(document_ids),
+                    "assertions_passed": assertions_passed,
+                    "provenance_violations": provenance_violations,
+                }
                 
             except Exception as e:
                 self.logger.error(
@@ -747,6 +765,7 @@ class EventEnrichmentPhaseWrapper:
 
                 # Phase assertions (Item 5) and run marker (Item 7)
                 assertions_passed = None
+                provenance_violations = 0
                 try:
                     from textgraphx.phase_assertions import PhaseAssertions, record_phase_run
                     from textgraphx.provenance import stamp_inferred_relationships
@@ -792,11 +811,17 @@ class EventEnrichmentPhaseWrapper:
                         enforce_provenance_contracts=True,
                     ).after_event_enrichment()
                     assertions_passed = assertion_result.passed
+                    provenance_violations = _provenance_violations_from_assertion(assertion_result)
                     record_phase_run(enricher.graph, "event_enrichment", duration_seconds=0.0)
                 except Exception:
                     self.logger.debug("Phase assertions/marker unavailable", exc_info=True)
 
-                return {"status": "success", "events_enriched": self.events_enriched, "assertions_passed": assertions_passed}
+                return {
+                    "status": "success",
+                    "events_enriched": self.events_enriched,
+                    "assertions_passed": assertions_passed,
+                    "provenance_violations": provenance_violations,
+                }
                 
             except Exception as e:
                 self.logger.error(
@@ -1378,6 +1403,7 @@ class TlinksRecognizerWrapper:
 
                 # Phase assertions (Item 5) and run marker (Item 7)
                 assertions_passed = None
+                provenance_violations = 0
                 try:
                     from textgraphx.phase_assertions import PhaseAssertions, record_phase_run
                     from textgraphx.provenance import stamp_inferred_relationships
@@ -1396,11 +1422,17 @@ class TlinksRecognizerWrapper:
                         enforce_provenance_contracts=True,
                     ).after_tlinks()
                     assertions_passed = assertion_result.passed
+                    provenance_violations = _provenance_violations_from_assertion(assertion_result)
                     record_phase_run(recognizer.graph, "tlinks", duration_seconds=0.0)
                 except Exception:
                     self.logger.debug("Phase assertions/marker unavailable", exc_info=True)
 
-                return {"status": "success", "tlinks_created": self.tlinks_created, "assertions_passed": assertions_passed}
+                return {
+                    "status": "success",
+                    "tlinks_created": self.tlinks_created,
+                    "assertions_passed": assertions_passed,
+                    "provenance_violations": provenance_violations,
+                }
                 
             except Exception as e:
                 self.logger.error(

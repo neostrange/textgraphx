@@ -31,6 +31,7 @@ class PhaseResult:
     documents_processed: int = 0
     error: Optional[str] = None
     assertions_passed: Optional[bool] = None  # Item 5: phase-level assertions result
+    provenance_violations: int = 0
 
 
 @dataclass
@@ -354,6 +355,7 @@ class PipelineOrchestrator:
                             phase_duration = time.time() - phase_start
                             doc_count = result.get("documents_processed", 0)
                             assertions_passed = result.get("assertions_passed")
+                            provenance_violations = int(result.get("provenance_violations", 0) or 0)
 
                             self.summary.phases[phase_name] = PhaseResult(
                                 name=phase_name,
@@ -361,6 +363,7 @@ class PipelineOrchestrator:
                                 duration=phase_duration,
                                 documents_processed=doc_count,
                                 assertions_passed=assertions_passed,
+                                provenance_violations=provenance_violations,
                             )
                             self.summary.success_count += 1
                             total_documents += doc_count
@@ -382,9 +385,14 @@ class PipelineOrchestrator:
                                 if assertions_passed is False
                                 else ""
                             )
+                            provenance_label = (
+                                f" [provenance_violations: {provenance_violations}]"
+                                if provenance_violations > 0
+                                else ""
+                            )
                             logger.info(
                                 f"\u2713 Phase '{phase_name}' completed in "
-                                f"{phase_duration:.2f}s{assertion_label}"
+                                f"{phase_duration:.2f}s{assertion_label}{provenance_label}"
                             )
                             logger.debug(f"  Result: {result}")
 
@@ -392,6 +400,11 @@ class PipelineOrchestrator:
                                 raise RuntimeError(
                                     "Strict transition gate failed: "
                                     f"phase '{phase_name}' reported assertion failure in testing mode"
+                                )
+                            if self.strict_transition_gate and provenance_violations > 0:
+                                raise RuntimeError(
+                                    "Strict transition gate failed: "
+                                    f"phase '{phase_name}' reported {provenance_violations} provenance contract violations"
                                 )
 
                         except Exception as e:
