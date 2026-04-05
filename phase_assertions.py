@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from textgraphx.time_utils import utc_iso_now
+from textgraphx.provenance import validate_inferred_relationship_provenance
 
 logger = logging.getLogger(__name__)
 
@@ -137,11 +138,13 @@ class PhaseAssertions:
         thresholds: Optional[PhaseThresholds] = None,
         hard_fail: bool = False,
         strict_transition_gate: bool = False,
+        enforce_provenance_contracts: bool = False,
     ) -> None:
         self._graph = graph
         self._thresholds = thresholds or PhaseThresholds()
         self._hard_fail = hard_fail
         self._strict_transition_gate = strict_transition_gate
+        self._enforce_provenance_contracts = enforce_provenance_contracts
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -161,6 +164,27 @@ class PhaseAssertions:
                 + "; ".join(result.errors)
             )
         return result
+
+    def _add_provenance_contract_check(
+        self,
+        result: AssertionResult,
+        rel_type: str,
+        label: str,
+    ) -> None:
+        missing = validate_inferred_relationship_provenance(self._graph, rel_type)
+        result.checks.append(
+            {
+                "label": label,
+                "actual": missing,
+                "minimum": 0,
+                "passed": missing == 0,
+            }
+        )
+        if missing != 0:
+            result.errors.append(
+                f"[{result.phase}] {label}: got {missing}, expected == 0"
+            )
+            result.passed = False
 
     # ------------------------------------------------------------------
     # Per-phase assertion methods (Item 5)
@@ -243,6 +267,12 @@ class PhaseAssertions:
             self._count("MATCH (n:Signal) RETURN count(n) AS c"),
             t.min_signals,
         )
+        if self._enforce_provenance_contracts:
+            self._add_provenance_contract_check(
+                result,
+                rel_type="TLINK",
+                label="TLINK relationships missing provenance contract fields",
+            )
 
         return self._finalize(result)
 
@@ -338,6 +368,27 @@ class PhaseAssertions:
             self._count("MATCH ()-[r:SLINK]->() RETURN count(r) AS c"),
             t.min_slink_rels,
         )
+        if self._enforce_provenance_contracts:
+            self._add_provenance_contract_check(
+                result,
+                rel_type="DESCRIBES",
+                label="DESCRIBES relationships missing provenance contract fields",
+            )
+            self._add_provenance_contract_check(
+                result,
+                rel_type="FRAME_DESCRIBES_EVENT",
+                label="FRAME_DESCRIBES_EVENT relationships missing provenance contract fields",
+            )
+            self._add_provenance_contract_check(
+                result,
+                rel_type="PARTICIPANT",
+                label="PARTICIPANT relationships missing provenance contract fields",
+            )
+            self._add_provenance_contract_check(
+                result,
+                rel_type="EVENT_PARTICIPANT",
+                label="EVENT_PARTICIPANT relationships missing provenance contract fields",
+            )
 
         return self._finalize(result)
 
@@ -351,6 +402,12 @@ class PhaseAssertions:
             self._count("MATCH ()-[r:TLINK]->() RETURN count(r) AS c"),
             t.min_tlink_rels,
         )
+        if self._enforce_provenance_contracts:
+            self._add_provenance_contract_check(
+                result,
+                rel_type="TLINK",
+                label="TLINK relationships missing provenance contract fields",
+            )
 
         return self._finalize(result)
 

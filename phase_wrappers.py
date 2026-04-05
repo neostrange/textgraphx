@@ -671,11 +671,6 @@ class TemporalPhaseWrapper:
                 try:
                     from textgraphx.phase_assertions import PhaseAssertions, record_phase_run
                     from textgraphx.provenance import stamp_inferred_relationships
-                    assertion_result = PhaseAssertions(
-                        temporal.graph,
-                        strict_transition_gate=self.strict_transition_gate,
-                    ).after_temporal()
-                    assertions_passed = assertion_result.passed
                     stamp_inferred_relationships(
                         temporal.graph,
                         rel_type="TLINK",
@@ -683,6 +678,12 @@ class TemporalPhaseWrapper:
                         evidence_source="temporal_phase",
                         rule_id="temporal_xml_tlinks",
                     )
+                    assertion_result = PhaseAssertions(
+                        temporal.graph,
+                        strict_transition_gate=self.strict_transition_gate,
+                        enforce_provenance_contracts=True,
+                    ).after_temporal()
+                    assertions_passed = assertion_result.passed
                     record_phase_run(
                         temporal.graph, "temporal",
                         duration_seconds=0.0,
@@ -747,11 +748,6 @@ class EventEnrichmentPhaseWrapper:
                 try:
                     from textgraphx.phase_assertions import PhaseAssertions, record_phase_run
                     from textgraphx.provenance import stamp_inferred_relationships
-                    assertion_result = PhaseAssertions(
-                        enricher.graph,
-                        strict_transition_gate=self.strict_transition_gate,
-                    ).after_event_enrichment()
-                    assertions_passed = assertion_result.passed
                     stamp_inferred_relationships(
                         enricher.graph,
                         rel_type="DESCRIBES",
@@ -780,6 +776,12 @@ class EventEnrichmentPhaseWrapper:
                         evidence_source="event_enrichment",
                         rule_id="participant_linking",
                     )
+                    assertion_result = PhaseAssertions(
+                        enricher.graph,
+                        strict_transition_gate=self.strict_transition_gate,
+                        enforce_provenance_contracts=True,
+                    ).after_event_enrichment()
+                    assertions_passed = assertion_result.passed
                     record_phase_run(enricher.graph, "event_enrichment", duration_seconds=0.0)
                 except Exception:
                     self.logger.debug("Phase assertions/marker unavailable", exc_info=True)
@@ -1369,11 +1371,6 @@ class TlinksRecognizerWrapper:
                 try:
                     from textgraphx.phase_assertions import PhaseAssertions, record_phase_run
                     from textgraphx.provenance import stamp_inferred_relationships
-                    assertion_result = PhaseAssertions(
-                        recognizer.graph,
-                        strict_transition_gate=self.strict_transition_gate,
-                    ).after_tlinks()
-                    assertions_passed = assertion_result.passed
                     stamp_inferred_relationships(
                         recognizer.graph,
                         rel_type="TLINK",
@@ -1381,6 +1378,12 @@ class TlinksRecognizerWrapper:
                         evidence_source="tlinks_recognizer",
                         rule_id="case_rules",
                     )
+                    assertion_result = PhaseAssertions(
+                        recognizer.graph,
+                        strict_transition_gate=self.strict_transition_gate,
+                        enforce_provenance_contracts=True,
+                    ).after_tlinks()
+                    assertions_passed = assertion_result.passed
                     record_phase_run(recognizer.graph, "tlinks", duration_seconds=0.0)
                 except Exception:
                     self.logger.debug("Phase assertions/marker unavailable", exc_info=True)

@@ -4,47 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-
-_SOURCE_AUTHORITY_TIER = {
-    # Primary authorities
-    "allen_nlp_srl": "primary",
-    "allennlp_srl": "primary",
-    "temporal_phase": "primary",
-    "ttk": "primary",
-    "heideltime": "primary",
-    "coref_service": "primary",
-    "external_coref": "primary",
-    # Secondary/derived authorities
-    "tlinks_recognizer": "secondary",
-    "event_enrichment": "secondary",
-    "refinement": "secondary",
-    "refinement_rule": "secondary",
-    # Optional enrichment authorities
-    "spacy": "support",
-    "spacy_support": "support",
-    "dbpedia_spotlight": "support",
-    "dbpedia": "support",
-    # Generic fallback
-    "heuristic": "support",
-}
-
-
-def _normalize_evidence_source(evidence_source: str) -> str:
-    source = str(evidence_source or "").strip().lower()
-    if not source:
-        raise ValueError("evidence_source must be non-empty")
-    return source
-
-
-def _resolve_authority_tier(evidence_source: str, authority_tier: Optional[str] = None) -> str:
-    if authority_tier is not None:
-        normalized = str(authority_tier).strip().lower()
-        if normalized not in {"primary", "secondary", "support"}:
-            raise ValueError("authority_tier must be one of: primary, secondary, support")
-        return normalized
-
-    source = _normalize_evidence_source(evidence_source)
-    return _SOURCE_AUTHORITY_TIER.get(source, "support")
+from textgraphx.authority import normalize_evidence_source, resolve_authority_tier
 
 
 def stamp_inferred_relationships(
@@ -66,8 +26,8 @@ def stamp_inferred_relationships(
     if confidence < 0.0 or confidence > 1.0:
         raise ValueError("confidence must be between 0.0 and 1.0")
 
-    normalized_source = _normalize_evidence_source(evidence_source)
-    normalized_tier = _resolve_authority_tier(normalized_source, authority_tier)
+    normalized_source = normalize_evidence_source(evidence_source)
+    normalized_tier = resolve_authority_tier(normalized_source, authority_tier)
     normalized_kind = str(source_kind or "rule").strip().lower()
     normalized_policy = str(conflict_policy or "additive").strip().lower()
     if normalized_kind not in {"rule", "service", "model", "manual"}:
