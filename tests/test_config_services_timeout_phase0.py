@@ -1,0 +1,24 @@
+"""Phase-0 tests for shared service timeout config wiring."""
+
+import pytest
+
+
+@pytest.mark.unit
+def test_services_timeout_env_override(monkeypatch):
+    import textgraphx.config as cfg
+
+    monkeypatch.setenv("SERVICE_TIMEOUT_SEC", "17")
+    cfg._CACHED = None
+    loaded = cfg.load_config(path=None, allow_env=True)
+
+    assert loaded.services.service_timeout_sec == 17
+
+
+@pytest.mark.unit
+def test_services_timeout_defaults_positive():
+    import textgraphx.config as cfg
+
+    cfg._CACHED = None
+    loaded = cfg.load_config(path=None, allow_env=False)
+
+    assert loaded.services.service_timeout_sec >= 1

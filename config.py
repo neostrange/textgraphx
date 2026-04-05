@@ -46,6 +46,7 @@ class PathsConfig:
 
 @dataclass
 class ServicesConfig:
+    service_timeout_sec: int = 20
     wsd_url: str = "http://localhost:81/api/model"
     coref_url: str = "http://localhost:9999/coreference_resolution"
     temporal_url: str = "http://localhost:5050/annotate"
@@ -227,6 +228,12 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
                     cp.get('runtime', 'naf_sentence_mode', fallback=runtime.naf_sentence_mode)
                 )
             if cp.has_section('services'):
+                try:
+                    services.service_timeout_sec = int(
+                        cp.get('services', 'service_timeout_sec', fallback=str(services.service_timeout_sec))
+                    )
+                except Exception:
+                    pass
                 services.wsd_url = cp.get('services', 'wsd_url', fallback=services.wsd_url)
                 services.coref_url = cp.get('services', 'coref_url', fallback=services.coref_url)
                 services.temporal_url = cp.get('services', 'temporal_url', fallback=services.temporal_url)
@@ -312,6 +319,9 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
                     str(runtime_map.get('naf_sentence_mode'))
                 )
             svc_map = tom.get('services', {})
+            services.service_timeout_sec = int(
+                svc_map.get('service_timeout_sec', services.service_timeout_sec)
+            )
             services.wsd_url = svc_map.get('wsd_url', services.wsd_url)
             services.coref_url = svc_map.get('coref_url', services.coref_url)
             services.temporal_url = svc_map.get('temporal_url', services.temporal_url)
@@ -376,6 +386,12 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
             runtime.naf_sentence_mode = _coerce_naf_sentence_mode(env_naf_mode)
 
         services.wsd_url = os.getenv('WSD_API_URL') or services.wsd_url
+        service_timeout = os.getenv('SERVICE_TIMEOUT_SEC')
+        if service_timeout is not None:
+            try:
+                services.service_timeout_sec = int(service_timeout)
+            except Exception:
+                pass
         services.coref_url = os.getenv('COREF_SERVICE_URL') or services.coref_url
         services.temporal_url = os.getenv('TEMPORAL_SERVICE_URL') or services.temporal_url
         services.heideltime_url = os.getenv('HEIDELTIME_SERVICE_URL') or services.heideltime_url
@@ -470,6 +486,7 @@ strict_transition_gate = auto
 naf_sentence_mode = auto
 
 [services]
+service_timeout_sec = 20
 dbpedia_sparql_url = https://dbpedia.org/sparql
 dbpedia_spotlight_url = https://api.dbpedia-spotlight.org/en/annotate
 dbpedia_timeout_sec = 8
@@ -506,6 +523,7 @@ strict_transition_gate = "auto"
 naf_sentence_mode = "auto"
 
 [services]
+service_timeout_sec = 20
 dbpedia_sparql_url = "https://dbpedia.org/sparql"
 dbpedia_spotlight_url = "https://api.dbpedia-spotlight.org/en/annotate"
 dbpedia_timeout_sec = 8

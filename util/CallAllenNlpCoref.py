@@ -3,6 +3,14 @@ import json
 from textgraphx.config import get_config
 
 
+def _service_timeout() -> int:
+    try:
+        timeout = int(get_config().services.service_timeout_sec)
+    except Exception:
+        timeout = 20
+    return max(1, timeout)
+
+
 def callAllenNlpCoref(apiName, string):
     URL = get_config().services.coref_url
 
@@ -20,13 +28,12 @@ def callAllenNlpCoref(apiName, string):
         # for testing Allennlp for coreferencing
         payload = {"document":string}
     
-    r = requests.post(URL, headers=PARAMS, data=json.dumps(payload))
-
-    #r = requests.post(URL, headers=PARAMS, data=payload)
-
-    #return print(r.text)
-
-    return json.loads(r.text)
+    try:
+        r = requests.post(URL, headers=PARAMS, data=json.dumps(payload), timeout=_service_timeout())
+        r.raise_for_status()
+        return json.loads(r.text)
+    except (requests.exceptions.RequestException, json.JSONDecodeError):
+        return {}
 
 # ss = """The Bank of America Corporation, the second-largest bank in the United States, has announced that it lost US$2.24 billion in the third quarter of this year, mainly due to increases in loan losses.
 
