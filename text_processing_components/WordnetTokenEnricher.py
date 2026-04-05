@@ -14,6 +14,15 @@ class WordnetTokenEnricher:
         """
         self.neo4j_executor = neo4j_executor
         self.wn_lemmatizer = WordNetLemmatizer()
+        # Rough POS-specific reference depths for WordNet normalization.
+        # Used to convert raw depth into a comparable abstraction score.
+        self._pos_reference_depth = {
+            "n": 20.0,
+            "v": 14.0,
+            "a": 10.0,
+            "s": 10.0,
+            "r": 8.0,
+        }
 
     def assign_synset_info_to_tokens(self, doc_id):
         """
@@ -37,13 +46,14 @@ class WordnetTokenEnricher:
             # Step 2: Retrieve the linked Token nodes for each Sentence node
             query = """
             MATCH (s:Sentence {id: $sentence_id})-[:HAS_TOKEN]->(t:TagOccurrence)
-            RETURN t.id AS token_id, t.nltkSynset AS nltkSynset, t.wnSynsetOffset AS wnSynsetOffset
+            RETURN t.id AS token_id, t.lemma AS token_lemma, t.nltkSynset AS nltkSynset, t.wnSynsetOffset AS wnSynsetOffset
             """
             params = {"sentence_id": sentence_id}
             token_result = self.neo4j_executor.execute_query(query, params)
 
             for token_record in token_result:
                 token_id = token_record["token_id"]
+                token_lemma = token_record.get("token_lemma")
                 nltk_synset = token_record["nltkSynset"]
 
                 if nltk_synset and nltk_synset != 'O':
@@ -61,7 +71,10 @@ class WordnetTokenEnricher:
                         hypernyms = self.get_all_hypernyms(synset)
                         synonyms = self.get_synonyms(synset)
                         domain_labels = self.get_domain_labels(synset)
-                        derivational_forms, derivational_eventive_verbs = self.get_derivational_features(synset)
+                        derivational_forms, derivational_eventive_verbs = self.get_derivational_features(
+                            synset,
+                            token_lemma=token_lemma or lemma,
+                        )
                         entails, causes = self.get_verb_relation_features(synset)
                         depth_min, depth_max, abstraction_level = self.get_depth_features(synset)
 
@@ -151,14 +164,43 @@ class WordnetTokenEnricher:
 
         return domain_labels
 
-    def get_derivational_features(self, synset):
+    def _normalize_lemma(self, value):
+        v = str(value or "").strip().lower().replace("_", " ")
+        return " ".join(v.split())
+
+    def _lemma_similarity(self, a, b):
+        """Cheap lexical similarity in [0,1] for noise filtering."""
+        a_n = self._normalize_lemma(a)
+        b_n = self._normalize_lemma(b)
+        if not a_n or not b_n:
+            return 0.0
+        if a_n == b_n:
+            return 1.0
+        if a_n in b_n or b_n in a_n:
+            return 0.9
+
+        a_parts = set(a_n.split())
+        b_parts = set(b_n.split())
+        overlap = len(a_parts & b_parts)
+        union = len(a_parts | b_parts)
+        token_jaccard = float(overlap) / float(union) if union else 0.0
+
+        a_chars = set(a_n)
+        b_chars = set(b_n)
+        char_union = len(a_chars | b_chars)
+        char_jaccard = float(len(a_chars & b_chars)) / float(char_union) if char_union else 0.0
+
+        return max(token_jaccard, char_jaccard)
+
+    def get_derivational_features(self, synset, token_lemma=""):
         """Return derivationally related forms and eventive-verb subset.
 
         This is useful for bridging nominal mentions to eventive verb concepts,
         which strengthens event-centric KG construction.
         """
         forms = set()
-        eventive_verbs = set()
+        scored_eventive_verbs = []
+        token_lemma_n = self._normalize_lemma(token_lemma)
 
         for lemma in synset.lemmas():
             for rel in lemma.derivationally_related_forms():
@@ -173,11 +215,22 @@ class WordnetTokenEnricher:
                 try:
                     rel_synset = rel.synset()
                     if rel_synset.pos() == "v":
-                        eventive_verbs.add(rel_synset.name())
+                        # Keep only reasonably lexical-aligned derivations.
+                        rel_score = self._lemma_similarity(token_lemma_n, rel_name)
+                        if rel_score >= 0.45:
+                            scored_eventive_verbs.append((rel_synset.name(), rel_score))
                 except Exception:
                     continue
 
-        return sorted(forms), sorted(eventive_verbs)
+        # Deterministic top-k to reduce noisy long tails.
+        scored_eventive_verbs = sorted(
+            scored_eventive_verbs,
+            key=lambda x: (x[1], x[0]),
+            reverse=True,
+        )[:5]
+        eventive_verbs = [syn_name for syn_name, _ in scored_eventive_verbs]
+
+        return sorted(forms), eventive_verbs
 
     def get_verb_relation_features(self, synset):
         """Return verb entailment and causal relation synset names."""
@@ -208,6 +261,13 @@ class WordnetTokenEnricher:
         if max_depth <= 0:
             return min_depth, max_depth, 0.0
 
-        abstraction = 1.0 - (float(min_depth) / float(max_depth))
+        pos = ""
+        try:
+            pos = synset.pos()
+        except Exception:
+            pos = ""
+        ref_depth = self._pos_reference_depth.get(pos, 20.0)
+        specificity = min(float(max_depth), ref_depth) / ref_depth
+        abstraction = 1.0 - specificity
         abstraction = max(0.0, min(1.0, abstraction))
         return min_depth, max_depth, round(abstraction, 4)

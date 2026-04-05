@@ -67,12 +67,23 @@ def test_derivational_features_extract_eventive_verbs():
     noun_rel = _FakeRelatedLemma("decision", _FakeSynset("decision.n.01", "n"))
     source = _FakeSynset("decision.n.01", "n", lemmas=[_FakeLemma([verb_rel, noun_rel])])
 
-    forms, eventive_verbs = _make_enricher().get_derivational_features(source)
+    forms, eventive_verbs = _make_enricher().get_derivational_features(source, token_lemma="decision")
 
     assert "decide" in forms
     assert "decision" in forms
     assert "decide.v.01" in eventive_verbs
     assert "decision.n.01" not in eventive_verbs
+
+
+def test_derivational_features_filter_lexically_distant_eventive_verbs():
+    close_rel = _FakeRelatedLemma("withdraw", _FakeSynset("withdraw.v.09", "v"))
+    noisy_rel = _FakeRelatedLemma("queer", _FakeSynset("queer.v.02", "v"))
+    source = _FakeSynset("withdrawal.n.02", "n", lemmas=[_FakeLemma([close_rel, noisy_rel])])
+
+    _, eventive_verbs = _make_enricher().get_derivational_features(source, token_lemma="withdrawal")
+
+    assert "withdraw.v.09" in eventive_verbs
+    assert "queer.v.02" not in eventive_verbs
 
 
 def test_verb_relation_features_extract_entails_and_causes():
@@ -94,7 +105,7 @@ def test_depth_features_produce_bounded_abstraction_score():
     assert depth_min == 2
     assert depth_max == 8
     assert 0.0 <= abstraction <= 1.0
-    assert abstraction == 0.75
+    assert abstraction == 0.6
 
 
 def test_depth_features_handles_zero_depth_safely():
