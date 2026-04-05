@@ -1,9 +1,6 @@
 import nltk
 from nltk.corpus import wordnet as wn
-from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
-from nltk.tokenize import word_tokenize
-from nltk import pos_tag
 import logging
 logger = logging.getLogger(__name__)
 
@@ -64,12 +61,22 @@ class WordnetTokenEnricher:
                         hypernyms = self.get_all_hypernyms(synset)
                         synonyms = self.get_synonyms(synset)
                         domain_labels = self.get_domain_labels(synset)
+                        derivational_forms, derivational_eventive_verbs = self.get_derivational_features(synset)
+                        entails, causes = self.get_verb_relation_features(synset)
+                        depth_min, depth_max, abstraction_level = self.get_depth_features(synset)
 
                         # Update the Token node in Neo4j with synset-related information
                         update_query = """
                         MATCH (t:TagOccurrence {id: $token_id})
                         SET t.hypernyms = $hypernyms, t.wn31SynsetOffset = $wn31SynsetOffset, t.synonyms = $synonyms, t.domain_labels = $domain_labels,
-                            t.wnLexname = $wnLexname
+                            t.wnLexname = $wnLexname,
+                            t.wnDerivationalForms = $wnDerivationalForms,
+                            t.wnDerivationalEventiveVerbs = $wnDerivationalEventiveVerbs,
+                            t.wnEntails = $wnEntails,
+                            t.wnCauses = $wnCauses,
+                            t.wnDepthMin = $wnDepthMin,
+                            t.wnDepthMax = $wnDepthMax,
+                            t.wnAbstractionLevel = $wnAbstractionLevel
                         """
                         params = {
                             "token_id": token_id,
@@ -77,7 +84,14 @@ class WordnetTokenEnricher:
                             "synonyms": synonyms,
                             "domain_labels": domain_labels,
                             "wn31SynsetOffset": wn_synset_offset,
-                            "wnLexname": wn_lexname
+                            "wnLexname": wn_lexname,
+                            "wnDerivationalForms": derivational_forms,
+                            "wnDerivationalEventiveVerbs": derivational_eventive_verbs,
+                            "wnEntails": entails,
+                            "wnCauses": causes,
+                            "wnDepthMin": depth_min,
+                            "wnDepthMax": depth_max,
+                            "wnAbstractionLevel": abstraction_level,
                         }
                         self.neo4j_executor.execute_query(update_query, params)
                     except Exception as e:
@@ -136,3 +150,64 @@ class WordnetTokenEnricher:
             domain_labels.append(lexname.split(".")[0])
 
         return domain_labels
+
+    def get_derivational_features(self, synset):
+        """Return derivationally related forms and eventive-verb subset.
+
+        This is useful for bridging nominal mentions to eventive verb concepts,
+        which strengthens event-centric KG construction.
+        """
+        forms = set()
+        eventive_verbs = set()
+
+        for lemma in synset.lemmas():
+            for rel in lemma.derivationally_related_forms():
+                try:
+                    rel_name = rel.name()
+                except Exception:
+                    continue
+                if not rel_name:
+                    continue
+                forms.add(rel_name)
+
+                try:
+                    rel_synset = rel.synset()
+                    if rel_synset.pos() == "v":
+                        eventive_verbs.add(rel_synset.name())
+                except Exception:
+                    continue
+
+        return sorted(forms), sorted(eventive_verbs)
+
+    def get_verb_relation_features(self, synset):
+        """Return verb entailment and causal relation synset names."""
+        entails = []
+        causes = []
+        try:
+            entails = [s.name() for s in synset.entailments()]
+        except Exception:
+            entails = []
+        try:
+            causes = [s.name() for s in synset.causes()]
+        except Exception:
+            causes = []
+        return sorted(set(entails)), sorted(set(causes))
+
+    def get_depth_features(self, synset):
+        """Return min/max depth and an abstraction score in [0, 1].
+
+        Higher abstraction score indicates a concept closer to the ontology
+        root (more general); lower score indicates more specific concepts.
+        """
+        try:
+            min_depth = int(synset.min_depth())
+            max_depth = int(synset.max_depth())
+        except Exception:
+            return 0, 0, 0.0
+
+        if max_depth <= 0:
+            return min_depth, max_depth, 0.0
+
+        abstraction = 1.0 - (float(min_depth) / float(max_depth))
+        abstraction = max(0.0, min(1.0, abstraction))
+        return min_depth, max_depth, round(abstraction, 4)
