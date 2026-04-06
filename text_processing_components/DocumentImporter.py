@@ -60,15 +60,21 @@ class MeantimeXMLImporter(DocumentImporter):
 def resolve_document_id_from_naf_root(root, fallback_id):
     """Resolve a stable AnnotatedText.id from a NAF root.
 
-    Prefer the public id when present so downstream graph ids align with
-    dataset-level identifiers and evaluation gold files.
+    Prefer numeric public ids when present. Non-numeric public ids are not
+    used as graph ids because downstream temporal/event phases enforce integer
+    document ids in Cypher.
     """
     public = root.find("./nafHeader/public")
     public_id = None if public is None else (public.attrib.get("publicId") or "").strip()
     if public_id:
         if public_id.isdigit():
             return int(public_id)
-        return public_id
+        logger.warning(
+            "Non-numeric publicId '%s' detected; using fallback integer id=%s",
+            public_id,
+            fallback_id,
+        )
+        return fallback_id
     return fallback_id
 
 # # Usage

@@ -43,15 +43,55 @@ class EntityProcessor:
         self.neo4j_repository = neo4j_repository
 
     @staticmethod
-    def _syntactic_type_from_tag(tag):
+    def _normalize_syntactic_type(raw_type):
+        t = str(raw_type or "").strip().upper()
+        if not t:
+            return ""
+        aliases = {
+            "NOMINAL": "NOM",
+            "PROPER": "NAM",
+            "PRONOMINAL": "PRO",
+        }
+        t = aliases.get(t, t)
+        allowed = {"NAM", "NOM", "PRO", "PTV", "PRE", "HLS", "CONJ", "APP", "ARC"}
+        return t if t in allowed else ""
+
+    @staticmethod
+    def _legacy_syntactic_type(canonical_type):
+        t = str(canonical_type or "").strip().upper()
+        if t == "NOM":
+            return "NOMINAL"
+        return t or "NOMINAL"
+
+    @classmethod
+    def _syntactic_type_from_tag(cls, tag, dep=None, raw_type=None):
+        # Prefer upstream syntactic labels when present and valid.
+        normalized = cls._normalize_syntactic_type(raw_type)
+        if normalized:
+            return normalized
+
+        dep = str(dep or "").strip().lower()
+        if dep == "appos":
+            return "APP"
+        if dep == "conj":
+            return "CONJ"
+        if dep in {"acl", "acl:relcl", "relcl", "rcmod"}:
+            return "ARC"
+        if dep in {"predet", "det", "nummod", "quantmod"}:
+            return "PTV"
+        if dep in {"attr", "acomp", "oprd", "xcomp", "ccomp"}:
+            return "PRE"
+
         tag = (tag or "").upper()
         if tag in ("NN", "NNS"):
-            return "NOMINAL"
+            return "NOM"
         if tag in ("NNP", "NNPS"):
             return "NAM"
-        if tag in ("PRP", "PRP$"):
+        if tag in ("PRP", "PRP$", "WP", "WP$"):
             return "PRO"
-        return "OTHER"
+        if tag in ("DT", "WDT", "PDT", "CD"):
+            return "PTV"
+        return "NOM"
 
     def process_entities(self, doc, text_id):
         """Extract entities from a spaCy `Doc` and prepare them for storage.
@@ -80,7 +120,18 @@ class EntityProcessor:
             head_token = entity.root
             head_text = head_token.text
             head_token_index = head_token.i
-            syntactic_type = self._syntactic_type_from_tag(getattr(head_token, "tag_", ""))
+            entity_raw_syntactic_type = getattr(entity, "syntactic_type", "")
+            if not entity_raw_syntactic_type and hasattr(entity, "_"):
+                try:
+                    entity_raw_syntactic_type = getattr(entity._, "syntactic_type", "")
+                except Exception:
+                    entity_raw_syntactic_type = ""
+            syntactic_type = self._syntactic_type_from_tag(
+                getattr(head_token, "tag_", ""),
+                dep=getattr(head_token, "dep_", ""),
+                raw_type=entity_raw_syntactic_type,
+            )
+            legacy_syntactic_type = self._legacy_syntactic_type(syntactic_type)
             start_char = entity.start_char
             end_char = entity.end_char
 
@@ -95,6 +146,7 @@ class EntityProcessor:
                     'head': head_text,
                     'head_token_index': head_token_index,
                     'syntactic_type': syntactic_type,
+                    'legacy_syntactic_type': legacy_syntactic_type,
                     'kb_id': entity.kb_id_,
                     'url_wikidata': entity.kb_id_,
                     'score': entity._.dbpedia_raw_result['@similarityScore'],
@@ -112,6 +164,7 @@ class EntityProcessor:
                     'head': head_text,
                     'head_token_index': head_token_index,
                     'syntactic_type': syntactic_type,
+                    'legacy_syntactic_type': legacy_syntactic_type,
                 }
 
             nes.append(ne)
@@ -140,6 +193,10 @@ class EntityProcessor:
             end = item.get('end_index')
             ne_type = item.get('type')
             item['id'] = make_ne_id(document_id, start, end, ne_type)
+            item['legacy_syntactic_type'] = item.get(
+                'legacy_syntactic_type',
+                self._legacy_syntactic_type(item.get('syntactic_type')),
+            )
 
         ne_query = """
             UNWIND $nes as item
@@ -150,7 +207,7 @@ class EntityProcessor:
             ne.start_tok = item.start_index, ne.end_tok = item.end_index,
             ne.start_char = item.start_char, ne.end_char = item.end_char,
             ne.head = item.head, ne.headTokenIndex = item.head_token_index,
-            ne.syntacticType = item.syntactic_type, ne.syntactic_type = item.syntactic_type,
+            ne.syntacticType = item.legacy_syntactic_type, ne.syntactic_type = item.syntactic_type,
             ne.token_id = item.id, ne.token_start = item.start_index, ne.token_end = item.end_index
             WITH ne, item as neIndex
             MATCH (text:AnnotatedText)-[:CONTAINS_SENTENCE]->(sentence:Sentence)-[:HAS_TOKEN]->(tagOccurrence:TagOccurrence)

@@ -50,7 +50,7 @@ class ServicesConfig:
     wsd_url: str = "http://localhost:81/api/model"
     coref_url: str = "http://localhost:9999/coreference_resolution"
     temporal_url: str = "http://localhost:5050/annotate"
-    heideltime_url: str = "http://localhost:5050/annotate"
+    heideltime_url: str = "http://localhost:5000/annotate"
     srl_url: str = "http://localhost:8000/predict"
     llm_url: str = "http://localhost:11434/api/generate"
     dbpedia_sparql_url: str = "https://dbpedia.org/sparql"
@@ -68,6 +68,7 @@ class RuntimeConfig:
     strict_transition_gate: Optional[bool] = None
     naf_sentence_mode: str = "auto"
     tlink_shadow_mode: bool = False
+    enable_cross_document_fusion: bool = False
 
 
 @dataclass
@@ -231,6 +232,13 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
                 runtime.tlink_shadow_mode = _coerce_bool(
                     cp.get('runtime', 'tlink_shadow_mode', fallback=str(runtime.tlink_shadow_mode))
                 )
+                runtime.enable_cross_document_fusion = _coerce_bool(
+                    cp.get(
+                        'runtime',
+                        'enable_cross_document_fusion',
+                        fallback=str(runtime.enable_cross_document_fusion),
+                    )
+                )
             if cp.has_section('services'):
                 try:
                     services.service_timeout_sec = int(
@@ -324,6 +332,10 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
                 )
             if 'tlink_shadow_mode' in runtime_map:
                 runtime.tlink_shadow_mode = bool(runtime_map.get('tlink_shadow_mode', runtime.tlink_shadow_mode))
+            if 'enable_cross_document_fusion' in runtime_map:
+                runtime.enable_cross_document_fusion = bool(
+                    runtime_map.get('enable_cross_document_fusion', runtime.enable_cross_document_fusion)
+                )
             svc_map = tom.get('services', {})
             services.service_timeout_sec = int(
                 svc_map.get('service_timeout_sec', services.service_timeout_sec)
@@ -393,19 +405,48 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
         env_tlink_shadow = os.getenv('TEXTGRAPHX_TLINK_SHADOW_MODE')
         if env_tlink_shadow is not None:
             runtime.tlink_shadow_mode = _coerce_bool(env_tlink_shadow)
+        env_cross_doc_fusion = os.getenv('TEXTGRAPHX_ENABLE_CROSS_DOCUMENT_FUSION')
+        if env_cross_doc_fusion is not None:
+            runtime.enable_cross_document_fusion = _coerce_bool(env_cross_doc_fusion)
 
-        services.wsd_url = os.getenv('WSD_API_URL') or services.wsd_url
-        service_timeout = os.getenv('SERVICE_TIMEOUT_SEC')
+        # Standardised TEXTGRAPHX_* env vars (preferred); legacy names kept for
+        # backward compatibility with existing deployments.
+        services.wsd_url = (
+            os.getenv('TEXTGRAPHX_WSD_URL')
+            or os.getenv('WSD_API_URL')
+            or services.wsd_url
+        )
+        service_timeout = os.getenv('TEXTGRAPHX_SERVICE_TIMEOUT_SEC') or os.getenv('SERVICE_TIMEOUT_SEC')
         if service_timeout is not None:
             try:
                 services.service_timeout_sec = int(service_timeout)
             except Exception:
                 pass
-        services.coref_url = os.getenv('COREF_SERVICE_URL') or services.coref_url
-        services.temporal_url = os.getenv('TEMPORAL_SERVICE_URL') or services.temporal_url
-        services.heideltime_url = os.getenv('HEIDELTIME_SERVICE_URL') or services.heideltime_url
-        services.srl_url = os.getenv('SRL_SERVICE_URL') or services.srl_url
-        services.llm_url = os.getenv('LLM_API_URL') or services.llm_url
+        services.coref_url = (
+            os.getenv('TEXTGRAPHX_COREF_URL')
+            or os.getenv('COREF_SERVICE_URL')
+            or services.coref_url
+        )
+        services.temporal_url = (
+            os.getenv('TEXTGRAPHX_TEMPORAL_URL')
+            or os.getenv('TEMPORAL_SERVICE_URL')
+            or services.temporal_url
+        )
+        services.heideltime_url = (
+            os.getenv('TEXTGRAPHX_HEIDELTIME_URL')
+            or os.getenv('HEIDELTIME_SERVICE_URL')
+            or services.heideltime_url
+        )
+        services.srl_url = (
+            os.getenv('TEXTGRAPHX_SRL_URL')
+            or os.getenv('SRL_SERVICE_URL')
+            or services.srl_url
+        )
+        services.llm_url = (
+            os.getenv('TEXTGRAPHX_LLM_URL')
+            or os.getenv('LLM_API_URL')
+            or services.llm_url
+        )
         services.dbpedia_sparql_url = os.getenv('DBPEDIA_SPARQL_URL') or services.dbpedia_sparql_url
         services.dbpedia_spotlight_url = os.getenv('DBPEDIA_SPOTLIGHT_URL') or services.dbpedia_spotlight_url
 
@@ -494,6 +535,7 @@ mode = production
 strict_transition_gate = auto
 naf_sentence_mode = auto
 tlink_shadow_mode = false
+enable_cross_document_fusion = false
 
 [services]
 service_timeout_sec = 20
@@ -532,6 +574,7 @@ mode = "production"
 strict_transition_gate = "auto"
 naf_sentence_mode = "auto"
 tlink_shadow_mode = false
+enable_cross_document_fusion = false
 
 [services]
 service_timeout_sec = 20

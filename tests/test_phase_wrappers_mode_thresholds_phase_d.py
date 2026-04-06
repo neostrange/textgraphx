@@ -21,3 +21,12 @@ def test_temporal_and_tlinks_assertions_use_mode_thresholds():
 
     assert "thresholds=_phase_thresholds_for_mode(\"temporal\")" in src
     assert "thresholds=_phase_thresholds_for_mode(\"tlinks\")" in src
+
+
+@pytest.mark.unit
+def test_refinement_wrapper_reads_cross_document_fusion_toggle():
+    src = Path("/home/neo/environments/textgraphx/textgraphx/phase_wrappers.py").read_text(encoding="utf-8")
+
+    assert "enable_cross_document_fusion" in src
+    assert "get_config().runtime.enable_cross_document_fusion" in src
+    assert "cross_document_fusion_enabled" in src

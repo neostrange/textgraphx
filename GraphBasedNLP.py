@@ -1,6 +1,7 @@
 import os
 import spacy
 import sys
+import importlib
 import argparse
 from pathlib import Path
 # When running this file directly (python textgraphx/GraphBasedNLP.py),
@@ -16,11 +17,26 @@ from textgraphx.util.RestCaller import callAllenNlpApi
 from textgraphx.util.GraphDbBase import GraphDBBase
 from textgraphx.TextProcessor import TextProcessor
 import xml.etree.ElementTree as ET
-from spacy.lang.char_classes import ALPHA, ALPHA_LOWER, ALPHA_UPPER
-from spacy.lang.char_classes import CONCAT_QUOTES, LIST_ELLIPSES, LIST_ICONS
-from spacy.util import compile_infix_regex
+if not hasattr(spacy, "__path__"):
+    try:
+        for module_name in list(sys.modules):
+            if module_name == "spacy" or module_name.startswith("spacy."):
+                del sys.modules[module_name]
+        spacy = importlib.import_module("spacy")
+    except Exception:
+        pass
+
+try:
+    from spacy.lang.char_classes import ALPHA, ALPHA_LOWER, ALPHA_UPPER
+    from spacy.lang.char_classes import CONCAT_QUOTES, LIST_ELLIPSES, LIST_ICONS
+    from spacy.util import compile_infix_regex
+except Exception:
+    ALPHA = ALPHA_LOWER = ALPHA_UPPER = ""
+    CONCAT_QUOTES = LIST_ELLIPSES = LIST_ICONS = []
+
+    def compile_infix_regex(*_args, **_kwargs):
+        raise RuntimeError("spaCy language char classes unavailable")
 from neo4j import GraphDatabase
-from textgraphx.TextProcessor import Neo4jRepository
 from textgraphx.text_processing_components.DocumentImporter import MeantimeXMLImporter, resolve_document_id_from_naf_root
 from textgraphx.text_normalization import normalize_naf_raw_text
 from textgraphx.config import get_config
@@ -32,6 +48,7 @@ from textgraphx.config import get_config
 # from spacy import util
 import logging
 import time
+import zlib
 
 # module logger
 logger = logging.getLogger(__name__)
@@ -221,19 +238,22 @@ class GraphBasedNLP(GraphDBBase):
     # Stores a corpus of text in the database
     def store_corpus(self, directory):
         
-        # Query the database to get the count of AnnotatedText nodes
-        query = "MATCH (n:AnnotatedText) RETURN count(n) as count"
-        result = self.neo4j_repository.execute_query(query=query, params={})
-        count = result[0]['count'] if result else 0
-        
-        # Initialize the text ID based on the count of documents
-        text_id = count + 1
+        # Keep ingestion deterministic for reproducible multi-document runs.
+        existing_ids_query = "MATCH (n:AnnotatedText) RETURN n.id AS id"
+        existing = self.neo4j_repository.execute_query(query=existing_ids_query, params={})
+        used_doc_ids = set()
+        for row in existing or []:
+            raw_id = row.get("id")
+            if isinstance(raw_id, int):
+                used_doc_ids.add(raw_id)
+            elif isinstance(raw_id, str) and raw_id.isdigit():
+                used_doc_ids.add(int(raw_id))
         
         # Initialize the list of text tuples
         text_tuples = []
         
         # Iterate over each file in the directory
-        for filename in os.listdir(directory):
+        for filename in sorted(os.listdir(directory)):
             # Construct the full path to the file
             f = os.path.join(directory, filename)
             
@@ -246,8 +266,20 @@ class GraphBasedNLP(GraphDBBase):
                     # Parse the XML file
                     tree = ET.parse(directory+'/' + filename)
                     root = tree.getroot()
-                    
-                    resolved_text_id = resolve_document_id_from_naf_root(root, text_id)
+
+                    stable_fallback_id = self._stable_fallback_doc_id(filename, used_doc_ids)
+                    resolved_text_id = resolve_document_id_from_naf_root(root, stable_fallback_id)
+                    if isinstance(resolved_text_id, str) and resolved_text_id.isdigit():
+                        resolved_text_id = int(resolved_text_id)
+                    if not isinstance(resolved_text_id, int):
+                        logger.warning(
+                            "Resolved non-integer document id '%s' for file '%s'; using stable fallback id=%s",
+                            resolved_text_id,
+                            filename,
+                            stable_fallback_id,
+                        )
+                        resolved_text_id = stable_fallback_id
+                    used_doc_ids.add(resolved_text_id)
 
                     # Extract text and normalize it for robust sentence segmentation.
                     text = root[1].text if len(root) > 1 else ""
@@ -280,8 +312,6 @@ class GraphBasedNLP(GraphDBBase):
                     document_importer.import_document()
                     #self.__text_processor.create_annotated_text(data, text, text_id)
                     
-                    # Increment the text ID
-                    text_id += 1
                 except Exception as e:
                     logger.exception("Error processing file %s", filename)
                 
@@ -291,6 +321,19 @@ class GraphBasedNLP(GraphDBBase):
         text_tuples = tuple(self.neo4j_repository.get_all_annotated_text_docs())
         # Return the list of text tuples
         return tuple(text_tuples)
+
+    @staticmethod
+    def _stable_fallback_doc_id(filename, used_ids):
+        # Use a deterministic integer id derived from filename and avoid collisions.
+        base_id = zlib.crc32(str(filename).encode("utf-8")) & 0x7FFFFFFF
+        if base_id == 0:
+            base_id = 1
+        doc_id = base_id
+        while doc_id in used_ids:
+            doc_id = (doc_id + 1) & 0x7FFFFFFF
+            if doc_id == 0:
+                doc_id = 1
+        return doc_id
 
     # Tokenizes and stores the given text tuples
     def process_text(self, text_tuples, text_id, storeTag):

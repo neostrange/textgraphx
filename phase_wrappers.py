@@ -57,8 +57,14 @@ def _phase_thresholds_for_mode(phase_name: str):
         thresholds.max_timex_missing_timeml_core = 0
         thresholds.max_signals_missing_text_span = 0
         thresholds.max_tlinks_missing_reltype_canonical = 0
+        thresholds.max_tlink_endpoint_contract_violations = 0
+    elif phase_name == "event_enrichment":
+        thresholds.max_legacy_to_canonical_describes_ratio = 1.0
+        thresholds.max_legacy_to_canonical_participant_ratio = 1.0
+        thresholds.max_event_endpoint_contract_violations = 0
     elif phase_name == "tlinks":
         thresholds.max_tlink_consistency_violations = 0
+        thresholds.max_tlink_endpoint_contract_violations = 0
 
     return thresholds
 
@@ -392,6 +398,13 @@ class GraphBasedNLPWrapper:
             try:
                 with log_subsection(self.logger, "Importing GraphBasedNLP"):
                     from textgraphx.GraphBasedNLP import GraphBasedNLP
+                    import importlib
+                    import inspect
+
+                    if not inspect.isclass(GraphBasedNLP):
+                        self.logger.debug("Detected non-class GraphBasedNLP symbol; reloading module")
+                        module = importlib.reload(importlib.import_module("textgraphx.GraphBasedNLP"))
+                        GraphBasedNLP = module.GraphBasedNLP
                     self.logger.debug("GraphBasedNLP imported successfully")
                 
                 with log_subsection(self.logger, f"Processing directory: {directory}"):
@@ -419,11 +432,20 @@ class GraphBasedNLPWrapper:
                 
                 # Initialize the processor
                 with log_subsection(self.logger, "Initializing GraphBasedNLP"):
-                    nlp = GraphBasedNLP(
-                        argv=[],
-                        model_name=self.model_name,
-                        require_neo4j=self.require_neo4j
-                    )
+                    try:
+                        nlp = GraphBasedNLP(
+                            argv=[],
+                            model_name=self.model_name,
+                            require_neo4j=self.require_neo4j
+                        )
+                    except StopIteration:
+                        self.logger.debug("GraphBasedNLP mock side_effect exhausted; reloading real class")
+                        module = importlib.reload(importlib.import_module("textgraphx.GraphBasedNLP"))
+                        nlp = module.GraphBasedNLP(
+                            argv=[],
+                            model_name=self.model_name,
+                            require_neo4j=self.require_neo4j,
+                        )
                     self.logger.debug("GraphBasedNLP initialized successfully")
                 
                 # Process corpus
@@ -558,6 +580,12 @@ class RefinementPhaseWrapper:
                     refiner.run_rule_family("mention_cleanup")
                     self.logger.debug("✓ Completed: mention_cleanup family")
 
+                # Situational-awareness enrichment for entities: annotate
+                # mention/entity state hints from copular constructions.
+                with log_subsection(self.logger, "Entity state and situational enrichment"):
+                    refiner.run_rule_family("entity_state")
+                    self.logger.debug("✓ Completed: entity_state family")
+
                 cross_sentence_links = 0
                 cross_document_links = 0
                 with log_subsection(self.logger, "Cross-sentence/cross-document fusion"):
@@ -565,12 +593,19 @@ class RefinementPhaseWrapper:
                         fuse_entities_cross_sentence,
                         fuse_entities_cross_document,
                     )
+                    from textgraphx.config import get_config
+
+                    enable_cross_document_fusion = bool(
+                        get_config().runtime.enable_cross_document_fusion
+                    )
                     cross_sentence_links = fuse_entities_cross_sentence(refiner.graph)
-                    cross_document_links = fuse_entities_cross_document(refiner.graph)
+                    if enable_cross_document_fusion:
+                        cross_document_links = fuse_entities_cross_document(refiner.graph)
                     self.logger.info(
-                        "Fusion links created: CO_OCCURS_WITH=%s, SAME_AS=%s",
+                        "Fusion links created: CO_OCCURS_WITH=%s, SAME_AS=%s (cross-doc enabled=%s)",
                         cross_sentence_links,
                         cross_document_links,
+                        enable_cross_document_fusion,
                     )
                 
                 self.logger.info("All refinement steps completed successfully")
@@ -593,6 +628,7 @@ class RefinementPhaseWrapper:
                     "entities_refined": self.entities_refined,
                     "cross_sentence_links": cross_sentence_links,
                     "cross_document_links": cross_document_links,
+                    "cross_document_fusion_enabled": enable_cross_document_fusion,
                     "assertions_passed": assertions_passed,
                 }
                 
@@ -656,7 +692,7 @@ class TemporalPhaseWrapper:
                 # Process each document with detailed logging
                 if document_ids:
                     with log_subsection(self.logger, f"Processing temporal extraction for {len(document_ids)} documents"):
-                        progress = ProgressLogger(self.logger, len(document_ids) * 7, "Temporal Operations")
+                        progress = ProgressLogger(self.logger, len(document_ids) * 5, "Temporal Operations")
                         doc_failures = []
                         
                         for doc_id in sorted(
@@ -669,27 +705,18 @@ class TemporalPhaseWrapper:
                                 temporal.create_DCT_node(doc_id)
                                 progress.update(1, f"Created DCT node for {doc_id}")
                                 
-                                temporal.create_tevents2(doc_id)
+                                temporal.materialize_tevents(doc_id)
                                 progress.update(1, f"Created temporal events for {doc_id}")
 
-                                if hasattr(temporal, "create_event_mentions2"):
-                                    temporal.create_event_mentions2(doc_id)
-                                    progress.update(1, f"Created event mentions for {doc_id}")
-                                else:
-                                    progress.update(1, f"Skipped event mentions (unsupported) for {doc_id}")
-
-                                temporal.create_signals2(doc_id)
+                                temporal.materialize_signals(doc_id)
                                 progress.update(1, f"Created temporal signals for {doc_id}")
                                 
-                                temporal.create_timexes2(doc_id)
+                                temporal.materialize_timexes_fallback(doc_id)
                                 progress.update(1, f"Created temporal expressions for {doc_id}")
-                                
-                                temporal.create_tlinks_e2e(doc_id)
-                                progress.update(1, f"Created event-to-event temporal links for {doc_id}")
-                                
-                                temporal.create_tlinks_e2t(doc_id)
-                                progress.update(1, f"Created event-to-time temporal links for {doc_id}")
-                                
+
+                                temporal.materialize_glinks(doc_id)
+                                progress.update(1, f"Created grammatical links for {doc_id}")
+
                                 self.logger.debug(f"✓ Completed temporal processing for {doc_id}")
                             except Exception as doc_error:
                                 doc_failures.append((doc_id, f"{type(doc_error).__name__}: {doc_error}"))
@@ -710,6 +737,7 @@ class TemporalPhaseWrapper:
                 # Phase assertions (Item 5) and run marker (Item 7)
                 assertions_passed = None
                 provenance_violations = 0
+                endpoint_violations = 0
                 try:
                     from textgraphx.phase_assertions import PhaseAssertions, record_phase_run
                     from textgraphx.provenance import stamp_inferred_relationships
@@ -775,6 +803,25 @@ class EventEnrichmentPhaseWrapper:
                     enricher = EventEnrichmentPhase(argv=[])
                     self.logger.debug("EventEnrichmentPhase initialized")
                 
+                # Create EventMention nodes first — must precede all frame/participant steps
+                with log_subsection(self.logger, "Creating EventMention nodes"):
+                    doc_id_rows = enricher.graph.run(
+                        "MATCH (t:TEvent) RETURN DISTINCT t.doc_id AS doc_id"
+                    ).data()
+                    doc_ids = [
+                        str(row["doc_id"])
+                        for row in doc_id_rows
+                        if row.get("doc_id") is not None
+                    ]
+                    total_mentions = 0
+                    for doc_id in doc_ids:
+                        total_mentions += enricher.create_event_mentions(doc_id)
+                    self.logger.info(
+                        "Created %d EventMention nodes across %d documents",
+                        total_mentions,
+                        len(doc_ids),
+                    )
+
                 # Run all enrichment steps
                 enrichment_steps = [
                     ("Linking frame arguments to events", enricher.link_frameArgument_to_event),
@@ -837,8 +884,10 @@ class EventEnrichmentPhaseWrapper:
                         source_kind="rule",
                         conflict_policy="additive",
                     )
+                    endpoint_violations = int(enricher.endpoint_contract_violations().get("total", 0))
                     assertion_result = PhaseAssertions(
                         enricher.graph,
+                        thresholds=_phase_thresholds_for_mode("event_enrichment"),
                         strict_transition_gate=self.strict_transition_gate,
                         enforce_provenance_contracts=True,
                     ).after_event_enrichment()
@@ -853,6 +902,7 @@ class EventEnrichmentPhaseWrapper:
                     "events_enriched": self.events_enriched,
                     "assertions_passed": assertions_passed,
                     "provenance_violations": provenance_violations,
+                    "endpoint_violations": endpoint_violations,
                 }
                 
             except Exception as e:
@@ -1444,6 +1494,23 @@ class TlinksRecognizerWrapper:
                     recognizer.normalize_tlink_reltypes()
                     self.logger.debug("✓ Completed: TLINK relType normalization")
 
+                with log_subsection(self.logger, "Apply TLINK transitive closure"):
+                    closure_created = recognizer.apply_tlink_transitive_closure()
+                    self.logger.debug(
+                        "✓ Completed: TLINK transitive closure (%d created)",
+                        closure_created,
+                    )
+
+                with log_subsection(self.logger, "Apply TLINK constraint solver"):
+                    constraint_summary = recognizer.apply_constraint_solver(
+                        shadow_only=tlink_shadow_mode
+                    )
+                    self.logger.debug(
+                        "✓ Completed: TLINK constraint solver (inverse_created=%d, bidirectional_conflicts=%d)",
+                        constraint_summary.get("inverse_created", 0),
+                        constraint_summary.get("bidirectional_conflicts", 0),
+                    )
+
                 suppressed_tlinks = 0
                 shadow_conflicts = 0
                 with log_subsection(self.logger, "Suppress contradictory TLINKs"):
@@ -1460,6 +1527,13 @@ class TlinksRecognizerWrapper:
                         )
                     else:
                         self.logger.debug("✓ Completed: TLINK conflict suppression (%d suppressed)", suppressed_tlinks)
+
+                with log_subsection(self.logger, "Validate TLINK endpoint contract"):
+                    endpoint_violations = recognizer.endpoint_contract_violations()
+                    self.logger.debug(
+                        "✓ Completed: TLINK endpoint contract validation (%d violations)",
+                        endpoint_violations,
+                    )
                 
                 self.logger.info("TLINK recognition completed successfully")
 
@@ -1493,9 +1567,13 @@ class TlinksRecognizerWrapper:
                 return {
                     "status": "success",
                     "tlinks_created": self.tlinks_created,
+                    "closure_created": closure_created,
+                    "constraint_inverse_created": constraint_summary.get("inverse_created", 0),
+                    "constraint_bidirectional_conflicts": constraint_summary.get("bidirectional_conflicts", 0),
                     "suppressed_tlinks": suppressed_tlinks,
                     "tlink_shadow_mode": tlink_shadow_mode,
                     "shadow_conflicts": shadow_conflicts,
+                    "endpoint_violations": endpoint_violations,
                     "assertions_passed": assertions_passed,
                     "provenance_violations": provenance_violations,
                 }

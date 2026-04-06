@@ -151,7 +151,8 @@ class SRLProcessor:
                 for arg_type, arg_ids in frameDict.items():
                     for arg_id in arg_ids:
                         q = """
-                        MATCH (a:FrameArgument {id: $arg_id}), (f:Frame {id: $frame_id})
+                        MATCH (a:FrameArgument {id: $arg_id})
+                        MATCH (f:Frame {id: $frame_id})
                         MERGE (a)-[r:PARTICIPANT]->(f)
                         SET r.type = $arg_type
                         MERGE (a)-[cr:HAS_FRAME_ARGUMENT]->(f)

@@ -16,10 +16,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from math import inf
 from typing import Any, Dict, List, Optional
 
 from textgraphx.time_utils import utc_iso_now
 from textgraphx.provenance import validate_inferred_relationship_provenance
+from textgraphx.reasoning_contracts import count_endpoint_violations
 
 logger = logging.getLogger(__name__)
 
@@ -64,10 +66,14 @@ class PhaseThresholds:
     min_event_participant_rels: int = 0      # EVENT_PARTICIPANT relationships
     min_clink_rels: int = 0                  # CLINK relationships
     min_slink_rels: int = 0                  # SLINK relationships
+    max_legacy_to_canonical_describes_ratio: float = inf
+    max_legacy_to_canonical_participant_ratio: float = inf
 
     # --- tlinks ---
     min_tlink_rels: int = 0                  # TLINK relationships
     max_tlink_consistency_violations: int = 10**9  # Contradictory unsuppressed TLINK pairs
+    max_event_endpoint_contract_violations: int = 10**9
+    max_tlink_endpoint_contract_violations: int = 10**9
 
 
 @dataclass
@@ -430,6 +436,28 @@ class PhaseAssertions:
             canonical_participant - legacy_participant,
             -10**9,
         )
+        describes_ratio = (
+            (legacy_describes / canonical_describes)
+            if canonical_describes > 0
+            else (inf if legacy_describes > 0 else 0.0)
+        )
+        participant_ratio = (
+            (legacy_participant / canonical_participant)
+            if canonical_participant > 0
+            else (inf if legacy_participant > 0 else 0.0)
+        )
+        self._add_upper_bound_check(
+            result,
+            label="Legacy-to-canonical DESCRIBES ratio",
+            actual=describes_ratio,
+            maximum=t.max_legacy_to_canonical_describes_ratio,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="Legacy-to-canonical PARTICIPANT ratio",
+            actual=participant_ratio,
+            maximum=t.max_legacy_to_canonical_participant_ratio,
+        )
         if legacy_describes > canonical_describes:
             logger.warning(
                 "[phase-assert] legacy DESCRIBES edges dominate canonical FRAME_DESCRIBES_EVENT edges (%d > %d)",
@@ -465,6 +493,36 @@ class PhaseAssertions:
             "SLINK relationships",
             self._count("MATCH ()-[r:SLINK]->() RETURN count(r) AS c"),
             t.min_slink_rels,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="Endpoint contract violations (EVENT_PARTICIPANT)",
+            actual=count_endpoint_violations(self._graph, "EVENT_PARTICIPANT"),
+            maximum=t.max_event_endpoint_contract_violations,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="Endpoint contract violations (INSTANTIATES)",
+            actual=count_endpoint_violations(self._graph, "INSTANTIATES"),
+            maximum=t.max_event_endpoint_contract_violations,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="Endpoint contract violations (HAS_FRAME_ARGUMENT)",
+            actual=count_endpoint_violations(self._graph, "HAS_FRAME_ARGUMENT"),
+            maximum=t.max_event_endpoint_contract_violations,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="Endpoint contract violations (FRAME_DESCRIBES_EVENT)",
+            actual=count_endpoint_violations(self._graph, "FRAME_DESCRIBES_EVENT"),
+            maximum=t.max_event_endpoint_contract_violations,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="Endpoint contract violations (REFERS_TO)",
+            actual=count_endpoint_violations(self._graph, "REFERS_TO"),
+            maximum=t.max_event_endpoint_contract_violations,
         )
         if self._enforce_provenance_contracts:
             self._add_provenance_contract_check(
@@ -523,6 +581,12 @@ class PhaseAssertions:
                 """
             ),
             maximum=t.max_tlink_consistency_violations,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="Endpoint contract violations (TLINK)",
+            actual=count_endpoint_violations(self._graph, "TLINK"),
+            maximum=t.max_tlink_endpoint_contract_violations,
         )
         if self._enforce_provenance_contracts:
             self._add_provenance_contract_check(

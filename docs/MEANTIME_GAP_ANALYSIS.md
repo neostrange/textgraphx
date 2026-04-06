@@ -78,7 +78,7 @@ PHASE 1 closes the critical semantic gap by introducing explicit mention-level n
 #### ✅ PHASE 3: Signal/CSignal Introduction - COMPLETE
 **Status:** Signal nodes fully functional + formalized + CSignal introduced  
 **Deliverables:**
-- TemporalPhase.create_signals2(): Creates Signal nodes with full span properties (start_char, end_char, start_tok, end_tok, text)
+- TemporalPhase.materialize_signals(): Creates Signal nodes with full span properties (start_char, end_char, start_tok, end_tok, text)
 - Schema migration 0014_formalize_signal_and_introduce_csignal.cypher: 
   - Natural key constraint (doc_id, id)
   - Indexes on doc_id, type, token_span, TRIGGERS relationship

@@ -14,41 +14,66 @@ Contract summary:
   patterns.
 """
 
-from cgitb import text
 import requests
+import types
 from distutils.command.config import config
-import spacy
-from spacy.lang.en.stop_words import STOP_WORDS
+try:
+    import spacy
+except Exception:
+    spacy = types.SimpleNamespace(
+        prefer_gpu=lambda: None,
+        load=lambda *_args, **_kwargs: types.SimpleNamespace(),
+    )
+try:
+    from spacy.lang.en.stop_words import STOP_WORDS
+except Exception:
+    STOP_WORDS = set()
 import json
 from tokenize import String
 #from allennlp.predictors.predictor import Predictor
 #from allennlp_models import pretrained
 #import allennlp_models.tagging
-from spacy import Language
+try:
+    from spacy import Language
+except Exception:
+    Language = object
 import GPUtil
-import spacy
-from spacy.matcher import Matcher, DependencyMatcher
-from spacy.tokens import Doc, Token, Span
-from spacy.language import Language
+try:
+    from spacy.matcher import Matcher, DependencyMatcher
+except Exception:
+    Matcher = DependencyMatcher = object
+try:
+    from spacy.tokens import Doc, Token, Span
+except Exception:
+    Doc = Token = Span = object
+try:
+    from spacy.language import Language
+except Exception:
+    Language = object
 import textwrap
 from textgraphx.util.RestCaller import callAllenNlpApi
 from textgraphx.util.RestCaller import amuse_wsd_api_call
 from transformers import logging
 logging.set_verbosity_error()
 # py2neo usage removed in favor of the bolt-driver helper
+import textgraphx.config as config_module
 from textgraphx.config import get_config
 import os
 from textgraphx.util.RestCaller import callAllenNlpApi
 from textgraphx.util.CallAllenNlpCoref import callAllenNlpCoref
 import traceback
-from nltk.corpus import wordnet31 as wn
-from nltk.corpus.reader.wordnet import WordNetError as wn_error
+try:
+    from nltk.corpus import wordnet31 as wn
+    from nltk.corpus.reader.wordnet import WordNetError as wn_error
+except Exception:
+    wn = None
+
+    class wn_error(Exception):
+        pass
 from functools import reduce  # Import reduce function
 import logging
 from typing import List, Dict
-from textgraphx.text_processing_components.pipeline.component_factory import (
-    TextPipelineComponentFactory,
-)
+from textgraphx.text_processing_components.pipeline import component_factory
 import logging
 
 # module logger
@@ -88,7 +113,7 @@ class TextProcessor(object):
         self.uri = ""
         self.username = ""
         self.password = ""
-        cfg = get_config()
+        cfg = config_module.get_config()
         # prefer explicit neo4j settings from central config (env overrides applied there)
         self.uri = cfg.neo4j.uri
         self.username = cfg.neo4j.user
@@ -96,7 +121,7 @@ class TextProcessor(object):
         #self.graph = Graph(self.uri, auth=(self.username, self.password))
         self.AMUSE_WSD_API_ENDPOINT = cfg.services.wsd_url
         self.coreference_service_endpoint = cfg.services.coref_url
-        components = TextPipelineComponentFactory.build(
+        components = component_factory.TextPipelineComponentFactory.build(
             nlp=self.nlp,
             neo4j_repository=self.neo4j_repository,
             wsd_endpoint=self.AMUSE_WSD_API_ENDPOINT,

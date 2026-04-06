@@ -38,7 +38,7 @@ NAF mode:      $TEXTGRAPHX_NAF_SENTENCE_MODE
 EOF
 
 echo "[1/5] Preflight health check"
-"$PYTHON_BIN" "$ROOT_DIR/textgraphx/run_pipeline.py" --check
+"$PYTHON_BIN" -m textgraphx.run_pipeline --check
 
 echo "[2/5] Full Neo4j cleanup"
 "$PYTHON_BIN" - <<'PY'
@@ -54,7 +54,7 @@ PY
 
 echo "[3/5] Full pipeline run"
 PIPELINE_OK=1
-if ! "$PYTHON_BIN" "$ROOT_DIR/textgraphx/run_pipeline.py" \
+if ! "$PYTHON_BIN" -m textgraphx.run_pipeline \
   --dataset "$DATASET_DIR" \
   --cleanup none \
   --phases ingestion,refinement,temporal,event_enrichment,tlinks; then
@@ -78,7 +78,7 @@ if hasattr(graph, "close"):
 PY
 
   echo "[3b/5] Full pipeline run (fallback non-strict baseline)"
-  "$PYTHON_BIN" "$ROOT_DIR/textgraphx/run_pipeline.py" \
+  "$PYTHON_BIN" -m textgraphx.run_pipeline \
     --dataset "$DATASET_DIR" \
     --cleanup none \
     --phases ingestion,refinement,temporal,event_enrichment,tlinks

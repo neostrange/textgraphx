@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from .db_interface import ExecutionHistory, ExecutionStatus
+from textgraphx.checkpoint import CheckpointManager
 from textgraphx.config import get_config
 from textgraphx.logging_utils import (
     get_logger, log_section, log_subsection, ProgressLogger
@@ -71,7 +72,11 @@ class PipelineOrchestrator:
         self.directory = Path(directory)
         self.model_name = model_name
         self.execution_id = str(uuid.uuid4())
+        cfg = get_config()
         self.execution_history = ExecutionHistory()
+        self.checkpoint_manager = CheckpointManager(
+            base_dir=str(Path(cfg.paths.output_dir) / "checkpoints")
+        )
         self.summary = PipelineSummary(
             execution_id=self.execution_id,
             phase_count=0,
@@ -81,7 +86,6 @@ class PipelineOrchestrator:
         )
         self.start_time = None
         self.phases_executed = []
-        cfg = get_config()
         self.runtime_mode = cfg.runtime.mode
         self.strict_transition_gate = (
             cfg.runtime.strict_transition_gate
@@ -95,6 +99,10 @@ class PipelineOrchestrator:
         logger.debug(f"  Runtime mode: {self.runtime_mode}")
         logger.debug(f"  Strict transition gate: {self.strict_transition_gate}")
         logger.debug(f"  Config setup complete")
+
+    def _checkpoint_doc_id(self) -> str:
+        """Build a stable checkpoint document key for dataset-level runs."""
+        return f"dataset::{self.directory.resolve()}"
 
     def _dataset_files(self) -> List[Path]:
         patterns = ("*.xml", "*.naf", "*.naf.xml", "*.txt")
@@ -172,6 +180,11 @@ class PipelineOrchestrator:
         }
 
     @staticmethod
+    def _count_total_documents(graph) -> int:
+        rows = graph.run("MATCH (n:AnnotatedText) RETURN count(n) AS count").data()
+        return int(rows[0].get("count", 0)) if rows else 0
+
+    @staticmethod
     def _clear_graph(graph) -> int:
         rows = graph.run("MATCH (n) DETACH DELETE n RETURN count(n) AS count").data()
         return int(rows[0].get("count", 0)) if rows else 0
@@ -179,8 +192,9 @@ class PipelineOrchestrator:
     def prepare_review_run(self, graph=None) -> Dict[str, object]:
         """Prepare a full review run.
 
-        If dataset documents are already present in Neo4j, the graph is cleared only
-        when `runtime.mode=testing`. In production mode this raises instead.
+        Any existing AnnotatedText data is considered unsafe for deterministic
+        review/evaluation runs. In testing mode, the full graph is cleared before
+        running. In non-testing modes, this raises instead of mutating data.
         """
         cfg = get_config()
         identities = self._get_dataset_identities()
@@ -192,14 +206,17 @@ class PipelineOrchestrator:
         try:
             existing = self._count_existing_documents(graph, identities)
             already_processed = existing["count"] > 0
-            if already_processed and cfg.runtime.mode != "testing":
+            total_existing = self._count_total_documents(graph)
+            contains_foreign_documents = total_existing > existing["count"]
+
+            if total_existing > 0 and cfg.runtime.mode != "testing":
                 raise RuntimeError(
-                    "Dataset document is already present in Neo4j. "
+                    "AnnotatedText nodes already exist in Neo4j. "
                     "Automatic database reset is only allowed in testing mode."
                 )
 
             cleared = 0
-            if already_processed:
+            if total_existing > 0:
                 cleared = self._clear_graph(graph)
                 logger.warning(
                     "Cleared Neo4j graph for testing review run; removed %s nodes",
@@ -208,11 +225,79 @@ class PipelineOrchestrator:
 
             return {
                 "already_processed": already_processed,
-                "database_cleared": already_processed,
+                "database_cleared": total_existing > 0,
                 "cleared_node_count": cleared,
                 "matched_documents": existing["matched_documents"],
+                "existing_document_count": total_existing,
+                "foreign_documents_present": contains_foreign_documents,
                 "runtime_mode": cfg.runtime.mode,
             }
+        finally:
+            if owns_graph:
+                close_fn = getattr(graph, "close", None)
+                if callable(close_fn):
+                    close_fn()
+
+    def assess_review_run_safety(self, phases: Optional[List[str]] = None, graph=None) -> Dict[str, object]:
+        """Return a non-mutating safety posture for a review run.
+
+        This method never clears data. It reports whether a run would be blocked
+        or require cleanup under current runtime mode and selected phases.
+        """
+        cfg = get_config()
+        phases = phases or self.default_phases(cfg)
+
+        posture = {
+            "runtime_mode": cfg.runtime.mode,
+            "strict_transition_gate": bool(self.strict_transition_gate),
+            "cross_document_fusion_enabled": bool(
+                getattr(cfg.runtime, "enable_cross_document_fusion", False)
+            ),
+            "review_preparation_required": self.phases_require_review_preparation(phases),
+            "materialization_gate_required": self.phases_require_materialization_gate(phases),
+            "dataset_file_count": 0,
+            "dataset_identity_count": 0,
+            "matched_documents": [],
+            "matched_existing_documents": 0,
+            "existing_document_count": 0,
+            "foreign_documents_present": False,
+            "would_clear_graph": False,
+            "would_block_run": False,
+            "reason": "ok",
+        }
+
+        if not posture["review_preparation_required"]:
+            posture["reason"] = "maintenance_only_phases"
+            return posture
+
+        identities = self._get_dataset_identities()
+        posture["dataset_identity_count"] = len(identities)
+        posture["dataset_file_count"] = len(self._dataset_files())
+        if not identities:
+            posture["would_block_run"] = True
+            posture["reason"] = "no_dataset_documents"
+            return posture
+
+        owns_graph = graph is None
+        graph = graph or make_graph_from_config()
+        try:
+            existing = self._count_existing_documents(graph, identities)
+            total_existing = self._count_total_documents(graph)
+            foreign = total_existing > existing["count"]
+
+            posture["matched_documents"] = existing["matched_documents"]
+            posture["matched_existing_documents"] = int(existing["count"])
+            posture["existing_document_count"] = int(total_existing)
+            posture["foreign_documents_present"] = bool(foreign)
+
+            if total_existing > 0:
+                if cfg.runtime.mode == "testing":
+                    posture["would_clear_graph"] = True
+                    posture["reason"] = "testing_mode_requires_clean_graph"
+                else:
+                    posture["would_block_run"] = True
+                    posture["reason"] = "existing_documents_in_non_testing_mode"
+            return posture
         finally:
             if owns_graph:
                 close_fn = getattr(graph, "close", None)
@@ -240,6 +325,7 @@ class PipelineOrchestrator:
     def run_for_review(self, phases: Optional[List[str]] = None) -> Dict[str, object]:
         """Prepare the graph and run the requested phases for Neo4j review."""
         phases = phases or self.default_phases()
+        self._allow_empty_materialization_gate = False
         if self.phases_require_review_preparation(phases):
             preparation = self.prepare_review_run()
         else:
@@ -252,6 +338,8 @@ class PipelineOrchestrator:
                 "review_preparation_skipped": True,
             }
         self.run_selected(phases)
+        if int(getattr(self.summary, "total_documents", 0) or 0) == 0:
+            self._allow_empty_materialization_gate = True
         if self.phases_require_materialization_gate(phases):
             preparation["materialization_gate"] = self.validate_materialization_gate()
         else:
@@ -291,6 +379,20 @@ class PipelineOrchestrator:
                 )
 
             failed = [check for check in checks if not check["passed"]]
+
+            if (
+                owns_graph
+                and getattr(self, "_allow_empty_materialization_gate", False)
+                and checks
+                and all(int(check.get("actual", 0)) == 0 for check in checks)
+            ):
+                return {
+                    "passed": True,
+                    "checks": checks,
+                    "skipped": True,
+                    "reason": "empty_review_run",
+                }
+
             result = {
                 "passed": len(failed) == 0,
                 "checks": checks,
@@ -308,11 +410,12 @@ class PipelineOrchestrator:
                 if callable(close_fn):
                     close_fn()
 
-    def run_selected(self, phases: List[str]) -> None:
+    def run_selected(self, phases: List[str], resume_from_checkpoint: bool = False) -> None:
         """Run selected phases of the pipeline.
         
         Args:
             phases: List of phase names to execute.
+            resume_from_checkpoint: If true, skip phases that already have a checkpoint.
             
         Raises:
             Exception: If a phase fails fatally.
@@ -320,6 +423,26 @@ class PipelineOrchestrator:
         with log_section(logger, f"PIPELINE EXECUTION - {len(phases)} phases"):
             self.start_time = time.time()
             started_at = datetime.now().isoformat()
+
+            if resume_from_checkpoint:
+                resume_plan = self.checkpoint_manager.resume_from_checkpoint(
+                    doc_id=self._checkpoint_doc_id(),
+                    phase_order=phases,
+                )
+                phases = resume_plan.remaining_phases
+                logger.info(
+                    "Checkpoint resume enabled: completed=%s remaining=%s",
+                    ", ".join(resume_plan.completed_phases) or "<none>",
+                    ", ".join(resume_plan.remaining_phases) or "<none>",
+                )
+                if not phases:
+                    logger.info("No remaining phases to execute after checkpoint resume.")
+                    self.summary.phase_count = 0
+                    self.summary.success_count = 0
+                    self.summary.failed_count = 0
+                    self.summary.total_duration = 0.0
+                    self.summary.total_documents = 0
+                    return
 
             # Item 8: per-document run report
             from textgraphx.run_report import RunReport
@@ -352,10 +475,19 @@ class PipelineOrchestrator:
                         phase_start = time.time()
                         try:
                             result = phase_runners[phase_name]()
+                            if (
+                                isinstance(result, dict)
+                                and str(result.get("status", "")).strip().lower() == "error"
+                            ):
+                                raise RuntimeError(
+                                    f"Phase '{phase_name}' returned error status: "
+                                    f"{result.get('message', 'unspecified phase error')}"
+                                )
                             phase_duration = time.time() - phase_start
                             doc_count = result.get("documents_processed", 0)
                             assertions_passed = result.get("assertions_passed")
                             provenance_violations = int(result.get("provenance_violations", 0) or 0)
+                            endpoint_violations = int(result.get("endpoint_violations", 0) or 0)
 
                             self.summary.phases[phase_name] = PhaseResult(
                                 name=phase_name,
@@ -368,6 +500,27 @@ class PipelineOrchestrator:
                             self.summary.success_count += 1
                             total_documents += doc_count
                             self.phases_executed.append(phase_name)
+
+                            # Item 5: checkpoint write for resumable phase execution.
+                            checkpoint_nodes = result.get("node_counts") if isinstance(result, dict) else None
+                            checkpoint_edges = result.get("edge_counts") if isinstance(result, dict) else None
+                            self.checkpoint_manager.save_checkpoint(
+                                doc_id=self._checkpoint_doc_id(),
+                                phase_name=phase_name,
+                                node_counts=checkpoint_nodes if isinstance(checkpoint_nodes, dict) else None,
+                                edge_counts=checkpoint_edges if isinstance(checkpoint_edges, dict) else None,
+                                phase_markers=list(self.phases_executed),
+                                properties_snapshot={
+                                    "assertions_passed": assertions_passed,
+                                    "provenance_violations": provenance_violations,
+                                    "endpoint_violations": endpoint_violations,
+                                },
+                                metadata={
+                                    "execution_id": self.execution_id,
+                                    "phase_duration_seconds": phase_duration,
+                                    "documents_processed": doc_count,
+                                },
+                            )
 
                             # Item 8: record phase outcome in run report
                             run_report.mark_processed(
@@ -390,9 +543,14 @@ class PipelineOrchestrator:
                                 if provenance_violations > 0
                                 else ""
                             )
+                            endpoint_label = (
+                                f" [endpoint_violations: {endpoint_violations}]"
+                                if endpoint_violations > 0
+                                else ""
+                            )
                             logger.info(
                                 f"\u2713 Phase '{phase_name}' completed in "
-                                f"{phase_duration:.2f}s{assertion_label}{provenance_label}"
+                                f"{phase_duration:.2f}s{assertion_label}{provenance_label}{endpoint_label}"
                             )
                             logger.debug(f"  Result: {result}")
 
@@ -405,6 +563,11 @@ class PipelineOrchestrator:
                                 raise RuntimeError(
                                     "Strict transition gate failed: "
                                     f"phase '{phase_name}' reported {provenance_violations} provenance contract violations"
+                                )
+                            if self.strict_transition_gate and endpoint_violations > 0:
+                                raise RuntimeError(
+                                    "Strict transition gate failed: "
+                                    f"phase '{phase_name}' reported {endpoint_violations} endpoint contract violations"
                                 )
 
                         except Exception as e:

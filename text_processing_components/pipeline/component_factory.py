@@ -9,19 +9,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from textgraphx.text_processing_components.WordSenseDisambiguator import WordSenseDisambiguator
-from textgraphx.text_processing_components.WordnetTokenEnricher import WordnetTokenEnricher
-from textgraphx.text_processing_components.CoreferenceResolver import CoreferenceResolver
-from textgraphx.text_processing_components.SRLProcessor import SRLProcessor
-from textgraphx.text_processing_components.SentenceCreator import SentenceCreator
-from textgraphx.text_processing_components.TagOccurrenceCreator import TagOccurrenceCreator
-from textgraphx.text_processing_components.TagOccurrenceDependencyProcessor import TagOccurrenceDependencyProcessor
-from textgraphx.text_processing_components.TagOccurrenceQueryExecutor import TagOccurrenceQueryExecutor
-from textgraphx.text_processing_components.NounChunkProcessor import NounChunkProcessor
-from textgraphx.text_processing_components.EntityProcessor import EntityProcessor
-from textgraphx.text_processing_components.EntityFuser import EntityFuser
-from textgraphx.text_processing_components.EntityDisambiguator import EntityDisambiguator
-
 
 @dataclass
 class TextPipelineComponents:
@@ -44,6 +31,19 @@ class TextPipelineComponentFactory:
 
     @staticmethod
     def build(nlp: Any, neo4j_repository: Any, wsd_endpoint: str, coref_endpoint: str) -> TextPipelineComponents:
+        from textgraphx.text_processing_components.WordSenseDisambiguator import WordSenseDisambiguator
+        from textgraphx.text_processing_components.WordnetTokenEnricher import WordnetTokenEnricher
+        from textgraphx.text_processing_components.CoreferenceResolver import CoreferenceResolver
+        from textgraphx.text_processing_components.SRLProcessor import SRLProcessor
+        from textgraphx.text_processing_components.SentenceCreator import SentenceCreator
+        from textgraphx.text_processing_components.TagOccurrenceCreator import TagOccurrenceCreator
+        from textgraphx.text_processing_components.TagOccurrenceDependencyProcessor import TagOccurrenceDependencyProcessor
+        from textgraphx.text_processing_components.TagOccurrenceQueryExecutor import TagOccurrenceQueryExecutor
+        from textgraphx.text_processing_components.NounChunkProcessor import NounChunkProcessor
+        from textgraphx.text_processing_components.EntityProcessor import EntityProcessor
+        from textgraphx.text_processing_components.EntityFuser import EntityFuser
+        from textgraphx.text_processing_components.EntityDisambiguator import EntityDisambiguator
+
         return TextPipelineComponents(
             wsd=WordSenseDisambiguator(wsd_endpoint, neo4j_repository),
             wn_token_enricher=WordnetTokenEnricher(neo4j_repository),

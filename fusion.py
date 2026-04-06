@@ -59,6 +59,7 @@ def fuse_entities_cross_document(
     confidence: float = 0.8,
     evidence_source: str = "refinement_phase",
     rule_id: str = "cross_document_same_kbid_v1",
+    require_type_compatibility: bool = True,
 ) -> int:
     """Create `SAME_AS` links for entities that share stable external identity.
 
@@ -77,11 +78,18 @@ def fuse_entities_cross_document(
       AND e1.kb_id IS NOT NULL
       AND e1.kb_id <> ""
       AND e1.kb_id = e2.kb_id
+            AND (
+                        $require_type_compatibility = false
+                        OR coalesce(e1.type, "") = ""
+                        OR coalesce(e2.type, "") = ""
+                        OR toUpper(coalesce(e1.type, "")) = toUpper(coalesce(e2.type, ""))
+                    )
     MERGE (e1)-[r:SAME_AS]->(e2)
     ON CREATE SET
       r.confidence = $confidence,
       r.evidence_source = $evidence_source,
       r.rule_id = $rule_id,
+            r.type_compatibility_required = $require_type_compatibility,
       r.created_at = datetime()
     RETURN count(r) AS c
     """
@@ -91,6 +99,7 @@ def fuse_entities_cross_document(
             "confidence": confidence,
             "evidence_source": evidence_source,
             "rule_id": rule_id,
+                        "require_type_compatibility": bool(require_type_compatibility),
         },
     ).data()
     return int(rows[0].get("c", 0)) if rows else 0

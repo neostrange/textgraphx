@@ -144,3 +144,20 @@ def test_canonicalize_event_attrs_explicit_certain_not_overridden_for_infinitive
     # MEANTIME convention: INFINITIVE always means POSSIBLE, even if graph stored CERTAIN explicitly.
     assert attrs["certainty"] == "POSSIBLE"
     assert attrs["time"] == "FUTURE"
+
+
+def test_canonicalize_event_attrs_keeps_external_ref_when_present():
+    attrs = dict(
+        _canonicalize_event_attrs(
+            {
+                "pos": "VB",
+                "tense": "PAST",
+                "certainty": "CERTAIN",
+                "polarity": "POS",
+                "time": "NON_FUTURE",
+                "pred": "fall",
+                "external_ref": "ev:123",
+            }
+        )
+    )
+    assert attrs["external_ref"] == "ev:123"

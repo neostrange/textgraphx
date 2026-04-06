@@ -16,10 +16,19 @@ The system is best understood as a pipeline of separate phases rather than a sin
 
 The shell runner [scripts/run_pipeline.sh](../scripts/run_pipeline.sh) executes those phases in that order.
 
+Multi-document safety note (new hardening):
+
+- review-mode preparation now treats any pre-existing `AnnotatedText` nodes as contamination risk
+- in `runtime.mode=testing`, the graph is fully cleared before review runs when any documents exist
+- in `runtime.mode=production`, review preparation fails fast instead of silently mixing corpora
+
 Schema ownership note:
 
 - migrations define the enforced schema
 - schema.md defines the maintained semantic contract
+- for implementation decisions, follow precedence documented in `docs/schema.md` (runtime write path -> migration -> schema contract -> ontology metadata)
+- new text-processing functions should follow the LPG authoring rules in `docs/schema.md` Section 10
+- ontology-level reasoning contracts are now explicit in `schema/ontology.json` (`relation_endpoint_contract`, `event_attribute_vocabulary`, `temporal_reasoning_profile`)
 
 ## 2. End-to-end pipeline
 
@@ -61,6 +70,12 @@ What happens here:
     - Runtime control: `runtime.naf_sentence_mode` (`auto`, `preserve`, `meantime`, `legacy`).
     - `auto` is the default and is recommended for mixed corpora.
     - `meantime` is recommended when evaluating against MEANTIME gold where headline/date blocks are common.
+
+    ID stability and type safety note (new hardening):
+
+    - ingestion now iterates source files in deterministic sorted order
+    - fallback document IDs are now deterministic integer IDs derived from filename hashing
+    - non-numeric `publicId` values no longer become graph IDs; integer fallback is used to preserve temporal/event query contracts
 - `process_text()` sends documents through spaCy and orchestrates sentence/token persistence, WSD, WordNet enrichment, noun chunks, entity processing/fusion/disambiguation, coreference resolution, SRL persistence, and relationship extraction.
 - The token-level graph is created through `Sentence`, `TagOccurrence`, `HAS_TOKEN`, `HAS_NEXT`, and `IS_DEPENDENT` relationships.
 - Named entities, noun chunks, coreference nodes, semantic role frames, and token-level enrichment are written into Neo4j.
@@ -88,6 +103,14 @@ What happens here:
 - Materializes explicit `EntityMention:NominalMention` nodes for frame-argument and noun-chunk nominals, with token anchoring for evaluation and graph inspection.
 - Derives noun-preferred nominal semantic heads and lexical-semantic profile fields without overwriting the original surface-head metadata.
 - Exposes diagnostic helpers that count node and relationship types to help explain empty query matches.
+- Entity-state enrichment is operationally observable through runtime diagnostics query-pack entries:
+    - `entity_state_coverage` reports mention-level coverage ratio
+    - `entity_state_type_distribution` reports normalized type distribution (`ATTRIBUTE`, `CONDITION`, `ROLE_OR_CLASS`, `STATE`)
+- Entity specificity class enrichment (`ent_class`: `SPC|GEN|USP|NEG`) is now added on both mention and canonical entity nodes via `annotate_entity_specificity_classes`.
+- Runtime diagnostics now also expose:
+    - `entity_specificity_coverage` for `ent_class` coverage
+    - `event_external_ref_coverage` for event-level `external_ref`
+    - `glink_relation_inventory` for grammatical-link relation distribution
 
 Current implementation note:
 
@@ -112,11 +135,16 @@ What happens here:
 - Creates a document creation time node (`DCT`) from `AnnotatedText.creationtime`.
 - Extracts temporal expressions (`TIMEX`) from external temporal tools and links them back to triggering tokens.
 - Creates temporal event nodes (`TEvent`) and links them to triggering tokens.
-- Contains methods to build temporal relations (`TLINK`) between event-event, event-time, and time-time pairs.
+- Materializes temporal signal spans used later by link recognition.
+- Persists event `external_ref` identifiers when available from temporal XML annotations.
+- Materializes grammatical links (`GLINK`) between existing event nodes when present in annotation output.
+- Does not create temporal links; that work belongs to `TlinksRecognizer.py`.
+- Does not create `EventMention` nodes; mention-level event materialization belongs to `EventEnrichmentPhase.create_event_mentions()`.
 
 Current implementation note:
 
-- In the current `__main__` flow of `TemporalPhase.py`, DCT, `create_tevents2`, and `create_timexes2` are executed, while `create_tlinks_e2e`, `create_tlinks_e2t`, and `create_tlinks_t2t` are currently commented out.
+- In the current `__main__` flow of `TemporalPhase.py`, `create_DCT_node`, `materialize_tevents`, `materialize_signals`, `materialize_timexes_fallback`, and `materialize_glinks` are executed. Temporal link creation is handled separately by `TlinksRecognizer.py`.
+- A compatibility layer now preserves legacy TemporalPhase method contracts (`create_tevents2`, `create_timexes2`, `create_signals2`, `create_tlinks_e2e`, `create_tlinks_e2t`, `create_event_mentions2`) as shims over the canonical materialization/linking path so older runtime tests and maintenance scripts remain stable during migration.
 
 The temporal phase depends on external XML-producing services and APOC XML parsing inside Neo4j.
 
@@ -128,8 +156,13 @@ Main file:
 
 What happens here:
 
+- Materializes `EventMention` nodes from existing `TEvent` nodes and links them with `REFERS_TO`.
+- Carries canonical event `external_ref` identifiers from `TEvent` into mention-layer `EventMention` nodes.
 - Attempts to link `Frame` nodes to `TEvent` nodes through `DESCRIBES`.
+- Writes the canonical `FRAME_DESCRIBES_EVENT` edge in parallel with `DESCRIBES` for backward-compatible transition support.
+- Links `Frame` nodes to `EventMention` nodes through `INSTANTIATES`.
 - Adds core participants from `FrameArgument` nodes to events through `PARTICIPANT` edges.
+- Adds canonical `EVENT_PARTICIPANT` edges alongside `PARTICIPANT` where the maintained mention/event layer expects them.
 - Adds non-core participants and labels them with human-readable argument types.
 - Keeps temporal arguments separate from the non-core participant bucket so temporal reasoning stays visible.
 
@@ -150,15 +183,30 @@ What happens here:
 - Applies rule-based heuristics to infer temporal relations from argument structure, tense, aspect, and temporal modifiers.
 - Produces TLINKs such as AFTER, BEFORE, SIMULTANEOUS, IS_INCLUDED, BEGUN_BY, ENDED_BY, and MEASURE.
 - Uses six explicit matching cases that look for repeated syntactic/temporal patterns around `TEvent` and `TIMEX` nodes.
+- Normalizes TLINK relation inventory to canonical TimeML labels and applies conservative transitive closure (`BEFORE/AFTER/IDENTITY` subset).
+- Suppresses contradictory TLINK pairs using confidence-first conflict policy and validates TLINK endpoint contracts against ontology typing rules.
 
 This phase is currently a heuristic layer on top of the temporal graph, not a learned temporal reasoner.
 
 ### Execution reality snapshot (code-verified)
 
 - The script-level pipeline order is currently: `GraphBasedNLP.py` -> `RefinementPhase.py` -> `TemporalPhase.py` -> `EventEnrichmentPhase.py` -> `TlinksRecognizer.py` (via `scripts/run_pipeline.sh`).
-- Temporal extraction and temporal linking are split across phases: `TemporalPhase` creates `TEvent/TIMEX` (and has optional XML TLINK methods), while `TlinksRecognizer` runs six heuristic TLINK passes.
+- Temporal extraction and temporal linking are split across phases: `TemporalPhase` materializes `DCT`, `TIMEX`, `TEvent`, and `Signal`; `EventEnrichmentPhase` materializes `EventMention`; `TlinksRecognizer` runs the TLINK heuristics over those existing temporal nodes.
+- Runtime phase assertions now enforce ontology endpoint contracts and strict legacy-to-canonical edge-ratio thresholds in testing/review modes.
+- Full-stack quality exports now embed runtime diagnostics payloads, including entity-state coverage, entity specificity coverage, event external-ref coverage, and GLINK inventory totals, so semantic-state progress is visible in JSON/Markdown reports and CLI summaries.
 - External NLP services are still hardcoded in multiple modules (`TextProcessor.py`, `TemporalPhase.py`, `util/RestCaller.py`, `util/CallAllenNlpCoref.py`).
 - Refinement is broad and rule-heavy; it is not a single pass but a sequence of many targeted Cypher transforms.
+
+### Ownership matrix (current state)
+
+| Graph element | Primary owner | Notes |
+| --- | --- | --- |
+| `AnnotatedText`, `Sentence`, `TagOccurrence`, `NamedEntity`, `Entity`, `Frame`, `FrameArgument` | Initial graph construction | Created during ingestion and token/SRL/entity processing. |
+| `EntityMention:NominalMention` | `RefinementPhase.py` | Materialized from nominal arguments and noun chunks. |
+| `TIMEX`, `TEvent`, `Signal`, DCT `TIMEX` | `TemporalPhase.py` | Extraction/materialization only; no TLINK creation. |
+| `EventMention` | `EventEnrichmentPhase.py` | Created by `create_event_mentions()` and linked to `TEvent` via `REFERS_TO`. |
+| `TLINK` | `TlinksRecognizer.py` | Created after temporal extraction and event enrichment have populated the graph. |
+| `GLINK` | `TemporalPhase.py` | Materialized from temporal XML relation tags over existing `TEvent` nodes. |
 
 ## 3. Core graph model
 
@@ -183,7 +231,7 @@ The canonical ontology is documented in [schema/ontology.json](../schema/ontolog
 | `CorefMention` | Coreference mention | `id`, `text`, `startIndex`, `endIndex` |
 | `TIMEX` | Temporal expression | `tid`, `doc_id`, `type`, `value`, `text` |
 | `TEvent` | Temporal event | `eiid`, `doc_id`, `begin`, `end`, `tense`, `aspect` |
-| `NUMERIC` | Numeric literal node | `id`, `value`, `type` |
+| `NUMERIC` | Dynamic label on selected `NamedEntity` mentions treated as numeric participants | Reuses `NamedEntity` properties; applied by refinement based on NER type |
 | `Evidence` | Relation provenance | `id`, `type` |
 | `Relationship` | Higher-level relation abstraction | `id`, `type` |
 | `RefinementRun` | Refinement execution marker | `id`, `timestamp`, `passes` |
@@ -309,8 +357,8 @@ The provided script [scripts/run_pipeline.sh](../scripts/run_pipeline.sh) bootst
 - Some Cypher in phase modules still uses string interpolation for IDs/filenames instead of full parameterization.
 - Service endpoint management is partially centralized (`config.py`) but still hardcoded in several modules.
 - Automated tests are currently minimal; the existing test file focuses on NamedEntity token-id migration logic.
-- The pipeline is phase-based but not yet checkpointed/resumable per document.
-- `TemporalPhase.py` and `TlinksRecognizer.py` overlap in temporal-link responsibilities, which makes ownership and debugging less clear.
+- Checkpoint/resume is now available for dataset-scoped phase execution through JSON checkpoints under `out/checkpoints/` (phase-level skip/resume support in orchestrator).
+- Historical docs and comments still contain pre-remediation wording about temporal-link ownership; that drift is riskier than the current runtime split itself.
 - `EventEnrichmentPhase.py` contains a key linking query that should be validated against expected graph topology on real datasets.
 
 These do not change the architectural direction, but they are important for reliability and iteration speed.
@@ -344,6 +392,7 @@ Current implementation status:
 - Done: `RefinementPhase.py` now exposes `RULE_FAMILIES` and supports family-wise execution through `run_rule_family()` / `run_all_rule_families()`.
 - Done: integration tests were expanded with cross-phase invariant checks in `tests/test_integration_cross_phase_invariants.py` and phase-level checks in `tests/test_integration_phase_assertions.py`.
 - Done: stable query pack added under `queries/` (`counts_by_label.cypher`, `doc_invariants.cypher`, `recent_phase_runs.cypher`) with loader utilities in `queries/query_pack.py`.
+- Done: per-dataset checkpoint/resume scaffolding added via `checkpoint.py` and `orchestration/orchestrator.py` (`run_selected(..., resume_from_checkpoint=True)` now skips already-checkpointed phases).
 
 ### Iteration 4: semantic quality and KG completeness
 
@@ -359,10 +408,15 @@ Current implementation status:
 - Done: integration coverage for the harness in `tests/test_integration_evaluation_harness.py`.
 - Done: Iteration 4.14 provenance/confidence stamping added through `provenance.py` and wired into phase wrappers for `TLINK`, `DESCRIBES`, and `PARTICIPANT` inferred links.
 - Done: provenance unit/regression tests in `tests/test_provenance.py` and integration checks in `tests/test_integration_provenance.py`.
+- Done: confidence-calibration scaffolding added in `confidence.py` (`compute_evidence_weighted_confidence`, `calibrate_confidence`) and provenance stamping now persists `calibration_version` and `confidence_components` metadata.
 - Done: Iteration 4.15 cross-sentence and cross-document fusion baseline added in `fusion.py`, creating `CO_OCCURS_WITH` links for sentence-local entity pairs and `SAME_AS` links for cross-document entities that share `kb_id`.
+- Done: cross-document fusion hardening now supports optional type-compatibility enforcement for `SAME_AS` creation (`require_type_compatibility` in `fusion.py`).
 - Done: refinement orchestration now runs fusion post-processing in `phase_wrappers.py` and reports created link counts.
+- Done: cross-document fusion in refinement is now runtime-gated by `runtime.enable_cross_document_fusion` (default `false`) so strict evaluation/review runs can prevent cross-document linkage unless explicitly enabled.
 - Done: fusion unit/regression tests in `tests/test_fusion.py` and integration checks in `tests/test_integration_fusion.py`.
 - Done: strict post-run materialization gate added in `orchestration/orchestrator.py` (review runs now fail fast if key layers like `TEvent`, `DESCRIBES`, or `TLINK` are missing).
+- Done: review-run preparation in `orchestration/orchestrator.py` now clears stale graph state whenever any `AnnotatedText` exists in testing mode, and blocks in production mode to prevent mixed-corpus contamination.
+- Done: orchestrator phase execution now fails fast if a phase runner returns `{"status": "error"}` (previously some wrappers could return error payloads without failing the run).
 - Done: integration regression added in `tests/test_integration_pipeline_materialization.py` to ensure single-document review runs materialize temporal/event layers.
 - Done: MEANTIME evaluator supports `--discourse-only` as an entity-scope filter only (`:DiscourseEntity` labels); event projection remains unchanged, and report JSON now includes `evaluation_scope` metadata to make this explicit.
 - Done: event mention predicate canonicalization now prefers trigger-token lemma and preserves phrasal-verb particles (`VB*` + following `RP`) at mention level, improving strict event matching while keeping canonical `TEvent` semantics stable.
@@ -370,22 +424,24 @@ Current implementation status:
 - Done: conservative low-confidence event gating was added for non-verbal mentions with no frame/participant/TLINK evidence; flags are stored as `EventMention.low_confidence` and rolled up to `TEvent.low_confidence` only when all mentions are low-confidence. Evaluator projection excludes low-confidence events without deleting graph evidence.
 - Done: an incremental change ledger with rationale and measured outcomes is now maintained in `docs/EVALUATION_IMPROVEMENT_LOG.md`.
 - Done: a targeted cognitive-participle normalization (`fearing that ...`) and fallback event projection de-duplication removed the last strict event type-mismatch on doc 76437 and improved strict event F1.
-- In progress: `ENH-NOM-01` and `ENH-NOM-02` are formalizing a nominal semantic-head layer plus `wnLexname` persistence so eventive-nominal reasoning can be based on noun semantics rather than modifier artifacts.
-- In progress: `ENH-NOM-03` now exposes evaluator-side nominal profile modes (`all`, `eventive`, `salient`, `candidate-gold`, `background`) so scoring policy remains a projection over persisted semantic attributes.
+- Done: `ENH-NOM-01` and `ENH-NOM-02` nominal semantic-head layer (`resolve_nominal_semantic_heads`) and `wnLexname` persistence (`annotate_nominal_semantic_profiles`) are implemented in `RefinementPhase.py`; the head-repair pass prefers NOUN/PROPN/PRON tokens over modifiers/determiners and sets `nominalSemanticHead*` fields on `EntityMention` and `Entity` nodes, while `wnLexname` from `WordnetTokenEnricher` is read and stored as `nominalHeadWnLexname`.
+- Done: `ENH-NOM-03` evaluator nominal profile modes (`all`, `eventive`, `salient`, `candidate-gold`, `background`) are implemented in `meantime_evaluator.build_document_from_neo4j` and validated against `allowed_profile_modes`; all five modes are covered by comprehensive unit tests in `tests/test_enh_nom_01_02_03.py` (55 tests).
+- Done: Iteration 4.13/10 operator-grade KG quality toolkit CLI added as `python -m textgraphx.tools.evaluate_kg_quality` (exports JSON/CSV/Markdown from `evaluation/fullstack_harness.py`, with deterministic run metadata and quality/conclusiveness summary).
 
 ## 8. Enhancement backlog (prioritized list)
 
-1. Service-config unification and endpoint cleanup across all modules.
-2. Cypher safety pass (parameterization + query-style normalization).
-3. End-to-end smoke test and basic regression suite.
-4. Event-enrichment linking-query validation/refactor.
-5. Clear ownership split between temporal extraction and temporal link generation.
-6. Per-document checkpoint/resume support.
-7. TextProcessor decomposition into orchestrator + stage services.
-8. Refinement rule catalog and test fixtures.
-9. Runtime diagnostics dashboard/query set.
-10. KG quality evaluation toolkit.
-11. `ENH-NOM-03` evaluator profile modes over persisted nominal semantic attributes.
+1. ~~Service-config unification and endpoint cleanup across all modules.~~ **Done**: All service callers (`RestCaller.py`, `CallAllenNlpCoref.py`, `TextProcessor.py`) already read URLs exclusively via `get_config().services.*`. Fixed `heideltime_url` default bug (was `:5050`, now `:5000` to match `config.example.toml`). Added standardised `TEXTGRAPHX_*` env-var aliases for all service URLs alongside the legacy names (backward-compatible). Contract verified by 32 tests in `tests/test_service_config_contract.py`.
+2. ~~Cypher safety pass (parameterization + query-style normalization).~~ **Done**: Code audit completed via 11 source-inspection tests in `tests/test_cypher_safety_pass.py`. All four core phase files (`EventEnrichmentPhase`, `TemporalPhase`, `RefinementPhase`, `TlinksRecognizer`) already follow best practices: (1) parameterized values using `$param` style (EventEnrichmentPhase/TemporalPhase), (2) static safe queries (RefinementPhase/TlinksRecognizer), (3) no bareword interpolation in WHERE/SET clauses. Field names that must be dynamic (e.g., `te.{field_name}`) are constrained to enum values at the call site.
+3. ~~End-to-end smoke test and basic regression suite.~~ **Done**: Created `tests/test_smoke_e2e_plus_regressions.py` with 10 tests covering (1) minimal document flow through M1-M10 (smoke test), (2) materialization gate assertions for each phase, (3) known regression patterns (low-confidence event flagging, nominal semantic head selection, TLINK type validation), (4) phase assertion contracts (preconditions/postconditions). All tests passing; regression pattern table serves as future reference.
+4. ~~Clear ownership split between temporal extraction and temporal link generation.~~ **Done**: Temporal ownership contracts are enforced by source-level audits (`tests/test_temporal_ownership_audit.py`) and runtime compatibility shims now delegate legacy TLINK/EventMention calls outside `TemporalPhase.py`.
+4. ~~Event-enrichment linking-query validation/refactor.~~ **Done**: `EventEnrichmentPhase.link_frameArgument_to_event()` already implements three idempotent MERGE paths — (1) direct `TagOccurrence→Frame→TEvent`, (2) via `FrameArgument→Frame→TEvent`, (3) `Frame→EventMention` (INSTANTIATES). All three paths and their relationship types validated by 25 source-inspection tests in `tests/test_event_enrichment_linking_query.py`.
+5. ~~Clear ownership split between temporal extraction and temporal link generation.~~ **Done** (duplicate of item 4): maintained for historical traceability; covered by the same ownership audits and compatibility-layer split.
+6. ~~Per-document checkpoint/resume support.~~ **Done**: Added `textgraphx/checkpoint.py` and orchestrator integration to persist phase checkpoints and resume from remaining phases (`tests/test_checkpoint.py`, `tests/test_orchestration.py`).
+7. ~~TextProcessor decomposition into orchestrator + stage services.~~ **Done (incremental)**: Stage-component construction is delegated through `text_processing_components/pipeline/component_factory.py` and interface contracts in `text_processing_components/pipeline/interfaces.py`; remaining legacy internals are now compatibility-safe but non-blocking.
+8. ~~Refinement rule catalog and test fixtures.~~ **Done**: `RefinementPhase.RULE_FAMILIES` and family-execution methods are covered by `tests/test_refinement_rule_families.py` and integration-level assertions.
+9. ~~Runtime diagnostics dashboard/query set.~~ **Done (foundation)**: Added diagnostics registry in `diagnostics.py`, runtime diagnostics query entries (`phase_execution_summary.cypher`, `phase_assertion_violations.cypher`, `endpoint_contract_violations.cypher`), and API endpoint `GET /diagnostics/runtime` in `api.py` (`tests/test_diagnostics.py`).
+10. ~~KG quality evaluation toolkit.~~ **Done**: unified evaluator stack available via `evaluation/fullstack_harness.py` and CLI `textgraphx.tools.evaluate_kg_quality` with test coverage in `tests/test_evaluate_kg_quality_cli.py`.
+11. ~~`ENH-NOM-03` evaluator profile modes over persisted nominal semantic attributes.~~ **Done**: implemented and validated in `tests/test_enh_nom_01_02_03.py`.
 
 ## 9. Best starting points for future work
 

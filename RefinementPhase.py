@@ -17,7 +17,6 @@ adds the repository root to sys.path so the package imports resolve.
 """
 
 import os
-import spacy
 import sys
 # allow running the module as a script (so `python RefinementPhase.py` works)
 # When the module is executed directly the package name is not set and
@@ -33,10 +32,8 @@ if __package__ is None and __name__ == '__main__':
 #import coreferee
 from textgraphx.util.SemanticRoleLabeler import SemanticRoleLabel
 from textgraphx.util.EntityFishingLinker import EntityFishing
-from spacy.tokens import Doc, Token, Span
 from textgraphx.util.RestCaller import callAllenNlpApi
 from textgraphx.util.GraphDbBase import GraphDBBase
-from textgraphx.TextProcessor import TextProcessor
 import xml.etree.ElementTree as ET
 # py2neo removed: use bolt-driver wrapper via neo4j_client
 import logging
@@ -138,6 +135,10 @@ class RefinementPhase():
         "mention_cleanup": [
             "trim_trailing_punctuation_from_entity_mentions",
             "tag_discourse_relevant_entities",
+        ],
+        "entity_state": [
+            "annotate_entity_state_signals",
+            "annotate_entity_specificity_classes",
         ],
     }
 
@@ -295,6 +296,179 @@ class RefinementPhase():
             "tag_discourse_relevant_entities: tagged %d NamedEntity + %d nominal mentions as :DiscourseEntity",
             tagged_ne,
             tagged_nom,
+        )
+        return ""
+
+    def annotate_entity_state_signals(self):
+        """Annotate situational state hints on entity mentions and canonical entities.
+
+        This pass captures lightweight state semantics from copular and near-copular
+        constructions (for example: "company is profitable", "team became ready").
+        The intent is to improve situational awareness queries without introducing
+        destructive schema changes.
+        """
+        logger.debug("annotate_entity_state_signals")
+        graph = self.graph
+
+        query = """
+            CALL {
+                MATCH (mention:EntityMention)<-[:PARTICIPATES_IN]-(subj_tok:TagOccurrence)-[:IS_DEPENDENT {type: 'nsubj'}]->(pred_tok:TagOccurrence)
+                WHERE toLower(coalesce(pred_tok.lemma, pred_tok.text, '')) IN ['be', 'become', 'remain', 'seem', 'appear', 'stay', 'feel']
+                OPTIONAL MATCH (state_tok:TagOccurrence)-[dep:IS_DEPENDENT]->(pred_tok)
+                WHERE dep.type IN ['acomp', 'attr', 'oprd', 'xcomp']
+                  AND (
+                      coalesce(state_tok.upos, '') IN ['ADJ', 'NOUN', 'VERB'] OR
+                      coalesce(state_tok.pos, '') IN ['JJ', 'JJR', 'JJS', 'NN', 'NNS', 'NNP', 'NNPS', 'VBN']
+                  )
+                WITH mention, pred_tok, head(collect(state_tok)) AS state_tok
+                WHERE state_tok IS NOT NULL
+                RETURN mention, pred_tok, state_tok
+                UNION
+                MATCH (mention:NamedEntity)<-[:PARTICIPATES_IN]-(subj_tok:TagOccurrence)-[:IS_DEPENDENT {type: 'nsubj'}]->(pred_tok:TagOccurrence)
+                WHERE toLower(coalesce(pred_tok.lemma, pred_tok.text, '')) IN ['be', 'become', 'remain', 'seem', 'appear', 'stay', 'feel']
+                OPTIONAL MATCH (state_tok:TagOccurrence)-[dep:IS_DEPENDENT]->(pred_tok)
+                WHERE dep.type IN ['acomp', 'attr', 'oprd', 'xcomp']
+                  AND (
+                      coalesce(state_tok.upos, '') IN ['ADJ', 'NOUN', 'VERB'] OR
+                      coalesce(state_tok.pos, '') IN ['JJ', 'JJR', 'JJS', 'NN', 'NNS', 'NNP', 'NNPS', 'VBN']
+                  )
+                WITH mention, pred_tok, head(collect(state_tok)) AS state_tok
+                WHERE state_tok IS NOT NULL
+                RETURN mention, pred_tok, state_tok
+            }
+            OPTIONAL MATCH (mention)-[:REFERS_TO]->(e:Entity)
+            WITH mention, e, pred_tok, state_tok,
+                 toLower(coalesce(state_tok.lemma, state_tok.text, '')) AS state_lemma,
+                 toLower(coalesce(pred_tok.lemma, pred_tok.text, '')) AS pred_lemma
+            WHERE state_lemma <> ''
+            SET mention.entityState = state_lemma,
+                mention.entityStateText = coalesce(state_tok.text, state_tok.lemma, state_lemma),
+                mention.entityStateType = CASE
+                    WHEN coalesce(state_tok.upos, '') = 'ADJ' OR coalesce(state_tok.pos, '') IN ['JJ', 'JJR', 'JJS'] THEN 'ATTRIBUTE'
+                    WHEN coalesce(state_tok.pos, '') = 'VBN' THEN 'CONDITION'
+                    WHEN coalesce(state_tok.upos, '') = 'NOUN' OR coalesce(state_tok.pos, '') IN ['NN', 'NNS', 'NNP', 'NNPS'] THEN 'ROLE_OR_CLASS'
+                    ELSE 'STATE'
+                END,
+                mention.entityStatePredicate = pred_lemma,
+                mention.entityStateHeadTokenIndex = coalesce(state_tok.tok_index_doc, mention.headTokenIndex),
+                mention.entityStateSource = 'copular_predicate',
+                mention.entityStateConfidence = 0.70
+            SET e.entityState = CASE
+                    WHEN e IS NULL THEN NULL
+                    WHEN coalesce(e.entityStateHeadTokenIndex, -1) <= coalesce(state_tok.tok_index_doc, -1) THEN state_lemma
+                    ELSE e.entityState
+                END,
+                e.entityStateType = CASE
+                    WHEN e IS NULL THEN NULL
+                    WHEN coalesce(e.entityStateHeadTokenIndex, -1) <= coalesce(state_tok.tok_index_doc, -1)
+                    THEN CASE
+                        WHEN coalesce(state_tok.upos, '') = 'ADJ' OR coalesce(state_tok.pos, '') IN ['JJ', 'JJR', 'JJS'] THEN 'ATTRIBUTE'
+                        WHEN coalesce(state_tok.pos, '') = 'VBN' THEN 'CONDITION'
+                        WHEN coalesce(state_tok.upos, '') = 'NOUN' OR coalesce(state_tok.pos, '') IN ['NN', 'NNS', 'NNP', 'NNPS'] THEN 'ROLE_OR_CLASS'
+                        ELSE 'STATE'
+                    END
+                    ELSE e.entityStateType
+                END,
+                e.entityStatePredicate = CASE
+                    WHEN e IS NULL THEN NULL
+                    WHEN coalesce(e.entityStateHeadTokenIndex, -1) <= coalesce(state_tok.tok_index_doc, -1) THEN pred_lemma
+                    ELSE e.entityStatePredicate
+                END,
+                e.entityStateHeadTokenIndex = CASE
+                    WHEN e IS NULL THEN NULL
+                    WHEN coalesce(e.entityStateHeadTokenIndex, -1) <= coalesce(state_tok.tok_index_doc, -1)
+                    THEN coalesce(state_tok.tok_index_doc, e.entityStateHeadTokenIndex)
+                    ELSE e.entityStateHeadTokenIndex
+                END,
+                e.entityStateSource = CASE
+                    WHEN e IS NULL THEN NULL
+                    WHEN coalesce(e.entityStateHeadTokenIndex, -1) <= coalesce(state_tok.tok_index_doc, -1) THEN 'copular_predicate'
+                    ELSE e.entityStateSource
+                END,
+                e.entityStateConfidence = CASE
+                    WHEN e IS NULL THEN NULL
+                    WHEN coalesce(e.entityStateHeadTokenIndex, -1) <= coalesce(state_tok.tok_index_doc, -1) THEN 0.70
+                    ELSE coalesce(e.entityStateConfidence, 0.70)
+                END
+            RETURN count(DISTINCT mention) AS mentions_state_annotated
+        """
+        data = graph.run(query).data()
+        annotated = data[0].get("mentions_state_annotated", 0) if data else 0
+        logger.info("annotate_entity_state_signals: annotated %d mention-level state hints", annotated)
+        return ""
+
+    def annotate_entity_specificity_classes(self):
+        """Annotate entity specificity class (ent_class) on mentions and entities.
+
+        Classes follow a lightweight MEANTIME-compatible convention:
+        - SPC: specific mention (default for named entities and definite mentions)
+        - GEN: generic mention (bare plurals / generic determiners)
+        - USP: underspecified or unknown specificity
+        - NEG: negated mention context
+        """
+        logger.debug("annotate_entity_specificity_classes")
+        graph = self.graph
+
+        query_mentions = """
+            CALL {
+                MATCH (m:EntityMention)
+                RETURN m
+                UNION
+                MATCH (m:NamedEntity)
+                RETURN m
+            }
+            OPTIONAL MATCH (tok:TagOccurrence)-[:PARTICIPATES_IN]->(m)
+            OPTIONAL MATCH (det_tok:TagOccurrence)-[:IS_DEPENDENT {type: 'det'}]->(tok)
+            OPTIONAL MATCH (neg_tok:TagOccurrence)-[:IS_DEPENDENT {type: 'neg'}]->(tok)
+            WITH m,
+                 [d IN collect(DISTINCT toLower(coalesce(det_tok.lemma, det_tok.text, ''))) WHERE d <> ''] AS det_lemmas,
+                 count(DISTINCT neg_tok) > 0 AS has_neg,
+                 count(DISTINCT tok) AS mention_width,
+                 any(p IN collect(DISTINCT coalesce(tok.pos, '')) WHERE p IN ['NNP', 'NNPS']) AS has_proper_pos
+            WITH m, det_lemmas, has_neg, mention_width, has_proper_pos,
+                 CASE
+                     WHEN has_neg THEN 'NEG'
+                     WHEN has_proper_pos THEN 'SPC'
+                     WHEN any(d IN det_lemmas WHERE d IN ['a', 'an', 'some', 'any']) THEN 'USP'
+                     WHEN any(d IN det_lemmas WHERE d IN ['the', 'this', 'that', 'these', 'those']) THEN 'SPC'
+                     WHEN mention_width > 1 THEN 'SPC'
+                     WHEN any(d IN det_lemmas WHERE d IN ['all', 'every', 'each']) THEN 'GEN'
+                     ELSE 'GEN'
+                 END AS ent_class
+            SET m.ent_class = ent_class,
+                m.entClass = ent_class,
+                m.entClassSource = 'refinement_specificity_heuristic'
+            RETURN count(DISTINCT m) AS mention_count
+        """
+        mention_rows = graph.run(query_mentions).data()
+        mention_count = mention_rows[0].get("mention_count", 0) if mention_rows else 0
+
+        query_entities = """
+            MATCH (m)-[:REFERS_TO]->(e:Entity)
+            WHERE (m:EntityMention OR m:NamedEntity)
+              AND coalesce(m.ent_class, m.entClass, '') <> ''
+            WITH e,
+                 collect(coalesce(m.ent_class, m.entClass)) AS classes
+            WITH e,
+                 CASE
+                     WHEN any(c IN classes WHERE c = 'NEG') THEN 'NEG'
+                     WHEN any(c IN classes WHERE c = 'SPC') THEN 'SPC'
+                     WHEN any(c IN classes WHERE c = 'USP') THEN 'USP'
+                     WHEN any(c IN classes WHERE c = 'GEN') THEN 'GEN'
+                     ELSE 'USP'
+                 END AS ent_class
+            SET e.ent_class = ent_class,
+                e.entClass = ent_class,
+                e.entClassSource = 'refinement_specificity_heuristic'
+            RETURN count(DISTINCT e) AS entity_count
+        """
+        entity_rows = graph.run(query_entities).data()
+        entity_count = entity_rows[0].get("entity_count", 0) if entity_rows else 0
+
+        logger.info(
+            "annotate_entity_specificity_classes: annotated %d mentions and %d entities",
+            mention_count,
+            entity_count,
         )
         return ""
 

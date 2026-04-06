@@ -81,14 +81,15 @@ class EvaluationMapping:
 
     mention_attr_keys: Dict[str, Tuple[str, ...]] = field(
         default_factory=lambda: {
-            "entity": ("syntactic_type",),
-            "event": ("pos", "tense", "aspect", "certainty", "polarity", "time", "pred"),
+            "entity": ("syntactic_type", "ent_class"),
+            "event": ("pos", "tense", "aspect", "certainty", "polarity", "time", "pred", "external_ref"),
             "timex": ("type", "value", "functionInDocument"),
         }
     )
     relation_attr_keys: Dict[str, Tuple[str, ...]] = field(
         default_factory=lambda: {
             "tlink": ("reltype",),
+            "glink": ("reltype",),
             "has_participant": ("sem_role",),
         }
     )
@@ -144,7 +145,7 @@ def parse_meantime_xml(xml_path: str) -> NormalizedDocument:
             mention = Mention(
                 kind="entity",
                 span=span,
-                attrs=_attrs_from_element(el, ("syntactic_type",)),
+                attrs=_attrs_from_element(el, ("syntactic_type", "ent_class")),
             )
             doc.entity_mentions.add(mention)
             mention_by_id[m_id] = mention
@@ -154,7 +155,7 @@ def parse_meantime_xml(xml_path: str) -> NormalizedDocument:
                 span=span,
                 attrs=_attrs_from_element(
                     el,
-                    ("pos", "tense", "aspect", "certainty", "polarity", "time", "pred"),
+                    ("pos", "tense", "aspect", "certainty", "polarity", "time", "pred", "external_ref"),
                 ),
             )
             doc.event_mentions.add(mention)
@@ -168,6 +169,9 @@ def parse_meantime_xml(xml_path: str) -> NormalizedDocument:
                         "type": el.get("type"),
                         "value": el.get("value"),
                         "functionInDocument": el.get("functionInDocument"),
+                        "anchorTimeID": el.get("anchorTimeID"),
+                        "beginPoint": el.get("beginPoint"),
+                        "endPoint": el.get("endPoint"),
                     }
                 ),
             )
@@ -179,7 +183,7 @@ def parse_meantime_xml(xml_path: str) -> NormalizedDocument:
         return doc
 
     for rel in relations:
-        if rel.tag not in {"TLINK", "HAS_PARTICIPANT"}:
+        if rel.tag not in {"TLINK", "GLINK", "HAS_PARTICIPANT"}:
             continue
 
         sources = [s.get("m_id") for s in rel.findall("source") if s.get("m_id")]
@@ -189,6 +193,8 @@ def parse_meantime_xml(xml_path: str) -> NormalizedDocument:
 
         relation_attrs: Tuple[Tuple[str, str], ...] = ()
         if rel.tag == "TLINK":
+            relation_attrs = _attrs_from_element(rel, ("reltype",))
+        elif rel.tag == "GLINK":
             relation_attrs = _attrs_from_element(rel, ("reltype",))
         elif rel.tag == "HAS_PARTICIPANT":
             relation_attrs = _attrs_from_element(rel, ("sem_role",))
@@ -269,7 +275,8 @@ def build_document_from_neo4j(
         WITH m, min(tok.tok_index_doc) AS start_tok, max(tok.tok_index_doc) AS end_tok
         RETURN DISTINCT start_tok, end_tok,
              id(m) AS node_id,
-               coalesce(m.syntactic_type, m.syntacticType) AS syntactic_type
+             coalesce(m.syntactic_type, m.syntacticType) AS syntactic_type,
+             coalesce(m.ent_class, m.entClass) AS ent_class
         ORDER BY start_tok, end_tok
         """,
         {"doc_id": doc_id_int},
@@ -323,8 +330,14 @@ def build_document_from_neo4j(
             if not include_nominal:
                 continue
         attrs = ()
+        ent_class = str(row.get("ent_class") or "").strip().upper()
+        attrs_list = []
         if syntactic_type:
-            attrs = (("syntactic_type", syntactic_type),)
+            attrs_list.append(("syntactic_type", syntactic_type))
+        if ent_class:
+            attrs_list.append(("ent_class", ent_class))
+        if attrs_list:
+            attrs = tuple(sorted(attrs_list))
         doc.entity_mentions.add(Mention(kind="entity", span=span, attrs=attrs))
 
     event_rows = graph.run(
@@ -341,6 +354,7 @@ def build_document_from_neo4j(
                  m.pos AS pos, m.tense AS tense, m.aspect AS aspect,
                  m.certainty AS certainty, m.polarity AS polarity,
                  m.time AS time, m.pred AS pred,
+                 coalesce(m.external_ref, m.externalRef) AS external_ref,
                  2 AS source_priority
              UNION
              WITH $doc_id AS doc_id
@@ -362,6 +376,7 @@ def build_document_from_neo4j(
                  m.pos AS pos, m.tense AS tense, m.aspect AS aspect,
                  m.certainty AS certainty, m.polarity AS polarity,
                  m.time AS time, pred AS pred,
+                 coalesce(m.external_ref, m.externalRef, m.eid, m.eiid) AS external_ref,
                  1 AS source_priority
                          UNION
                          WITH $doc_id AS doc_id
@@ -382,11 +397,12 @@ def build_document_from_neo4j(
                                  '' AS polarity,
                                  '' AS time,
                                  f.headword AS pred,
+                                 '' AS external_ref,
                                  0 AS source_priority
          }
-         WITH start_tok, end_tok, pos, tense, aspect, certainty, polarity, time, pred, source_priority
+         WITH start_tok, end_tok, pos, tense, aspect, certainty, polarity, time, pred, external_ref, source_priority
          WHERE start_tok IS NOT NULL AND end_tok IS NOT NULL
-         RETURN DISTINCT start_tok, end_tok, pos, tense, aspect, certainty, polarity, time, pred, source_priority
+         RETURN DISTINCT start_tok, end_tok, pos, tense, aspect, certainty, polarity, time, pred, external_ref, source_priority
          ORDER BY start_tok, end_tok, source_priority DESC
         """,
         {"doc_id": doc_id_int},
@@ -430,7 +446,12 @@ def build_document_from_neo4j(
              m
         WHERE start_tok IS NOT NULL AND end_tok IS NOT NULL
         RETURN DISTINCT start_tok, end_tok,
-               m.type AS type, m.value AS value, m.functionInDocument AS functionInDocument
+             m.type AS type,
+             m.value AS value,
+             m.functionInDocument AS functionInDocument,
+             m.anchorTimeID AS anchorTimeID,
+             m.beginPoint AS beginPoint,
+             m.endPoint AS endPoint
         ORDER BY start_tok, end_tok
         """,
         {"doc_id": doc_id_int},
@@ -442,6 +463,9 @@ def build_document_from_neo4j(
                 "type": row.get("type"),
                 "value": row.get("value"),
                 "functionInDocument": row.get("functionInDocument"),
+                "anchorTimeID": row.get("anchorTimeID"),
+                "beginPoint": row.get("beginPoint"),
+                "endPoint": row.get("endPoint"),
             }
         )
         doc.timex_mentions.add(Mention(kind="timex", span=span, attrs=attrs))
@@ -484,6 +508,47 @@ def build_document_from_neo4j(
                 target_kind=tgt_kind,
                 target_span=tgt_span,
                 attrs=(("reltype", str(row.get("reltype") or "")),),
+            )
+        )
+
+    glink_rows = graph.run(
+        """
+            MATCH (a)-[r:GLINK]->(b)
+                WHERE (a.doc_id = $doc_id OR EXISTS {
+                                 MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN]->(a)
+                            })
+                    AND (b.doc_id = $doc_id OR EXISTS {
+                                 MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN]->(b)
+                            })
+                    AND a.start_tok IS NOT NULL AND a.end_tok IS NOT NULL
+          AND b.start_tok IS NOT NULL AND b.end_tok IS NOT NULL
+        RETURN labels(a) AS source_labels,
+               a.start_tok AS a_start, a.end_tok AS a_end,
+               labels(b) AS target_labels,
+               b.start_tok AS b_start, b.end_tok AS b_end,
+               r.relType AS reltype
+        """,
+        {"doc_id": doc_id_int},
+    ).data()
+    for row in glink_rows:
+        src_kind = _node_kind_from_labels(row.get("source_labels", []))
+        tgt_kind = _node_kind_from_labels(row.get("target_labels", []))
+        if src_kind is None or tgt_kind is None:
+            continue
+        src_span = _span_from_bounds(int(row["a_start"]), int(row["a_end"]), token_index_alignment)
+        tgt_span = _span_from_bounds(int(row["b_start"]), int(row["b_end"]), token_index_alignment)
+        if src_kind == "event":
+            src_span = _align_relation_event_span(src_span, doc.event_mentions)
+        if tgt_kind == "event":
+            tgt_span = _align_relation_event_span(tgt_span, doc.event_mentions)
+        doc.relations.add(
+            Relation(
+                kind="glink",
+                source_kind=src_kind,
+                source_span=src_span,
+                target_kind=tgt_kind,
+                target_span=tgt_span,
+                attrs=(('reltype', str(row.get('reltype') or '')),),
             )
         )
 
@@ -634,6 +699,7 @@ def _canonicalize_event_attrs(row: Dict[str, Any]) -> Tuple[Tuple[str, str], ...
     polarity = str(row.get("polarity") or "").strip().upper() or "POS"
     time = str(row.get("time") or "").strip().upper() or "NON_FUTURE"
     pred = str(row.get("pred") or "").strip().lower()
+    external_ref = str(row.get("external_ref") or row.get("externalRef") or "").strip()
 
     # MEANTIME convention: INFINITIVE-tense events signal future/possible actions.
     # When certainty/time are not explicitly set in the graph, apply these defaults.
@@ -648,6 +714,8 @@ def _canonicalize_event_attrs(row: Dict[str, Any]) -> Tuple[Tuple[str, str], ...
         attrs_map["pos"] = pos
     if pred:
         attrs_map["pred"] = pred
+    if external_ref:
+        attrs_map["external_ref"] = external_ref
 
     # Gold noun events typically omit tense/aspect when they are semantically
     # unexpressed. Preserve those attrs only when informative.
@@ -673,6 +741,9 @@ def _canonicalize_timex_attrs(row: Dict[str, Any]) -> Tuple[Tuple[str, str], ...
     typ = str(row.get("type") or "").strip().upper()
     value = str(row.get("value") or "").strip()
     function_in_document = str(row.get("functionInDocument") or "").strip() or "NONE"
+    anchor_time_id = str(row.get("anchorTimeID") or "").strip()
+    begin_point = str(row.get("beginPoint") or "").strip()
+    end_point = str(row.get("endPoint") or "").strip()
 
     if typ == "DATE":
         if len(value) == 8 and value.isdigit():
@@ -689,6 +760,12 @@ def _canonicalize_timex_attrs(row: Dict[str, Any]) -> Tuple[Tuple[str, str], ...
         attrs_map["value"] = value
     if function_in_document:
         attrs_map["functionInDocument"] = function_in_document
+    if anchor_time_id:
+        attrs_map["anchorTimeID"] = anchor_time_id
+    if begin_point:
+        attrs_map["beginPoint"] = begin_point
+    if end_point:
+        attrs_map["endPoint"] = end_point
     return tuple(sorted(attrs_map.items()))
 
 

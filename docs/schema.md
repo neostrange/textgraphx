@@ -13,13 +13,82 @@ This is therefore an implementation schema, not a purely conceptual ontology.
 
 See also: [schema-evolution-plan.md](./schema-evolution-plan.md), which turns the schema findings into a staged implementation and migration plan.
 
+## Canonical Source Hierarchy
+
+When schema statements disagree, use this precedence order:
+
+1. Runtime write paths in code (`GraphBasedNLP.py`, `RefinementPhase.py`, `TemporalPhase.py`, `EventEnrichmentPhase.py`, `TlinksRecognizer.py`).
+2. Applied migrations in `schema/migrations/`.
+3. This document (`docs/schema.md`) as the maintained contract.
+4. Ontology metadata (`schema/ontology.json`) as machine-readable policy and vocabulary.
+5. Architecture and historical docs as explanatory context.
+
+Practical rule:
+
+- If code writes an edge/label/property and this file does not mention it, the schema is incomplete and this file must be updated.
+- If this file mentions an edge/label/property that no code or migration writes, treat it as deprecated or planned until proven active.
+
+## Governance Mode (Balanced)
+
+This repository uses a balanced governance model.
+
+Hard-contract scope (must pass):
+
+- Identity keys and key type consistency (`doc_id`, node identifiers, composite natural keys).
+- Referential integrity for canonical chains (`EntityMention -> REFERS_TO -> Entity`, `EventMention -> REFERS_TO -> TEvent`, `Frame -> INSTANTIATES -> EventMention`).
+- Required core fields for canonical labels (`AnnotatedText`, `TagOccurrence`, `NamedEntity`, `Entity`, `TIMEX`, `TEvent`, `EventMention`, `Frame`, `FrameArgument`).
+- Span integrity (`start_tok <= end_tok`, token/char fields consistent when both exist).
+
+Advisory-contract scope (warn, do not block by default):
+
+- Enrichment profile completeness (`nominalSemantic*`, confidence/source metadata).
+- Optional provenance coverage on non-critical inferred edges.
+- Transitional dual-edge usage ratios (`PARTICIPANT` vs `EVENT_PARTICIPANT`, `DESCRIBES` vs `FRAME_DESCRIBES_EVENT`).
+
+Legacy policy:
+
+- Preserve legacy labels and relationships while canonical aliases are active.
+- Removal must happen only through an explicit migration and coordinated query updates.
+
+## Reasoning Contracts (Canonical)
+
+The ontology includes explicit machine-readable reasoning contracts that should be treated as canonical for advanced temporal/event reasoning.
+
+### Relation endpoint contract
+
+`schema/ontology.json.relation_endpoint_contract` defines allowed source/target type pairs for high-impact relationships (`EVENT_PARTICIPANT`, `REFERS_TO`, `INSTANTIATES`, `TLINK`).
+
+Practical use:
+
+- Writers must not emit endpoints outside the allowed sets.
+- Query authors can rely on endpoint typing guarantees instead of broad defensive label checks.
+- CI tests should fail on endpoint drift in canonical relationships.
+
+### Event attribute vocabulary
+
+`schema/ontology.json.event_attribute_vocabulary` defines normalized values for event-centric fields (`tense`, `aspect`, `polarity`, `certainty`, modality defaults).
+
+Practical use:
+
+- Normalize extraction outputs to this vocabulary before write when possible.
+- Treat out-of-vocabulary values as quality defects (hard for canonical fields, advisory for enrichment-only fields).
+
+### Temporal reasoning profile
+
+`schema/ontology.json.temporal_reasoning_profile` defines canonical TLINK relations, contradiction pairs, closure rules, and conflict-consistency policy.
+
+Practical use:
+
+- TLINK normalization and conflict suppression logic should follow this profile.
+- Evaluation and phase assertions should reference this profile for consistency checks.
+
 ## 1. Schema Layers
 
 The graph has five practical layers:
 
 1. Document and token layer: `AnnotatedText`, `Sentence`, `TagOccurrence`, `Tag`.
 2. Mention and semantic layer: `NamedEntity`, `Entity`, `Frame`, `FrameArgument`, `NounChunk`, `Antecedent`, `CorefMention`.
-3. Temporal and event layer: `TIMEX`, `TEvent`.
+3. Temporal and event layer: `TIMEX`, `TEvent`, `EventMention`, `Signal`.
 4. Relation and fusion layer: `Evidence`, `Relationship`, plus inferred edges such as `CO_OCCURS_WITH` and `SAME_AS`.
 5. Operational audit layer: `PhaseRun`, `RefinementRun`.
 
@@ -43,11 +112,13 @@ Node labels:
 - `Entity`
 - `Frame`
 - `FrameArgument`
+- `EventMention`
 - `Signal`
 - `Antecedent`
 - `CorefMention`
 - `TIMEX`
 - `TEvent`
+- `VALUE`
 
 Relationship types:
 
@@ -56,10 +127,14 @@ Relationship types:
 - `HAS_NEXT`
 - `IS_DEPENDENT`
 - `PARTICIPATES_IN`
+- `HAS_FRAME_ARGUMENT`
 - `REFERS_TO`
 - `PARTICIPANT`
+- `EVENT_PARTICIPANT`
 - `TRIGGERS`
 - `DESCRIBES`
+- `FRAME_DESCRIBES_EVENT`
+- `INSTANTIATES`
 - `CREATED_ON`
 - `TLINK`
 - `CLINK`
@@ -131,7 +206,7 @@ Transition policy:
 | `NounChunk` | Noun phrase span | `id`: deterministic noun chunk id. `type`: chunk type, defaulting to `NOUN_CHUNK`. `value`: noun chunk surface text. `index`: start token index. | Created by `NounChunkProcessor`. |
 | `Frame` | Predicate frame from SRL | `id`: deterministic frame id, usually `frame_<doc>_<start>_<end>`. `headword`: predicate head text. `headTokenIndex`: predicate head token index. `text`: frame span text. `startIndex`: start token index. `endIndex`: end token index. | Created by `SRLProcessor._merge_frame()`. |
 | `FrameArgument` | SRL argument span | `id`: deterministic argument id, usually `fa_<doc>_<start>_<end>_<argtype>`. `head`: resolved argument head text. `headTokenIndex`: head token index. `type`: PropBank role, for example `ARG0` or `ARGM-TMP`. `text`: argument surface text. `startIndex`: start token index. `endIndex`: end token index. `syntacticType`: syntactic class such as `NAM`, `NOMINAL`, `PRO`, `EVENTIVE`, `IN`. `signal`: temporal or prepositional signal text. `complement`: complement head text. `complementIndex`: complement token index. `complementFullText`: full complement span text. `argumentType`: normalized non-core semantic type such as `Locative` or `CauseClauses`. | Base node created by `SRLProcessor._merge_frame_argument()`. Many enrichment properties are added later by refinement and event-enrichment phases. |
-| `Signal` | Temporal trigger span from TTK output | `id`: TTK signal id when available, else deterministic fallback. `doc_id`: owning document id. `type`: currently `SIGNAL`. `text`: signal surface text. `start_tok`: first token index. `end_tok`: last token index. `start_char`: character start offset. `end_char`: character end offset. | Created by `TemporalPhase.create_signals2()`. Tokens are anchored with `TRIGGERS` just like `TIMEX` and `TEvent`. |
+| `Signal` | Temporal trigger span from TTK output | `id`: TTK signal id when available, else deterministic fallback. `doc_id`: owning document id. `type`: currently `SIGNAL`. `text`: signal surface text. `start_tok`: first token index. `end_tok`: last token index. `start_char`: character start offset. `end_char`: character end offset. | Created by `TemporalPhase.materialize_signals()`. Tokens are anchored with `TRIGGERS` just like `TIMEX` and `TEvent`. |
 | `Antecedent` | Coreference cluster head | `id`: deterministic cluster-head id. `text`: antecedent span text. `startIndex`: start token index. `endIndex`: end token index. `head`: resolved head text. `headTokenIndex`: resolved head token index. `syntacticType`: coarse syntactic category. | Created by `CoreferenceResolver.create_node()`, then enriched in refinement. |
 | `CorefMention` | Coreference mention | `id`: deterministic mention id. `text`: mention span text. `startIndex`: start token index. `endIndex`: end token index. `head`: resolved head text. `headTokenIndex`: resolved head token index. `syntacticType`: coarse syntactic category. | Created by `CoreferenceResolver.create_node()`, then enriched in refinement. |
 
@@ -139,8 +214,9 @@ Transition policy:
 
 | Label | Role | Properties | Notes |
 | --- | --- | --- | --- |
-| `TIMEX` | Temporal expression | `tid`: temporal id within a document. `doc_id`: owning document id. `type`: TIMEX type such as `DATE`, `TIME`, `DURATION`. `value`: normalized temporal value. `text`: surface text when available. `quant`: quantifier from HeidelTime, default `N/A`. `origin`: extraction source, commonly `text2graph` or XML-provided origin. `start_index`: token start index in the current HeidelTime path. `end_index`: token end index in the current HeidelTime path. `begin`: legacy start offset from the older XML path. `end`: legacy end offset from the older XML path. `functionInDocument`: `CREATION_TIME` for DCT or `NONE` otherwise. | Created by `TemporalPhase.create_DCT_node()`, `create_timexes2()`, and the older `create_timexes()` path. The document creation time node is also just a `TIMEX`. |
-| `TEvent` | Temporalized event node | `eiid`: event instance id. `doc_id`: owning document id. `begin`: event begin token index or offset. `end`: event end token index or offset. `aspect`: temporal aspect. `class`: event class. `epos`: event POS from TTK output. `form`: event surface form. `pos`: event POS. `tense`: event tense. `modality`: modal surface value from TTK when present. `polarity`: event polarity from TTK when present. | Created by `TemporalPhase.create_tevents2()`. |
+| `TIMEX` | Temporal expression | `tid`: temporal id within a document. `doc_id`: owning document id. `type`: TIMEX type such as `DATE`, `TIME`, `DURATION`. `value`: normalized temporal value. `text`: surface text when available. `quant`: quantifier from HeidelTime, default `N/A`. `origin`: extraction source, commonly `text2graph` or XML-provided origin. `start_index`: token start index in the current HeidelTime path. `end_index`: token end index in the current HeidelTime path. `begin`: legacy start offset from the older XML path. `end`: legacy end offset from the older XML path. `functionInDocument`: `CREATION_TIME` for DCT or `NONE` otherwise. | Created by `TemporalPhase.create_DCT_node()`, `TemporalPhase.materialize_timexes()`, and `TemporalPhase.materialize_timexes_fallback()`. The document creation time node is also just a `TIMEX`. |
+| `TEvent` | Temporalized event node | `eiid`: event instance id. `doc_id`: owning document id. `begin`: event begin token index or offset. `end`: event end token index or offset. `aspect`: temporal aspect. `class`: event class. `epos`: event POS from TTK output. `form`: event surface form. `pos`: event POS. `tense`: event tense. `modality`: modal surface value from TTK when present. `polarity`: event polarity from TTK when present. | Created by `TemporalPhase.materialize_tevents()`. |
+| `EventMention` | Mention-level event instantiation | `id`: stable mention id, currently derived from `TEvent.eiid`. `doc_id`: owning document id. `pred`: mention-level predicate text. `tense`, `aspect`, `pos`, `epos`, `form`, `modality`, `polarity`, `class`: copied or normalized temporal/event attributes. `start_tok`, `end_tok`, `start_char`, `end_char`, `begin`, `end`: mention span coordinates. | Created by `EventEnrichmentPhase.create_event_mentions()`. Each `EventMention` links to a canonical `TEvent` through `REFERS_TO`; `TemporalPhase` does not create these nodes. |
 
 ### 2.4 Relation, keyword, and audit nodes
 
@@ -228,6 +304,7 @@ Several relationship types are overloaded across different subgraphs. The tables
 | --- | --- | --- | --- |
 | `REFERS_TO` | `TagOccurrence -> Tag` | none | Optional lemma grouping edge for non-stop tokens. |
 | `REFERS_TO` | `EntityMention -> Entity` | none | Explicit mention-to-canonical link used by refinement-generated nominal mentions and by the maintained mention layer. |
+| `REFERS_TO` | `EventMention -> TEvent` | none | Mention-to-canonical event link created by `EventEnrichmentPhase.create_event_mentions()`. |
 | `REFERS_TO` | `NamedEntity -> Entity` | `type`: usually `evoke` | Canonical link from a surface mention to an entity abstraction. |
 | `REFERS_TO` | `FrameArgument -> NamedEntity` | none | Refinement link from an argument span to a matched mention. |
 | `REFERS_TO` | `FrameArgument -> Entity` | none | Flattened or fallback link from an argument span to a canonical or synthetic entity. Some refinement queries use undirected `MERGE`, so treat this as semantically bidirectional in old data. |
@@ -246,10 +323,16 @@ Several relationship types are overloaded across different subgraphs. The tables
 | Relationship | Endpoint pattern | Properties | Meaning |
 | --- | --- | --- | --- |
 | `PARTICIPANT` | `FrameArgument -> Frame` | `type`: SRL role such as `ARG0`, `ARGM-TMP` | Canonical SRL membership edge. |
+| `HAS_FRAME_ARGUMENT` | `FrameArgument -> Frame` | none | Canonical relationship used by newer write paths and query contracts to represent frame membership alongside legacy `PARTICIPANT`. |
 | `DESCRIBES` | `Frame -> TEvent` | none | Links a frame to a temporal event it describes. |
+| `FRAME_DESCRIBES_EVENT` | `Frame -> TEvent` | none | Canonical event-description edge written alongside `DESCRIBES` for backward-compatible transition support. |
+| `INSTANTIATES` | `Frame -> EventMention` | none | Links a frame to the mention-level event instantiation after `EventMention` creation. |
 | `PARTICIPANT` | `Entity -> TEvent` | `type`: copied from `FrameArgument.type`. `prep`: preposition when the argument is prepositional. | Event participant edge created for core roles in `EventEnrichmentPhase`. |
+| `PARTICIPANT` | `Entity -> EventMention` | `type`: copied from `FrameArgument.type`. `prep`: preposition when the argument is prepositional. | Mention-level participant edge retained for compatibility alongside `EVENT_PARTICIPANT`. |
 | `PARTICIPANT` | `NUMERIC -> TEvent` | `type`: copied from `FrameArgument.type`. `prep`: optional preposition. | Numeric participant edge in event enrichment. |
+| `PARTICIPANT` | `NUMERIC -> EventMention` | `type`: copied from `FrameArgument.type`. `prep`: optional preposition. | Mention-level numeric participant edge retained for compatibility alongside `EVENT_PARTICIPANT`. |
 | `PARTICIPANT` | `FrameArgument -> TEvent` | `type`: original non-core argument type. `prep`: optional preposition. | Non-core event participant edge from the argument span itself. |
+| `EVENT_PARTICIPANT` | `Entity|NUMERIC|FrameArgument -> TEvent|EventMention` | `type`: copied from frame-argument role. `prep`: optional preposition for prepositional arguments. | Canonical participant edge family written alongside `PARTICIPANT` during the maintained transition period. |
 | `TRIGGERS` | `TagOccurrence -> TIMEX` | none | Token or token span triggers a temporal expression node. |
 | `TRIGGERS` | `TagOccurrence -> TEvent` | none | Token triggers a temporal event node. |
 | `TRIGGERS` | `TagOccurrence -> Signal` | none | Token or token span anchors a temporal signal node. |
@@ -267,6 +350,18 @@ Several relationship types are overloaded across different subgraphs. The tables
 | `CO_OCCURS_WITH` | `Entity -> Entity` | `confidence`: confidence score. `evidence_source`: rule family or phase. `rule_id`: specific rule identifier. `created_at`: creation timestamp. | Cross-sentence fusion edge for nearby entity co-occurrence. |
 | `SAME_AS` | `Entity -> Entity` | `confidence`: confidence score. `evidence_source`: rule family or phase. `rule_id`: specific rule identifier. `created_at`: creation timestamp. | Cross-document identity fusion for entities sharing stable KB identity. |
 | `DESCRIBES` | `Keyword -> AnnotatedText` | `rank`: keyword rank score | Legacy keyword-to-document descriptive edge. This is separate from `Frame -> TEvent` event description, but reuses the same relationship type. |
+
+### 4.5 Transitional relationship policy
+
+Some relationship families are intentionally dual-written during the current schema-alignment period so that maintained query paths and older graph consumers can coexist.
+
+| Legacy relationship | Canonical/current relationship | Current write policy |
+| --- | --- | --- |
+| `PARTICIPANT` (`FrameArgument -> Frame`) | `HAS_FRAME_ARGUMENT` | Queries should tolerate both; newer query contracts prefer `HAS_FRAME_ARGUMENT|PARTICIPANT`. |
+| `DESCRIBES` (`Frame -> TEvent`) | `FRAME_DESCRIBES_EVENT` | `EventEnrichmentPhase.link_frameArgument_to_event()` writes both edges intentionally. |
+| `PARTICIPANT` (event participant edges) | `EVENT_PARTICIPANT` | Core and non-core participant enrichment write both edges for compatibility while newer consumers can prefer `EVENT_PARTICIPANT`. |
+
+This dual-write strategy is intentional. It should be removed only as part of an explicit migration with coordinated query updates; it is not redundant drift.
 
 ## 5. Identity Conventions
 
@@ -388,3 +483,73 @@ If you need one simplified schema view for downstream consumers, use this canoni
 - Fusion and provenance: `CO_OCCURS_WITH`, `SAME_AS`, and relation-evidence nodes where the legacy relation extraction path is enabled.
 
 That view matches the maintained pipeline more closely than the older conceptual ontology alone.
+
+## 10. Function Authoring Playbook (LPG)
+
+Use these rules when adding new text-processing functions that write Neo4j data.
+
+### 10.1 Choose canonical write targets first
+
+- Prefer canonical labels and relationships over legacy aliases.
+- Keep dual-write only where transition policy explicitly requires it.
+- Do not invent new labels/edge types when an existing canonical type already encodes the same semantics.
+
+### 10.2 MERGE identity discipline
+
+- MERGE only on deterministic identity keys.
+- Set mutable properties with `SET` after identity is established.
+- Do not include non-identity attributes in MERGE patterns.
+- For temporal nodes, scope identities by document (`(tid, doc_id)` and `(eiid, doc_id)`).
+
+### 10.3 Required minimum fields on create
+
+Node creation must include at least:
+
+- `AnnotatedText`: `id`
+- `TagOccurrence`: `id`, `tok_index_doc`, `index`, `end_index`
+- `NamedEntity`: `id`, `type`, span anchors (`index`/`end_index` or canonical equivalents)
+- `Entity`: `id`, `type`
+- `TIMEX`: `tid`, `doc_id`, `type`
+- `TEvent`: `eiid`, `doc_id`
+- `EventMention`: `id`, `doc_id`, `start_tok`, `end_tok`
+- `Frame`: `id`
+- `FrameArgument`: `id`, `type`
+
+### 10.4 Canonical relationship obligations
+
+When mention/event layers are present, preserve these chains:
+
+- `EntityMention -[:REFERS_TO]-> Entity`
+- `EventMention -[:REFERS_TO]-> TEvent`
+- `Frame -[:INSTANTIATES]-> EventMention` when frame-event alignment exists
+
+### 10.5 Span policy for new writes
+
+- Write canonical token fields (`start_tok`, `end_tok`) whenever span semantics exist.
+- Write character fields (`start_char`, `end_char`) when available from the extractor.
+- Legacy span fields may be retained for compatibility, but new logic should query canonical fields first.
+
+### 10.6 Provenance on inferred edges
+
+For new inferred relationships, include provenance fields where possible:
+
+- `confidence`
+- `evidence_source`
+- `rule_id`
+- `created_at`
+
+This is strongly recommended for all new inference logic and required for any rule used in evaluation reports.
+
+## 11. Schema Drift Control
+
+Before merging any schema-affecting change, verify all four checks:
+
+1. The new/changed label or relationship appears in this file.
+2. The write path exists in code or migration (not documentation-only).
+3. Contract tests cover the new shape (hard-contract if canonical, advisory if optional).
+4. Legacy-impact is explicit (preserved alias, migration path, or deprecation note).
+
+Suggested CI gate policy:
+
+- Fail if code introduces undocumented canonical labels/relationships/properties.
+- Warn if advisory provenance/profile fields are missing.

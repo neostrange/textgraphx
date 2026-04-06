@@ -3,6 +3,10 @@
 Convenient pipeline runner with environment setup and health checks.
 Provides a single-command entry point to run the full or selective phases.
 
+Pipeline phase execution order keeps temporal extraction ahead of temporal link
+recognition: TemporalPhase populates TIMEX and TEvent nodes before
+TlinksRecognizer derives graph links between them.
+
 Usage:
     python run_pipeline.py                    # Full pipeline (all phases)
     python run_pipeline.py --dataset /path    # Full pipeline with custom dataset
@@ -13,15 +17,6 @@ Usage:
 import sys
 import os
 import logging
-from pathlib import Path
-
-# Add the project root to Python path so textgraphx package is importable
-project_root = str(Path(__file__).parent / "textgraphx")
-sys.path.insert(0, project_root)
-sys.path.insert(0, str(Path(__file__).parent))
-
-# Now import and run the canonical orchestrator
-from textgraphx.orchestration.orchestrator import PipelineOrchestrator
 from textgraphx.health_check import run_health_checks, print_health_check_report
 from textgraphx.config import get_config
 from textgraphx.neo4j_client import make_graph_from_config
@@ -77,8 +72,39 @@ def main():
         action="store_true",
         help="Run pre-flight health checks without executing pipeline"
     )
+    parser.add_argument(
+        "--preflight-safety",
+        action="store_true",
+        help="Print non-mutating safety posture (clear/block/fusion/gates) and exit",
+    )
     
     args = parser.parse_args()
+
+    def _parse_selected_phases(phases_arg):
+        if phases_arg:
+            return [p.strip().lower() for p in phases_arg.split(",") if p.strip()]
+        return PipelineOrchestrator.default_phases(get_config())
+
+    def _print_safety_posture(posture, phases):
+        print("\n" + "=" * 70)
+        print("Safety Preflight")
+        print("=" * 70)
+        print(f"Runtime mode:                  {posture.get('runtime_mode')}")
+        print(f"Selected phases:               {', '.join(phases)}")
+        print(f"Review preparation required:   {posture.get('review_preparation_required')}")
+        print(f"Materialization gate required: {posture.get('materialization_gate_required')}")
+        print(f"Strict transition gate:        {posture.get('strict_transition_gate')}")
+        print(f"Cross-document fusion enabled: {posture.get('cross_document_fusion_enabled')}")
+        print(f"Dataset files:                 {posture.get('dataset_file_count')}")
+        print(f"Dataset identities:            {posture.get('dataset_identity_count')}")
+        print(f"Existing AnnotatedText:        {posture.get('existing_document_count')}")
+        print(f"Matched existing dataset docs: {posture.get('matched_existing_documents')}")
+        print(f"Foreign docs present:          {posture.get('foreign_documents_present')}")
+        print(f"Would clear graph:             {posture.get('would_clear_graph')}")
+        print(f"Would block run:               {posture.get('would_block_run')}")
+        print(f"Reason:                        {posture.get('reason')}")
+        print("=" * 70 + "\n")
+
     
     # Resolve dataset path
     dataset_path = Path(args.dataset)
@@ -122,6 +148,16 @@ def main():
         import traceback
         traceback.print_exc()
         sys.exit(1)
+
+    if args.preflight_safety:
+        phases = _parse_selected_phases(args.phases)
+        try:
+            posture = orchestrator.assess_review_run_safety(phases=phases)
+        except Exception as e:
+            print(f"\n❌ Error during safety preflight: {e}\n")
+            sys.exit(1)
+        _print_safety_posture(posture, phases)
+        sys.exit(1 if posture.get("would_block_run") else 0)
     
     print("\n" + "=" * 70)
     print("🚀 TextGraphX Pipeline Runner")
@@ -135,10 +171,10 @@ def main():
     try:
         if args.phases:
             # Parse phases
-            phases = [p.strip().lower() for p in args.phases.split(",")]
+            phases = _parse_selected_phases(args.phases)
             print(f"Running selected phases: {', '.join(phases)}\n")
         else:
-            phases = PipelineOrchestrator.default_phases(get_config())
+            phases = _parse_selected_phases(None)
             print("Running all phases in canonical order:\n")
 
         if args.cleanup == "full":

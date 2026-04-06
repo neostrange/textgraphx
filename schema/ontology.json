@@ -21,6 +21,10 @@
       "key_properties": ["id", "type", "value", "index", "end_index", "kb_id", "score", "normal_term", "head", "headTokenIndex"],
       "id_convention": "<doc>_<start>_<end>_<type>"
     },
+    "EntityMention": {
+      "purpose": "Mention-level entity span abstraction",
+      "key_properties": ["id", "doc_id", "value", "head", "headTokenIndex", "start_tok", "end_tok", "start_char", "end_char"]
+    },
     "Entity": { "purpose": "Canonical/disambiguated entity", "key_properties": ["id", "type", "kb_id"] },
     "Frame": {
       "purpose": "SRL predicate frame",
@@ -40,9 +44,14 @@
     "NounChunk": { "purpose": "Noun chunk span", "key_properties": ["id", "type", "value"] },
     "Antecedent": { "purpose": "Coref cluster head", "key_properties": ["id", "text", "startIndex", "endIndex"] },
     "CorefMention": { "purpose": "Coreference mention", "key_properties": ["id", "text", "startIndex", "endIndex"] },
-    "NUMERIC": { "purpose": "Numeric literal node", "key_properties": ["id", "value", "type"] },
+    "NUMERIC": { "purpose": "Canonical numeric participant type, typically represented as a dynamic label on selected NamedEntity mentions", "key_properties": ["id", "value", "type"] },
+    "VALUE": { "purpose": "Canonical value expression node/label used for quantified participants", "key_properties": ["id", "type", "value"] },
     "TIMEX": { "purpose": "Temporal expression", "key_properties": ["tid", "doc_id", "type", "value", "text"] },
     "TEvent": { "purpose": "Temporal event", "key_properties": ["eiid", "doc_id", "begin", "end", "class", "tense"] },
+    "EventMention": {
+      "purpose": "Mention-level event instantiation linked to canonical TEvent",
+      "key_properties": ["id", "doc_id", "pred", "tense", "aspect", "class", "start_tok", "end_tok", "start_char", "end_char"]
+    },
     "Evidence": { "purpose": "Provenance/evidence node for relation extraction", "key_properties": ["id", "type"] },
     "Relationship": { "purpose": "High-level relation node between Entities", "key_properties": ["id", "type"] }
   },
@@ -60,8 +69,9 @@
     "TLINK": "TEvent/TIMEX -> TEvent/TIMEX (properties: id, relType, signalID)",
     "CREATED_ON": "AnnotatedText|PhaseRun|RefinementRun -> date/time literal (properties: date)",
     "FRAME_DESCRIBES_EVENT": "Frame -> TEvent (canonical replacement for DESCRIBES in this context)",
+    "INSTANTIATES": "Frame -> EventMention (canonical frame-to-mention event instantiation)",
     "HAS_FRAME_ARGUMENT": "FrameArgument -> Frame (canonical replacement for PARTICIPANT in this context)",
-    "EVENT_PARTICIPANT": "Entity|NUMERIC|FrameArgument -> TEvent (canonical replacement for PARTICIPANT in participant context)",
+    "EVENT_PARTICIPANT": "Entity|NUMERIC|FrameArgument|VALUE -> TEvent|EventMention (canonical replacement for PARTICIPANT in participant context)",
     "CLINK": "TEvent -> TEvent (properties: source)",
     "SLINK": "TEvent -> TEvent (properties: source)",
     "IS_RELATED_TO": "NamedEntity -> NamedEntity (properties: root, type)",
@@ -77,16 +87,19 @@
         "AnnotatedText",
         "Sentence",
         "TagOccurrence",
+        "EntityMention",
         "NamedEntity",
         "Entity",
         "Frame",
         "FrameArgument",
+        "EventMention",
         "Signal",
         "Antecedent",
         "CorefMention",
         "TIMEX",
         "TEvent",
-        "NUMERIC"
+        "NUMERIC",
+        "VALUE"
       ],
       "relationship_types": [
         "CONTAINS_SENTENCE",
@@ -100,6 +113,7 @@
         "DESCRIBES",
         "CREATED_ON",
         "TLINK",
+        "INSTANTIATES",
         "COREF",
         "FRAME_DESCRIBES_EVENT",
         "HAS_FRAME_ARGUMENT",
@@ -133,6 +147,38 @@
         "TO"
       ]
     }
+  },
+  "source_hierarchy": {
+    "precedence": [
+      "runtime_write_paths",
+      "applied_migrations",
+      "docs_schema_contract",
+      "ontology_metadata",
+      "architecture_and_historical_docs"
+    ],
+    "runtime_write_paths": [
+      "GraphBasedNLP.py",
+      "RefinementPhase.py",
+      "TemporalPhase.py",
+      "EventEnrichmentPhase.py",
+      "TlinksRecognizer.py"
+    ],
+    "notes": "When sources disagree, treat runtime write paths plus applied migrations as authoritative. docs/schema.md is the maintained human contract and must be updated to match implemented writes."
+  },
+  "governance_mode": {
+    "mode": "balanced",
+    "hard_contract_scope": [
+      "identity_keys",
+      "referential_integrity",
+      "core_required_properties",
+      "span_integrity"
+    ],
+    "advisory_scope": [
+      "enrichment_profile_completeness",
+      "optional_provenance_coverage",
+      "legacy_alias_usage_ratio"
+    ],
+    "legacy_policy": "preserve_with_aliases"
   },
   "identity_policy": {
     "doc_id_type": "integer",
@@ -180,6 +226,84 @@
       "replaced_by": ["HAS_FRAME_ARGUMENT", "EVENT_PARTICIPANT"],
       "status": "transitioning"
     }
+  },
+  "relation_endpoint_contract": {
+    "REFERS_TO": {
+      "allowed_pairs": [
+        ["EntityMention", "Entity"],
+        ["EventMention", "TEvent"],
+        ["NamedEntity", "Entity"],
+        ["FrameArgument", "Entity"],
+        ["FrameArgument", "NamedEntity"],
+        ["FrameArgument", "NUMERIC"],
+        ["TagOccurrence", "Tag"]
+      ],
+      "status": "canonical"
+    },
+    "EVENT_PARTICIPANT": {
+      "sources": ["Entity", "NUMERIC", "FrameArgument", "VALUE"],
+      "targets": ["TEvent", "EventMention"],
+      "status": "canonical_transition"
+    },
+    "FRAME_DESCRIBES_EVENT": {
+      "sources": ["Frame"],
+      "targets": ["TEvent"],
+      "status": "canonical"
+    },
+    "HAS_FRAME_ARGUMENT": {
+      "sources": ["FrameArgument"],
+      "targets": ["Frame"],
+      "status": "canonical"
+    },
+    "INSTANTIATES": {
+      "sources": ["Frame"],
+      "targets": ["EventMention"],
+      "status": "canonical"
+    },
+    "TLINK": {
+      "sources": ["TEvent", "TIMEX"],
+      "targets": ["TEvent", "TIMEX"],
+      "status": "canonical"
+    }
+  },
+  "event_attribute_vocabulary": {
+    "tense": ["PAST", "PRESENT", "FUTURE", "NONE", "INFINITIVE", "PRESPART", "PASTPART"],
+    "aspect": ["NONE", "PROGRESSIVE", "PERFECTIVE", "PERFECTIVE_PROGRESSIVE"],
+    "polarity": ["POS", "NEG"],
+    "certainty": ["CERTAIN", "PROBABLE", "POSSIBLE", "UNCERTAIN"],
+    "modality_defaults": ["NONE", "MUST", "MAY", "MIGHT", "SHOULD", "WOULD", "COULD", "CAN", "WILL", "SHALL"],
+    "normalization_policy": "uppercase_enforced"
+  },
+  "temporal_reasoning_profile": {
+    "canonical_reltypes": [
+      "BEFORE",
+      "AFTER",
+      "SIMULTANEOUS",
+      "INCLUDES",
+      "IS_INCLUDED",
+      "BEGINS",
+      "BEGUN_BY",
+      "ENDS",
+      "ENDED_BY",
+      "DURING",
+      "IDENTITY",
+      "VAGUE"
+    ],
+    "contradiction_pairs": [
+      ["BEFORE", "AFTER"],
+      ["INCLUDES", "IS_INCLUDED"],
+      ["BEGINS", "BEGUN_BY"],
+      ["ENDS", "ENDED_BY"]
+    ],
+    "closure_rules": [
+      {"lhs": ["BEFORE", "BEFORE"], "rhs": "BEFORE"},
+      {"lhs": ["AFTER", "AFTER"], "rhs": "AFTER"},
+      {"lhs": ["IDENTITY", "BEFORE"], "rhs": "BEFORE"},
+      {"lhs": ["IDENTITY", "AFTER"], "rhs": "AFTER"},
+      {"lhs": ["IDENTITY", "IDENTITY"], "rhs": "IDENTITY"}
+    ],
+    "consistency_policy": "suppress_lower_confidence_conflicts",
+    "dct_anchor_policy": "allow_case6_when_non_nominal_or_temporally_anchored"
   },
   "argument_type_vocabulary": {
     "description": "Controlled vocabulary for FrameArgument.argumentType. Maps PropBank ARGM modifier codes to stable semantic role category names. This vocabulary is the canonical reference; the CASE expression in EventEnrichmentPhase.add_non_core_participants_to_event must match exactly.",

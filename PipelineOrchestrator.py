@@ -61,6 +61,7 @@ class PipelineOrchestrator:
     """Compatibility shim for the legacy orchestrator path.
 
     Canonical implementation now lives in textgraphx.orchestration.orchestrator.
+    Legacy phase ordering remains TemporalPhase before TlinksRecognizer.
     """
 
     PHASE_ORDER = ["ingestion", "refinement", "temporal", "event_enrichment", "dbpedia_enrichment", "tlinks"]

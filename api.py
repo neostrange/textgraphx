@@ -17,6 +17,8 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from execution_history import ExecutionHistory, ExecutionRecord
 from execution_summary import ExecutionSummary
+from textgraphx.diagnostics import get_runtime_metrics
+from textgraphx.neo4j_client import make_graph_from_config
 from textgraphx.orchestration.orchestrator import PipelineOrchestrator
 
 logger = logging.getLogger(__name__)
@@ -190,6 +192,21 @@ async def get_statistics():
     """Get pipeline execution statistics."""
     stats = _execution_history.get_statistics()
     return Statistics(**stats)
+
+
+@app.get("/diagnostics/runtime", tags=["Analytics"])
+async def get_runtime_diagnostics():
+    """Return runtime diagnostics aggregated from registered query pack entries."""
+    graph = make_graph_from_config()
+    close_fn = getattr(graph, "close", None)
+    try:
+        return get_runtime_metrics(graph)
+    except Exception as e:
+        logger.error(f"Failed to compute runtime diagnostics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if callable(close_fn):
+            close_fn()
 
 
 # Background task for pipeline execution

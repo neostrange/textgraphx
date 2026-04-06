@@ -244,8 +244,9 @@ Top-level layout (key files / folders)
   - `TextProcessor.py` — orchestration helpers, example relationship-extraction logic
   - `neo4j_client.py` — centralized Neo4j bolt driver helper + py2neo-compatible wrapper
   - `RefinementPhase.py` — idempotent refinement rules (head-finding, FA→Entity linking)
-  - `TemporalPhase.py` — TIMEX/TEvent creation and TLINK wiring
-  - `EventEnrichmentPhase.py` — frame → event linking and participant creation
+  - `TemporalPhase.py` — DCT, TIMEX, TEvent, and Signal materialization
+  - `EventEnrichmentPhase.py` — EventMention creation plus frame → event and participant enrichment
+  - `TlinksRecognizer.py` — heuristic TLINK creation over existing temporal nodes
 - `textgraphx/text_processing_components/` — token-level writers and per-component Cypher generators
   - `textgraphx/text_processing_components/TagOccurrenceCreator.py` / `textgraphx/text_processing_components/TagOccurrenceQueryExecutor.py` — token → TagOccurrence writes and HAS_NEXT linking
   - `textgraphx/text_processing_components/SRLProcessor.py` — Frame and FrameArgument creation, PARTICIPANT wiring
@@ -258,6 +259,17 @@ Design notes
 - Centralized DB access: `textgraphx/neo4j_client.py` implements `make_graph_from_config()` and `BoltGraphCompat` to keep code that expects py2neo-like `.run(...).data()` working with the official bolt driver.
 - Idempotency: phases write using MERGE with deterministic document-scoped ids to make repeated runs safe.
 - Phases are intentionally decoupled — you can run only tokenization, or run refinement/temporal phases against an existing graph.
+
+Documentation authority
+- `textgraphx/docs/schema.md` is the implementation-facing schema contract.
+- `textgraphx/docs/architecture-overview.md` is the current architecture narrative.
+- Root `docs/` files mix current milestone notes with historical implementation records; treat them as supporting context unless they explicitly describe the current state.
+
+Repository structure notes
+- `textgraphx/orchestration/orchestrator.py` is the canonical orchestrator implementation.
+- `textgraphx/PipelineOrchestrator.py` is retained as a compatibility shim for older entry points and should not be treated as the primary architecture source.
+- `scripts/` contains the operational entry-point scripts; package-local helpers under `textgraphx/` support those entry points but are not the authoritative runbook by themselves.
+- The repository still contains some low-risk historical irregularities (`util` vs `utils`, a crowded package root, legacy milestone docs), but this project state favors clarification over directory movement.
 
 ## Data model / semantic model (canonical)
 
@@ -460,8 +472,9 @@ License: See `textgraphx/LICENSE` (the project includes a license file)
             - `textgraphx/text_processing_components/SRLProcessor.py` — Frame and FrameArgument creation
             - `textgraphx/text_processing_components/CoreferenceResolver.py` — Antecedent / CorefMention creation and COREF linking
             - `textgraphx/RefinementPhase.py` — head-finding & FA→Entity linking rules (contains many Cypher rules and instrumentation)
-            - `textgraphx/TemporalPhase.py` — TIMEX / TEvent creation and TLINK wiring
-            - `textgraphx/EventEnrichmentPhase.py` — event ↔ frame ↔ participant wiring
+            - `textgraphx/TemporalPhase.py` — DCT / TIMEX / TEvent / Signal materialization
+            - `textgraphx/EventEnrichmentPhase.py` — EventMention creation plus event ↔ frame ↔ participant wiring
+            - `textgraphx/TlinksRecognizer.py` — TLINK creation and temporal-link heuristics
             - `textgraphx/neo4j_client.py` — centralized bolt-driver helper and compatibility wrapper
 
             ---

@@ -14,12 +14,12 @@ Baseline strict event matching was weak due to:
 ### Changes
 
 1. EventMention predicate canonicalization from trigger lemma
-- File: `textgraphx/TemporalPhase.py`
+- File: `textgraphx/TemporalPhase.py` _(Historical pre-remediation location. After Item 4 ownership fix, `EventMention` creation and predicate canonicalization live in `textgraphx/EventEnrichmentPhase.py`.)_
 - Change: `EventMention.pred` now prefers trigger-token lemma over raw form.
 - Rationale: gold `pred` is lemma-like; this improves semantic comparability.
 
 2. Phrasal verb preservation (`VB*` + following `RP`)
-- File: `textgraphx/TemporalPhase.py`
+- File: `textgraphx/TemporalPhase.py` _(Historical pre-remediation location. After Item 4 ownership fix, phrasal-verb span logic for `EventMention` lives in `textgraphx/EventEnrichmentPhase.py`.)_
 - Change: mention-level `pred` becomes multiword (e.g., `drag down`) and `end_tok` extends to include the particle.
 - Rationale: preserves lexicalized event meaning without mutating canonical `TEvent` identity.
 

@@ -16,6 +16,8 @@ def stamp_inferred_relationships(
     authority_tier: Optional[str] = None,
     source_kind: str = "rule",
     conflict_policy: str = "additive",
+    calibration_version: Optional[str] = None,
+    confidence_components: Optional[Dict[str, float]] = None,
     extra_properties: Optional[Dict[str, Any]] = None,
 ) -> int:
     """Stamp provenance/confidence properties on inferred relationships.
@@ -43,6 +45,8 @@ def stamp_inferred_relationships(
         r.authority_tier = $authority_tier,
         r.source_kind = $source_kind,
         r.conflict_policy = $conflict_policy,
+        r.calibration_version = $calibration_version,
+        r.confidence_components = $confidence_components,
         r.created_at = coalesce(r.created_at, datetime().epochMillis)
     RETURN count(r) AS c
     """
@@ -54,6 +58,8 @@ def stamp_inferred_relationships(
         "authority_tier": normalized_tier,
         "source_kind": normalized_kind,
         "conflict_policy": normalized_policy,
+        "calibration_version": calibration_version,
+        "confidence_components": confidence_components,
     }
     if extra_properties:
         for key, value in extra_properties.items():

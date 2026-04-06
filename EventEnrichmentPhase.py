@@ -24,7 +24,6 @@ from textgraphx.util.EntityFishingLinker import EntityFishing
 from spacy.tokens import Doc, Token, Span
 from textgraphx.util.RestCaller import callAllenNlpApi
 from textgraphx.util.GraphDbBase import GraphDBBase
-from textgraphx.TextProcessor import TextProcessor
 import xml.etree.ElementTree as ET
 # legacy py2neo imports removed; use bolt-driver wrapper via neo4j_client
 import logging
@@ -32,6 +31,11 @@ import logging
 from textgraphx.neo4j_client import make_graph_from_config
 from textgraphx.config import get_config
 from textgraphx.merge_utils import resolve_attribute_conflict
+from textgraphx.reasoning_contracts import (
+    canonical_event_attribute_vocabulary,
+    count_endpoint_violations,
+    normalize_event_attr,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +155,72 @@ class EventEnrichmentPhase():
 
         return len(updates)
 
+    def normalize_eventmention_vocabulary(self):
+        """Normalize EventMention core attributes to ontology vocabulary."""
+        graph = self.graph
+        vocab = canonical_event_attribute_vocabulary()
+
+        tense_allowed = [str(v) for v in vocab.get("tense", [])]
+        aspect_allowed = [str(v) for v in vocab.get("aspect", [])]
+        polarity_allowed = [str(v) for v in vocab.get("polarity", [])]
+        certainty_allowed = [str(v) for v in vocab.get("certainty", [])]
+
+        # Keep normalization in Cypher so it can be rerun idempotently on existing graphs.
+        query = """
+        MATCH (em:EventMention)
+        SET em.tense = CASE
+                WHEN em.tense IS NULL OR trim(toString(em.tense)) = '' THEN 'NONE'
+                WHEN toUpper(toString(em.tense)) IN $tense_allowed THEN toUpper(toString(em.tense))
+                ELSE 'NONE'
+            END,
+            em.aspect = CASE
+                WHEN em.aspect IS NULL OR trim(toString(em.aspect)) = '' THEN 'NONE'
+                WHEN toUpper(toString(em.aspect)) IN $aspect_allowed THEN toUpper(toString(em.aspect))
+                ELSE 'NONE'
+            END,
+            em.polarity = CASE
+                WHEN em.polarity IS NULL OR trim(toString(em.polarity)) = '' THEN 'POS'
+                WHEN toUpper(toString(em.polarity)) IN $polarity_allowed THEN toUpper(toString(em.polarity))
+                ELSE 'POS'
+            END,
+            em.certainty = CASE
+                WHEN em.certainty IS NULL OR trim(toString(em.certainty)) = '' THEN 'UNCERTAIN'
+                WHEN toUpper(toString(em.certainty)) IN $certainty_allowed THEN toUpper(toString(em.certainty))
+                ELSE 'UNCERTAIN'
+            END
+        RETURN count(em) AS normalized
+        """
+        rows = graph.run(
+            query,
+            {
+                "tense_allowed": tense_allowed,
+                "aspect_allowed": aspect_allowed,
+                "polarity_allowed": polarity_allowed,
+                "certainty_allowed": certainty_allowed,
+            },
+        ).data()
+        normalized = rows[0].get("normalized", 0) if rows else 0
+        logger.info("normalize_eventmention_vocabulary: normalized %d EventMention nodes", normalized)
+        return normalized
+
+    def endpoint_contract_violations(self):
+        """Return endpoint-contract violation counts for critical event relations."""
+        rels = [
+            "EVENT_PARTICIPANT",
+            "INSTANTIATES",
+            "HAS_FRAME_ARGUMENT",
+            "FRAME_DESCRIBES_EVENT",
+            "REFERS_TO",
+        ]
+        violations = {rel: count_endpoint_violations(self.graph, rel) for rel in rels}
+        total = sum(violations.values())
+        if total > 0:
+            logger.warning("endpoint_contract_violations: %s", violations)
+        else:
+            logger.info("endpoint_contract_violations: no violations")
+        violations["total"] = total
+        return violations
+
          
 
 
@@ -161,6 +231,84 @@ class EventEnrichmentPhase():
     #   Path 2 – via args: TagOccurrence PARTICIPATES_IN FrameArgument PARTICIPANT Frame
     #                      AND same TagOccurrence TRIGGERS TEvent
     # Both paths are idempotent (MERGE) so running them together is safe.
+    def create_event_mentions(self, doc_id):
+        """Create EventMention nodes for each TEvent in the document.
+        
+        EventMention represents the mention-level event instantiation with temporal
+        properties like tense, aspect, polarity, and modality. Each EventMention 
+        refers to a canonical TEvent via the REFERS_TO relationship.
+        
+        This method was moved from TemporalPhase to EventEnrichmentPhase as part of
+        Item 4 (temporal ownership split) to clarify that event mention materialization
+        is an enrichment responsibility, not pure temporal extraction.
+        
+        Precondition: TEvent nodes already exist (created by TemporalPhase)
+        Postcondition: EventMention nodes created, each with REFERS_TO link to TEvent
+        """
+        logger.debug("create_event_mentions for doc_id=%s", doc_id)
+        doc_id = str(doc_id)
+        graph = self.graph
+        
+        query = """
+        MATCH (event:TEvent {doc_id: toInteger($doc_id)})
+        WHERE NOT EXISTS { (event)<-[:REFERS_TO]-(em:EventMention) }
+        OPTIONAL MATCH (tok:TagOccurrence)-[:TRIGGERS]->(event)
+        WITH event, tok
+        ORDER BY tok.tok_index_doc
+        WITH event, head(collect(tok)) AS trig_tok, event.eiid + '_mention' as mention_id
+        OPTIONAL MATCH (s:Sentence)-[:HAS_TOKEN]->(trig_tok)
+        WITH event, mention_id, trig_tok,
+             head([(s)-[:HAS_TOKEN]->(candidate:TagOccurrence)
+                   WHERE candidate.tok_index_doc = trig_tok.tok_index_doc + 1 | candidate]) AS next_tok,
+             CASE
+                 WHEN trig_tok IS NOT NULL AND trig_tok.lemma IS NOT NULL AND trim(toString(trig_tok.lemma)) <> ''
+                 THEN toLower(trim(toString(trig_tok.lemma)))
+                 ELSE NULL
+             END AS trigger_lemma
+        MERGE (em:EventMention {id: mention_id})
+        SET em.doc_id = event.doc_id,
+            em.pred = CASE
+                WHEN trigger_lemma IS NOT NULL
+                     AND trig_tok.pos STARTS WITH 'VB'
+                     AND next_tok.pos = 'RP'
+                     AND next_tok.lemma IS NOT NULL
+                     AND trim(toString(next_tok.lemma)) <> ''
+                THEN trigger_lemma + ' ' + toLower(trim(toString(next_tok.lemma)))
+                ELSE coalesce(trigger_lemma, event.pred, event.form)
+            END,
+            em.tense = event.tense,
+            em.aspect = event.aspect,
+            em.pos = event.pos,
+            em.epos = event.epos,
+            em.form = event.form,
+            em.modality = event.modality,
+            em.polarity = event.polarity,
+            em.class = event.class,
+            em.external_ref = coalesce(event.external_ref, event.eid, em.external_ref),
+            em.start_tok = event.start_tok,
+            em.end_tok = CASE
+                WHEN trig_tok.pos STARTS WITH 'VB' AND next_tok.pos = 'RP'
+                THEN coalesce(next_tok.tok_index_doc, event.end_tok)
+                ELSE event.end_tok
+            END,
+            em.start_char = event.start_char,
+            em.end_char = event.end_char,
+            em.begin = event.begin,
+            em.end = event.end
+        WITH em, event
+        MERGE (em)-[:REFERS_TO]->(event)
+        RETURN count(*) as mentions_created
+        """
+        
+        try:
+            result = graph.run(query, parameters={"doc_id": doc_id}).data()
+            mentions_created = result[0].get("mentions_created", 0) if result else 0
+            logger.info("create_event_mentions: created %d EventMention nodes for doc_id=%s", mentions_created, doc_id)
+            return mentions_created
+        except Exception:
+            logger.exception("Failed to create event mentions for doc_id=%s", doc_id)
+            return 0
+
     def link_frameArgument_to_event(self):
         logger.debug("link_frameArgument_to_event")
         graph = self.graph
@@ -192,7 +340,7 @@ class EventEnrichmentPhase():
         logger.info("link_frameArgument_to_event: %d DESCRIBES relationships merged", linked)
 
         # Path 3: Link Frame to EventMention (mention layer)
-        # EventMention nodes are created in TemporalPhase and refer to canonical TEvent
+        # EventMention nodes are created in EventEnrichmentPhase and refer to canonical TEvent
         query_instantiates = """
             MATCH (f:Frame)-[:DESCRIBES|:FRAME_DESCRIBES_EVENT]->(event:TEvent)
             MATCH (em:EventMention)-[:REFERS_TO]->(event)
@@ -226,15 +374,10 @@ class EventEnrichmentPhase():
                                         MATCH (f:Frame)<-[:PARTICIPANT]-(fa:FrameArgument)-[:REFERS_TO]->(e)
                                         WHERE fa.type IN ['ARG0','ARG1','ARG2','ARG3','ARG4']
                                             AND (e:Entity OR e:NUMERIC OR e:VALUE)
-                                        CALL {
-                                            WITH f
-                                            MATCH (f)-[:FRAME_DESCRIBES_EVENT]->(event:TEvent)
-                                            RETURN event, 0 AS rel_priority
-                                            UNION
-                                            WITH f
-                                            MATCH (f)-[:DESCRIBES]->(event:TEvent)
-                                            RETURN event, 1 AS rel_priority
-                                        }
+                                        OPTIONAL MATCH (f)-[:FRAME_DESCRIBES_EVENT]->(event_c:TEvent)
+                                        OPTIONAL MATCH (f)-[:DESCRIBES]->(event_l:TEvent)
+                                        WITH fa, e, f, coalesce(event_c, event_l) AS event,
+                                            CASE WHEN event_c IS NULL THEN 1 ELSE 0 END AS rel_priority
                                         WITH fa, e, f, event, rel_priority,
                                              abs(
                                                  toFloat(coalesce(f.headTokenIndex, f.start_tok, 0))
@@ -287,15 +430,10 @@ class EventEnrichmentPhase():
 
         query = """    
                     MATCH (f:Frame)<-[:PARTICIPANT]-(fa:FrameArgument)
-                                        CALL {
-                                            WITH f
-                                            MATCH (f)-[:FRAME_DESCRIBES_EVENT]->(event:TEvent)
-                                            RETURN event, 0 AS rel_priority
-                                            UNION
-                                            WITH f
-                                            MATCH (f)-[:DESCRIBES]->(event:TEvent)
-                                            RETURN event, 1 AS rel_priority
-                                        }
+                                        OPTIONAL MATCH (f)-[:FRAME_DESCRIBES_EVENT]->(event_c:TEvent)
+                                        OPTIONAL MATCH (f)-[:DESCRIBES]->(event_l:TEvent)
+                                        WITH fa, f, coalesce(event_c, event_l) AS event,
+                                            CASE WHEN event_c IS NULL THEN 1 ELSE 0 END AS rel_priority
                                         WITH fa, f, event, rel_priority,
                                              abs(
                                                  toFloat(coalesce(f.headTokenIndex, f.start_tok, 0))
@@ -638,9 +776,12 @@ class EventEnrichmentPhase():
         self._resolve_tevent_field_conflicts("polarity", incoming_source="event_enrichment", incoming_confidence=0.65)
         self._resolve_tevent_field_conflicts("time", incoming_source="event_enrichment", incoming_confidence=0.70)
 
+        # Normalize mention-level event vocabulary to ontology contract.
+        self.normalize_eventmention_vocabulary()
+
         # Mark low-confidence event mentions using conservative linguistic evidence.
-        # We only down-rank non-verbal mentions that have no supporting frame,
-        # participant, or temporal-link evidence.
+        # In addition to non-verbal spans, down-rank weak/light verb mentions
+        # when they have little structural support.
         query_low_confidence = """
         MATCH (em:EventMention)-[:REFERS_TO]->(te:TEvent)
         OPTIONAL MATCH (f:Frame)-[:INSTANTIATES]->(em)
@@ -649,10 +790,21 @@ class EventEnrichmentPhase():
            WITH em, te, frame_support, count(DISTINCT ent) AS participant_support
            OPTIONAL MATCH (te)-[:TLINK]-(tl_target)
            WHERE tl_target:TEvent OR tl_target:TIMEX
-           WITH em, frame_support, participant_support, count(DISTINCT tl_target) AS tlink_support
+           WITH em, frame_support, participant_support, count(DISTINCT tl_target) AS tlink_support,
+                split(toLower(coalesce(em.pred, '')), ' ')[0] AS pred_lc
         SET em.low_confidence = CASE
             WHEN em.pos IN ['NOUN', 'NN', 'NNS', 'NNP', 'NNPS', 'OTHER', 'JJ']
                  AND frame_support = 0
+                 AND participant_support = 0
+                 AND tlink_support = 0
+                 AND coalesce(em.special_cases, 'NONE') = 'NONE'
+            THEN true
+            WHEN em.pos IN ['VERB', 'VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ', 'MD']
+                 AND pred_lc IN [
+                     'be', 'have', 'do', 'make', 'take', 'give', 'get',
+                     'say', 'tell', 'report', 'state', 'note', 'add'
+                 ]
+                 AND frame_support <= 1
                  AND participant_support = 0
                  AND tlink_support = 0
                  AND coalesce(em.special_cases, 'NONE') = 'NONE'
@@ -692,6 +844,9 @@ class EventEnrichmentPhase():
             "(certainty=%d, time=%d, special_cases=%d, aspect=%d, polarity=%d, clause_scope=%d)",
             total, certainty_count, time_count, special_count, aspect_count, polarity_count, clause_scope_count
         )
+
+        # Log endpoint contract status for runtime observability.
+        self.endpoint_contract_violations()
         
         return total
 

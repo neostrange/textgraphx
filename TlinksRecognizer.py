@@ -19,6 +19,11 @@ if __package__ is None and __name__ == '__main__':
 
 from textgraphx.neo4j_client import make_graph_from_config
 from textgraphx.timeml_relations import CANONICAL_TLINK_RELTYPES
+from textgraphx.reasoning_contracts import count_endpoint_violations
+from textgraphx.temporal_constraints import solve_tlink_constraints
+import xml.etree.ElementTree as ET
+import requests
+import json
 
 logger = logging.getLogger(__name__)
 logger.info("TlinksRecognizer module imported")
@@ -61,30 +66,32 @@ class TlinksRecognizer:
 
     def create_tlinks_case1(self):
         logger.debug("create_tlinks_case1")
-        query = """ MATCH p= (e1:TEvent)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(f1:Frame)<-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(fa:FrameArgument where fa.type = 'ARGM-TMP')
-                <-[:PARTICIPATES_IN]-(et:TagOccurrence where et.pos = 'VBD')-[:PARTICIPATES_IN]->(f2:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(e2:TEvent)
-                    where fa.headTokenIndex = et.tok_index_doc and fa.signal = 'after'
-                    with *
-                    match (e1),(e2)
-                    merge (e1)-[tl:TLINK]-(e2)
-                    on create set tl.relType = 'AFTER', tl.source = 't2g', tl.confidence = 0.90, tl.rule_id = 'case1_after_eventive', tl.evidence_source = 'tlinks_recognizer'
-                    on match set tl.relType = 'AFTER', tl.confidence = coalesce(tl.confidence, 0.90), tl.rule_id = coalesce(tl.rule_id, 'case1_after_eventive'), tl.evidence_source = coalesce(tl.evidence_source, 'tlinks_recognizer')
-                    RETURN p
+        query = """
+            MATCH p= (e1:TEvent)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(f1:Frame)<-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(fa:FrameArgument {type: 'ARGM-TMP'})
+                <-[:PARTICIPATES_IN]-(et:TagOccurrence)-[:PARTICIPATES_IN]->(f2:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(e2:TEvent)
+            WHERE fa.headTokenIndex = et.tok_index_doc AND fa.signal = 'after'
+            WITH *
+            MATCH (e1),(e2)
+            MERGE (e1)-[tl:TLINK]-(e2)
+            ON CREATE SET tl.relType = 'AFTER', tl.source = 't2g', tl.confidence = 0.90, tl.rule_id = 'case1_after_eventive', tl.evidence_source = 'tlinks_recognizer'
+            ON MATCH SET tl.relType = 'AFTER', tl.confidence = coalesce(tl.confidence, 0.90), tl.rule_id = coalesce(tl.rule_id, 'case1_after_eventive'), tl.evidence_source = coalesce(tl.evidence_source, 'tlinks_recognizer')
+            RETURN p
         """
         return self._run_query(query)
 
     def create_tlinks_case2(self):
         logger.debug("create_tlinks_case2")
-        query = """ MATCH p= (e1:TEvent)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(f1:Frame)<-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(fa:FrameArgument where fa.type = 'ARGM-TMP')
-                <-[:PARTICIPATES_IN]-(et:TagOccurrence where et.pos = 'VBG')-[:PARTICIPATES_IN]->(f2:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(e2:TEvent)
-                    where fa.complement = et.text and fa.syntacticType = 'EVENTIVE'
-                    with *
-                    merge (e1)-[tl:TLINK]-(e2)
-                    with *
-                    set tl.source = 't2g', tl.confidence = 0.85, tl.rule_id = 'case2_eventive_complement', tl.evidence_source = 'tlinks_recognizer',
-                    (case when fa.signal in ['after'] then tl END).relType = 'AFTER',
-                    (case when fa.signal in ['before'] then tl END).relType = 'BEFORE'
-                    RETURN p
+        query = """
+            MATCH p= (e1:TEvent)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(f1:Frame)<-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(fa:FrameArgument {type: 'ARGM-TMP'})
+                <-[:PARTICIPATES_IN]-(et:TagOccurrence {pos: 'VBG'})-[:PARTICIPATES_IN]->(f2:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(e2:TEvent)
+            WHERE fa.complement = et.text AND fa.syntacticType = 'EVENTIVE'
+            WITH *
+            MERGE (e1)-[tl:TLINK]-(e2)
+            WITH *
+            SET tl.source = 't2g', tl.confidence = 0.85, tl.rule_id = 'case2_eventive_complement', tl.evidence_source = 'tlinks_recognizer',
+                (CASE WHEN fa.signal IN ['after'] THEN tl END).relType = 'AFTER',
+                (CASE WHEN fa.signal IN ['before'] THEN tl END).relType = 'BEFORE'
+            RETURN p
         """
         return self._run_query(query)
 
@@ -147,8 +154,9 @@ class TlinksRecognizer:
 
     def create_tlinks_case6(self):
         logger.debug("create_tlinks_case6")
-        query = """ MATCH p = (e:TEvent)<-[:TRIGGERS]-(t:TagOccurrence)<-[:HAS_TOKEN]-(s:Sentence)<-[:CONTAINS_SENTENCE]-(ann:AnnotatedText)-[:CREATED_ON]->(dct:TIMEX)
-                    WHERE NOT (e.tense IN ['PRESPART', 'PASPART', 'INFINITIVE']) AND NOT (t.pos IN ['NNP', 'NNS', 'NN']) 
+        query = """ MATCH p = (e:TEvent)<-[:TRIGGERS]-(t:TagOccurrence)<-[:HAS_TOKEN]-(s:Sentence)<-[:CONTAINS_SENTENCE]-(ann:AnnotatedText)-[:CREATED_ON]->(dct)
+                WHERE dct:TIMEX
+                AND NOT (e.tense IN ['PRESPART', 'PASPART', 'INFINITIVE']) AND NOT (t.pos IN ['NNP', 'NNS', 'NN']) 
                     //AND NOT (e.tense IN ['PRESENT'] and e.aspect IN ['NONE'])
                     MERGE (e)-[tlink:TLINK]-(dct)
                     SET tlink.source = 't2g',
@@ -299,11 +307,260 @@ class TlinksRecognizer:
                 logger.info("suppress_tlink_conflicts: suppressed %d TLINK relationships", suppressed)
         return rows
 
+    def apply_tlink_transitive_closure(self, max_rounds: int = 3):
+        """Materialize conservative TLINK transitive closure edges.
+
+        Supports high-precision closure rules:
+        BEFORE+BEFORE=>BEFORE, AFTER+AFTER=>AFTER,
+        IDENTITY+X=>X, X+IDENTITY=>X.
+        """
+        logger.debug("apply_tlink_transitive_closure")
+        total_created = 0
+        for round_idx in range(1, max_rounds + 1):
+            query = """
+            MATCH (a)-[r1:TLINK]->(b)-[r2:TLINK]->(c)
+            WHERE a <> c
+              AND coalesce(r1.suppressed, false) = false
+              AND coalesce(r2.suppressed, false) = false
+            WITH a, b, c,
+                 coalesce(r1.relTypeCanonical, r1.relType, 'VAGUE') AS t1,
+                 coalesce(r2.relTypeCanonical, r2.relType, 'VAGUE') AS t2,
+                 coalesce(r1.confidence, 0.0) AS c1,
+                 coalesce(r2.confidence, 0.0) AS c2
+            WITH a, c, c1, c2,
+                 CASE
+                    WHEN t1 = 'BEFORE' AND t2 = 'BEFORE' THEN 'BEFORE'
+                    WHEN t1 = 'AFTER' AND t2 = 'AFTER' THEN 'AFTER'
+                    WHEN t1 = 'IDENTITY' AND t2 IN $canonical THEN t2
+                    WHEN t2 = 'IDENTITY' AND t1 IN $canonical THEN t1
+                    ELSE NULL
+                 END AS inferred
+            WHERE inferred IS NOT NULL
+            MERGE (a)-[r:TLINK {relType: inferred}]->(c)
+            ON CREATE SET r.relTypeCanonical = inferred,
+                          r.source = 'closure',
+                          r.rule_id = 'transitive_closure',
+                          r.evidence_source = 'tlinks_recognizer',
+                          r.confidence = round((c1 + c2) / 2.0, 3),
+                          r.closureRound = $round,
+                          r.createdByClosure = true
+            RETURN count(CASE WHEN r.createdByClosure = true AND r.closureRound = $round THEN 1 END) AS created
+            """
+            rows = self._run_query(
+                query,
+                {"round": round_idx, "canonical": list(CANONICAL_TLINK_RELTYPES)},
+            )
+            created = rows[0].get("created", 0) if rows else 0
+            total_created += created
+            if created == 0:
+                break
+        logger.info("apply_tlink_transitive_closure: created %d TLINKs", total_created)
+        return total_created
+
+    def endpoint_contract_violations(self):
+        """Return endpoint-contract violations for TLINK relationships."""
+        violations = count_endpoint_violations(self.graph, "TLINK")
+        if violations:
+            logger.warning("TLINK endpoint contract violations: %d", violations)
+        else:
+            logger.info("TLINK endpoint contract violations: none")
+        return violations
+
+    def apply_constraint_solver(self, shadow_only: bool = False):
+        """Apply conservative TLINK constraint solver over existing links."""
+        summary = solve_tlink_constraints(self.graph, shadow_only=shadow_only)
+        logger.info(
+            "apply_constraint_solver: inverse_created=%d bidirectional_conflicts=%d shadow_only=%s",
+            summary.get("inverse_created", 0),
+            summary.get("bidirectional_conflicts", 0),
+            shadow_only,
+        )
+        return summary
+
+    def get_doc_text_and_dct(self, doc_id):
+        """Retrieve document text and creation time from AnnotatedText node."""
+        logger.debug("get_doc_text_and_dct for doc_id=%s", doc_id)
+        query = "MATCH (n:AnnotatedText) WHERE n.id = $doc_id RETURN n.text AS text, n.creationtime AS dct"
+        try:
+            data = self.graph.run(query, parameters={"doc_id": doc_id}).data()
+            if data:
+                return {
+                    "text": str(data[0].get("text", "")),
+                    "dct": data[0].get("dct", ""),
+                }
+        except Exception:
+            logger.exception("Failed to get doc text and DCT for doc_id=%s", doc_id)
+        return {"text": "", "dct": ""}
+
+    def callTtkService(self, parameters):
+        """Call TTK service and return XML response body."""
+        logger.debug("callTtkService with dct=%s", parameters.get("dct"))
+        try:
+            from textgraphx.config import get_config
+
+            cfg = get_config()
+            ttk_url = cfg.services.temporal_url
+            response = requests.post(ttk_url, json=parameters, timeout=30)
+            response.raise_for_status()
+            logger.info("TTK service returned status %d", response.status_code)
+            return response.text
+        except Exception:
+            logger.exception("TTK service call failed")
+            return ""
+
+    def _get_ttk_xml(self, doc_id):
+        """Get TTK XML output for a document."""
+        logger.debug("_get_ttk_xml for doc_id=%s", doc_id)
+        response_dict = self.get_doc_text_and_dct(doc_id)
+        return self.callTtkService(response_dict)
+
+    def _iter_tlink_elements(self, xml_text):
+        """Yield TLINK elements from TTK XML."""
+        try:
+            root = ET.fromstring(xml_text)
+        except ET.ParseError:
+            logger.exception("Failed to parse TTK XML for TLINK extraction")
+            return
+
+        for elem in root.iter():
+            tag = elem.tag.split("}")[-1] if isinstance(elem.tag, str) else elem.tag
+            if tag == "TLINK":
+                yield elem
+
+    def create_tlinks_e2e(self, doc_id):
+        """Build event-to-event links from TTK output over existing temporal nodes."""
+        logger.debug("create_tlinks_e2e for doc_id=%s", doc_id)
+        result_xml = self._get_ttk_xml(doc_id)
+        if not result_xml:
+            logger.warning("No TTK XML returned for E2E link extraction")
+            return ""
+
+        query = """
+            MATCH (e1:TEvent {eiid: $event_instance_id, doc_id: toInteger($doc_id)})
+            MATCH (e2:TEvent {eiid: $related_event_instance, doc_id: toInteger($doc_id)})
+            MERGE (e1)-[tl:TLINK {id: $lid, relType: $rel_type}]->(e2)
+            SET tl.signalID = $signal_id
+        """
+
+        linked = 0
+        for tlink in self._iter_tlink_elements(result_xml):
+            event_instance_id = tlink.attrib.get("eventInstanceID")
+            related_event_instance = tlink.attrib.get("relatedToEventInstance")
+            if not event_instance_id or not related_event_instance:
+                continue
+
+            try:
+                self.graph.run(
+                    query,
+                    parameters={
+                        "event_instance_id": event_instance_id,
+                        "related_event_instance": related_event_instance,
+                        "lid": tlink.attrib.get("lid", ""),
+                        "rel_type": tlink.attrib.get("relType", ""),
+                        "signal_id": tlink.attrib.get("signalID"),
+                        "doc_id": doc_id,
+                    },
+                )
+                linked += 1
+            except Exception:
+                logger.exception("Failed to link E2E TLINK: %s -> %s", event_instance_id, related_event_instance)
+
+        logger.info("create_tlinks_e2e: linked %d event-event TLINKs for doc_id=%s", linked, doc_id)
+        return f"linked {linked} E2E TLINKs"
+
+    def create_tlinks_e2t(self, doc_id):
+        """Build event-to-time links from TTK output over existing temporal nodes."""
+        logger.debug("create_tlinks_e2t for doc_id=%s", doc_id)
+        result_xml = self._get_ttk_xml(doc_id)
+        if not result_xml:
+            logger.warning("No TTK XML returned for E2T link extraction")
+            return ""
+
+        query = """
+            MATCH (e:TEvent {eiid: $event_instance_id, doc_id: toInteger($doc_id)})
+            MATCH (t:TIMEX {tid: $related_to_time, doc_id: toInteger($doc_id)})
+            MERGE (e)-[tl:TLINK {id: $lid, relType: $rel_type}]->(t)
+            SET tl.signalID = $signal_id
+        """
+
+        linked = 0
+        for tlink in self._iter_tlink_elements(result_xml):
+            event_instance_id = tlink.attrib.get("eventInstanceID")
+            related_to_time = tlink.attrib.get("relatedToTime")
+            if not event_instance_id or not related_to_time:
+                continue
+
+            try:
+                self.graph.run(
+                    query,
+                    parameters={
+                        "event_instance_id": event_instance_id,
+                        "related_to_time": related_to_time,
+                        "lid": tlink.attrib.get("lid", ""),
+                        "rel_type": tlink.attrib.get("relType", ""),
+                        "signal_id": tlink.attrib.get("signalID"),
+                        "doc_id": doc_id,
+                    },
+                )
+                linked += 1
+            except Exception:
+                logger.exception("Failed to link E2T TLINK: %s -> %s", event_instance_id, related_to_time)
+
+        logger.info("create_tlinks_e2t: linked %d event-time TLINKs for doc_id=%s", linked, doc_id)
+        return f"linked {linked} E2T TLINKs"
+
+    def create_tlinks_t2t(self, doc_id):
+        """Build time-to-time links from TTK output over existing temporal nodes."""
+        logger.debug("create_tlinks_t2t for doc_id=%s", doc_id)
+        result_xml = self._get_ttk_xml(doc_id)
+        if not result_xml:
+            logger.warning("No TTK XML returned for T2T link extraction")
+            return ""
+
+        query = """
+            MATCH (t1:TIMEX {tid: $time_id, doc_id: toInteger($doc_id)})
+            MATCH (t2:TIMEX {tid: $related_to_time, doc_id: toInteger($doc_id)})
+            MERGE (t1)-[tl:TLINK {id: $lid, relType: $rel_type}]->(t2)
+            SET tl.signalID = $signal_id
+        """
+
+        linked = 0
+        for tlink in self._iter_tlink_elements(result_xml):
+            related_to_time = tlink.attrib.get("relatedToTime")
+            time_id = tlink.attrib.get("timeID")
+            if not related_to_time or not time_id:
+                continue
+
+            try:
+                self.graph.run(
+                    query,
+                    parameters={
+                        "time_id": time_id,
+                        "related_to_time": related_to_time,
+                        "lid": tlink.attrib.get("lid", ""),
+                        "rel_type": tlink.attrib.get("relType", ""),
+                        "signal_id": tlink.attrib.get("signalID"),
+                        "doc_id": doc_id,
+                    },
+                )
+                linked += 1
+            except Exception:
+                logger.exception("Failed to link T2T TLINK: %s -> %s", time_id, related_to_time)
+
+        logger.info("create_tlinks_t2t: linked %d time-time TLINKs for doc_id=%s", linked, doc_id)
+        return f"linked {linked} T2T TLINKs"
+
 
 if __name__ == '__main__':
     import time as _time
     tp = TlinksRecognizer(sys.argv[1:])
     _phase_start = _time.time()
+    if len(sys.argv) > 1:
+        doc_id = sys.argv[1]
+        tp.create_tlinks_e2e(doc_id)
+        tp.create_tlinks_e2t(doc_id)
+        tp.create_tlinks_t2t(doc_id)
+
     tp.create_tlinks_case1()
     tp.create_tlinks_case2()
     tp.create_tlinks_case3()
@@ -312,7 +569,9 @@ if __name__ == '__main__':
     tp.create_tlinks_case6()
     tp.create_tlinks_case7()
     tp.normalize_tlink_reltypes()
+    tp.apply_tlink_transitive_closure()
     tp.suppress_tlink_conflicts()
+    tp.endpoint_contract_violations()
     _phase_duration = _time.time() - _phase_start
 
     # Record a PhaseRun marker for restart visibility (Item 7)
@@ -323,7 +582,7 @@ if __name__ == '__main__':
             phase_name="tlinks",
             duration_seconds=_phase_duration,
             metadata={
-                "passes": "case1,case2,case3,case4,case5,case6"
+                    "passes": "e2e,e2t,t2t,case1,case2,case3,case4,case5,case6"
             },
         )
     except Exception:

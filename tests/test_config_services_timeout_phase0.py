@@ -33,3 +33,14 @@ def test_runtime_tlink_shadow_mode_env_override(monkeypatch):
     loaded = cfg.load_config(path=None, allow_env=True)
 
     assert loaded.runtime.tlink_shadow_mode is True
+
+
+@pytest.mark.unit
+def test_runtime_cross_document_fusion_env_override(monkeypatch):
+    import textgraphx.config as cfg
+
+    monkeypatch.setenv("TEXTGRAPHX_ENABLE_CROSS_DOCUMENT_FUSION", "true")
+    cfg._CACHED = None
+    loaded = cfg.load_config(path=None, allow_env=True)
+
+    assert loaded.runtime.enable_cross_document_fusion is True

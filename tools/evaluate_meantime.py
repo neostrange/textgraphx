@@ -113,6 +113,12 @@ def _build_parser() -> argparse.ArgumentParser:
             "Applies only to nominal entity mentions and leaves non-nominal entities unchanged."
         ),
     )
+    parser.add_argument(
+        "--projection-determinism-runs",
+        type=int,
+        default=2,
+        help="Number of repeated projection runs for determinism checks (Neo4j prediction mode only).",
+    )
     return parser
 
 
@@ -229,6 +235,7 @@ def _evaluate_batch(args: argparse.Namespace, mapping: EvaluationMapping) -> dic
 
     reports = []
     skipped_prediction_files: list[str] = []
+    projection_determinism_by_doc: dict[str, dict] = {}
     graph = None
     if args.pred_neo4j:
         from textgraphx.neo4j_client import make_graph_from_config
@@ -253,6 +260,17 @@ def _evaluate_batch(args: argparse.Namespace, mapping: EvaluationMapping) -> dic
                     gold_like_nominal_filter=getattr(args, "gold_like_nominal_filter", False),
                     nominal_profile_mode=getattr(args, "nominal_profile_mode", "all"),
                 )
+                if hasattr(graph, "run"):
+                    projection_determinism_by_doc[str(gold_doc.doc_id)] = check_projection_determinism(
+                        graph=graph,
+                        doc_id=gold_doc.doc_id,
+                        runs=int(getattr(args, "projection_determinism_runs", 2)),
+                        gold_token_sequence=gold_doc.token_sequence,
+                        discourse_only=getattr(args, "discourse_only", False),
+                        normalize_nominal_boundaries=getattr(args, "normalize_nominal_boundaries", True),
+                        gold_like_nominal_filter=getattr(args, "gold_like_nominal_filter", False),
+                        nominal_profile_mode=getattr(args, "nominal_profile_mode", "all"),
+                    )
 
             reports.append(
                 evaluate_documents(
@@ -275,7 +293,26 @@ def _evaluate_batch(args: argparse.Namespace, mapping: EvaluationMapping) -> dic
         f1_threshold=float(args.f1_threshold),
     )
     scorecards = build_dual_scorecards_from_aggregate(aggregate)
-    return {
+    projection_determinism = None
+    if projection_determinism_by_doc:
+        stable_documents = 0
+        for v in projection_determinism_by_doc.values():
+            # Support both batch-local key ('stable') and evaluator key ('deterministic').
+            stable_flag = v.get("stable")
+            if stable_flag is None:
+                stable_flag = v.get("deterministic", False)
+            if bool(stable_flag):
+                stable_documents += 1
+        documents_checked = len(projection_determinism_by_doc)
+        projection_determinism = {
+            "runs": int(getattr(args, "projection_determinism_runs", 2)),
+            "documents_checked": documents_checked,
+            "stable_documents": stable_documents,
+            "unstable_documents": documents_checked - stable_documents,
+            "all_stable": stable_documents == documents_checked,
+            "by_doc": projection_determinism_by_doc,
+        }
+    output = {
         "mode": "batch",
         "documents_evaluated": len(reports),
         "skipped_prediction_files": skipped_prediction_files,
@@ -291,6 +328,9 @@ def _evaluate_batch(args: argparse.Namespace, mapping: EvaluationMapping) -> dic
         "diagnostics": diagnostics,
         "reports": reports,
     }
+    if projection_determinism is not None:
+        output["projection_determinism"] = projection_determinism
+    return output
 
 
 def main() -> int:
