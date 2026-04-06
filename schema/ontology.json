@@ -390,7 +390,8 @@
       "0013_add_event_mention_property_indexes.cypher",
       "0014_formalize_signal_and_introduce_csignal.cypher",
       "0015_formalize_has_participant_with_semantic_role_governance.cypher",
-      "0016_formalize_value_nodes_with_type_classification.cypher"
+      "0016_formalize_value_nodes_with_type_classification.cypher",
+      "0017_backfill_has_lemma_edges.cypher"
     ]
   },
   "legacy_layer_policy": {
@@ -429,6 +430,8 @@
     {"name": "Signal_nodes", "query": "MATCH (n:Signal) RETURN count(n) AS cnt"},
     {"name": "CLINK_rels", "query": "MATCH ()-[r:CLINK]->() RETURN count(r) AS cnt"},
     {"name": "SLINK_rels", "query": "MATCH ()-[r:SLINK]->() RETURN count(r) AS cnt"},
+    {"name": "Legacy_Tag_REFERS_TO_rels", "query": "MATCH (:TagOccurrence)-[r:REFERS_TO]->(:Tag) RETURN count(r) AS cnt"},
+    {"name": "HAS_LEMMA_rels", "query": "MATCH (:TagOccurrence)-[r:HAS_LEMMA]->(:Tag) RETURN count(r) AS cnt"},
     {"name": "TIMEX_missing_start_tok", "query": "MATCH (n:TIMEX) WHERE n.start_tok IS NULL RETURN count(n) AS cnt"},
     {"name": "Signal_missing_start_tok", "query": "MATCH (n:Signal) WHERE n.start_tok IS NULL RETURN count(n) AS cnt"},
     {"name": "TEvent_missing_start_tok", "query": "MATCH (n:TEvent) WHERE n.start_tok IS NULL RETURN count(n) AS cnt"}

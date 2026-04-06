@@ -19,10 +19,27 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
-ONTOLOGY_JSON = ROOT / "textgraphx" / "schema" / "ontology.json"
-MIGRATIONS_DIR = ROOT / "textgraphx" / "schema" / "migrations"
-TEXT_PROCESSOR_SRC = ROOT / "textgraphx" / "TextProcessor.py"
+def _resolve_repo_root() -> Path:
+    """Resolve repository root for both workspace layouts.
+
+    Supports running tests from either:
+    - <workspace>/textgraphx/tests
+    - <workspace>/tests (with package under <workspace>/textgraphx)
+    """
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        if (parent / "schema" / "ontology.json").exists() and (parent / "TextProcessor.py").exists():
+            return parent
+        nested = parent / "textgraphx"
+        if (nested / "schema" / "ontology.json").exists() and (nested / "TextProcessor.py").exists():
+            return nested
+    raise RuntimeError("Could not resolve repository root containing schema/ontology.json")
+
+
+ROOT = _resolve_repo_root()
+ONTOLOGY_JSON = ROOT / "schema" / "ontology.json"
+MIGRATIONS_DIR = ROOT / "schema" / "migrations"
+TEXT_PROCESSOR_SRC = ROOT / "TextProcessor.py"
 
 
 def _payload() -> dict:
@@ -144,11 +161,11 @@ class TestMigrationManifest:
             "ontology.json must have a 'migration_manifest' section listing expected migration files"
         )
 
-    def test_migration_manifest_covers_all_eight_files(self):
+    def test_migration_manifest_covers_all_migration_files(self):
         manifest = _payload().get("migration_manifest", {})
         files = manifest.get("files", [])
-        assert len(files) == 16, (
-            f"migration_manifest.files must list exactly 16 migration files; found {len(files)}"
+        assert len(files) == 17, (
+            f"migration_manifest.files must list exactly 17 migration files; found {len(files)}"
         )
 
     def test_migration_manifest_files_are_ordered(self):
@@ -164,10 +181,10 @@ class TestMigrationManifest:
             "migration_manifest.files must start with the 0001 constraint migration"
         )
 
-    def test_migration_manifest_ends_at_0008(self):
+    def test_migration_manifest_ends_at_latest(self):
         files = _payload().get("migration_manifest", {}).get("files", [])
-        assert files and files[-1].startswith("0016"), (
-            "migration_manifest.files must end with the 0016 value node formalization migration"
+        assert files and files[-1].startswith("0017"), (
+            "migration_manifest.files must end with the 0017 HAS_LEMMA backfill migration"
         )
 
 
@@ -182,10 +199,10 @@ class TestMigrationFiles:
     def _files(self) -> list[Path]:
         return sorted(MIGRATIONS_DIR.glob("*.cypher"))
 
-    def test_eight_migration_files_exist(self):
+    def test_all_migration_files_exist(self):
         files = self._files()
-        assert len(files) == 16, (
-            f"Expected 16 .cypher migration files; found {len(files)}: {[f.name for f in files]}"
+        assert len(files) == 17, (
+            f"Expected 17 .cypher migration files; found {len(files)}: {[f.name for f in files]}"
         )
 
     def test_migration_files_are_non_empty(self):
@@ -224,6 +241,7 @@ class TestMigrationFiles:
             "0003_normalize_temporal_doc_id.cypher",
             "0005_backfill_canonical_span_fields.cypher",
             "0008_backfill_canonical_event_edges.cypher",
+            "0017_backfill_has_lemma_edges.cypher",
         ]:
             content = (MIGRATIONS_DIR / name).read_text(encoding="utf-8").upper()
             assert "MERGE" in content or "SET" in content, (
