@@ -183,7 +183,7 @@ def parse_meantime_xml(xml_path: str) -> NormalizedDocument:
         return doc
 
     for rel in relations:
-        if rel.tag not in {"TLINK", "GLINK", "HAS_PARTICIPANT"}:
+        if rel.tag not in {"TLINK", "GLINK", "CLINK", "SLINK", "HAS_PARTICIPANT"}:
             continue
 
         sources = [s.get("m_id") for s in rel.findall("source") if s.get("m_id")]
@@ -196,6 +196,10 @@ def parse_meantime_xml(xml_path: str) -> NormalizedDocument:
             relation_attrs = _attrs_from_element(rel, ("reltype",))
         elif rel.tag == "GLINK":
             relation_attrs = _attrs_from_element(rel, ("reltype",))
+        elif rel.tag == "CLINK":
+            relation_attrs = _attrs_from_element(rel, ("reltype", "source"))
+        elif rel.tag == "SLINK":
+            relation_attrs = _attrs_from_element(rel, ("reltype", "source"))
         elif rel.tag == "HAS_PARTICIPANT":
             relation_attrs = _attrs_from_element(rel, ("sem_role",))
 
@@ -549,6 +553,57 @@ def build_document_from_neo4j(
                 target_kind=tgt_kind,
                 target_span=tgt_span,
                 attrs=(('reltype', str(row.get('reltype') or '')),),
+            )
+        )
+
+    clink_slink_rows = graph.run(
+        """
+            MATCH (a)-[r:CLINK|SLINK]->(b)
+                WHERE (a.doc_id = $doc_id OR EXISTS {
+                                 MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN]->(a)
+                            })
+                    AND (b.doc_id = $doc_id OR EXISTS {
+                                 MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN]->(b)
+                            })
+                    AND a.start_tok IS NOT NULL AND a.end_tok IS NOT NULL
+          AND b.start_tok IS NOT NULL AND b.end_tok IS NOT NULL
+        RETURN type(r) AS rel_kind,
+               labels(a) AS source_labels,
+               a.start_tok AS a_start, a.end_tok AS a_end,
+               labels(b) AS target_labels,
+               b.start_tok AS b_start, b.end_tok AS b_end,
+               coalesce(r.relType, '') AS reltype,
+               coalesce(r.source, '') AS source
+        """,
+        {"doc_id": doc_id_int},
+    ).data()
+    for row in clink_slink_rows:
+        src_kind = _node_kind_from_labels(row.get("source_labels", []))
+        tgt_kind = _node_kind_from_labels(row.get("target_labels", []))
+        if src_kind is None or tgt_kind is None:
+            continue
+        src_span = _span_from_bounds(int(row["a_start"]), int(row["a_end"]), token_index_alignment)
+        tgt_span = _span_from_bounds(int(row["b_start"]), int(row["b_end"]), token_index_alignment)
+        if src_kind == "event":
+            src_span = _align_relation_event_span(src_span, doc.event_mentions)
+        if tgt_kind == "event":
+            tgt_span = _align_relation_event_span(tgt_span, doc.event_mentions)
+        rel_kind = str(row.get("rel_kind") or "").strip().lower()
+        attrs = []
+        reltype = str(row.get("reltype") or "").strip()
+        source = str(row.get("source") or "").strip()
+        if reltype:
+            attrs.append(("reltype", reltype))
+        if source:
+            attrs.append(("source", source))
+        doc.relations.add(
+            Relation(
+                kind=rel_kind,
+                source_kind=src_kind,
+                source_span=src_span,
+                target_kind=tgt_kind,
+                target_span=tgt_span,
+                attrs=tuple(attrs),
             )
         )
 

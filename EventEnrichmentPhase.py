@@ -518,7 +518,11 @@ class EventEnrichmentPhase():
                     MATCH (fa)<-[:PARTICIPATES_IN]-(t:TagOccurrence)-[:TRIGGERS]->(sub_event:TEvent)
                     WHERE main_event <> sub_event
                     MERGE (main_event)-[cl:CLINK]->(sub_event)
-                    SET cl.source = 'srl_argm_cau'
+                    SET cl.source = 'srl_argm_cau',
+                        cl.rule_id = 'derive_clinks_from_causal_arguments_v2',
+                        cl.source_kind = 'rule',
+                        cl.link_semantics = 'causal',
+                        cl.confidence_hint = 0.62
                     RETURN count(DISTINCT sub_event) AS linked
         """
         data = graph.run(query).data()
@@ -617,7 +621,14 @@ class EventEnrichmentPhase():
                                         SET sl.source = CASE
                                                 WHEN fa.type = 'ARGM-DSP' THEN 'srl_argm_dsp'
                                                 ELSE 'reported_speech_lexical'
-                                        END
+                                        END,
+                                            sl.rule_id = 'derive_slinks_from_reported_speech_v2',
+                                            sl.source_kind = 'rule',
+                                            sl.link_semantics = 'subordinating',
+                                            sl.confidence_hint = CASE
+                                                WHEN fa.type = 'ARGM-DSP' THEN 0.66
+                                                ELSE 0.58
+                                            END
                     RETURN count(DISTINCT sl) AS linked
         """
         data = graph.run(query).data()

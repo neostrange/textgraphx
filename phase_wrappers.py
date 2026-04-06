@@ -913,6 +913,24 @@ class EventEnrichmentPhaseWrapper:
                         source_kind="rule",
                         conflict_policy="additive",
                     )
+                    stamp_inferred_relationships(
+                        enricher.graph,
+                        rel_type="CLINK",
+                        confidence=0.62,
+                        evidence_source="event_enrichment",
+                        rule_id="derive_clinks_from_causal_arguments_v2",
+                        source_kind="rule",
+                        conflict_policy="additive",
+                    )
+                    stamp_inferred_relationships(
+                        enricher.graph,
+                        rel_type="SLINK",
+                        confidence=0.58,
+                        evidence_source="event_enrichment",
+                        rule_id="derive_slinks_from_reported_speech_v2",
+                        source_kind="rule",
+                        conflict_policy="additive",
+                    )
                     endpoint_violations = int(enricher.endpoint_contract_violations().get("total", 0))
                     assertion_result = PhaseAssertions(
                         enricher.graph,
