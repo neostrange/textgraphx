@@ -68,9 +68,12 @@ class PhaseThresholds:
     min_slink_rels: int = 0                  # SLINK relationships
     max_legacy_to_canonical_describes_ratio: float = inf
     max_legacy_to_canonical_participant_ratio: float = inf
+    max_event_participants_per_described_event: float = inf
+    max_frame_arguments_per_described_event: float = inf
 
     # --- tlinks ---
     min_tlink_rels: int = 0                  # TLINK relationships
+    max_tlink_rels: int = 10**9              # TLINK absolute upper bound (cost-model)
     max_tlink_consistency_violations: int = 10**9  # Contradictory unsuppressed TLINK pairs
     max_event_endpoint_contract_violations: int = 10**9
     max_tlink_endpoint_contract_violations: int = 10**9
@@ -415,9 +418,12 @@ class PhaseAssertions:
             canonical_describes,
             t.min_frame_describes_event_rels,
         )
+        has_frame_arguments = self._count(
+            "MATCH ()-[r:HAS_FRAME_ARGUMENT]->() RETURN count(r) AS c"
+        )
         result.add_check(
             "HAS_FRAME_ARGUMENT relationships",
-            self._count("MATCH ()-[r:HAS_FRAME_ARGUMENT]->() RETURN count(r) AS c"),
+            has_frame_arguments,
             t.min_has_frame_argument_rels,
         )
         result.add_check(
@@ -457,6 +463,28 @@ class PhaseAssertions:
             label="Legacy-to-canonical PARTICIPANT ratio",
             actual=participant_ratio,
             maximum=t.max_legacy_to_canonical_participant_ratio,
+        )
+        participants_per_event = (
+            (canonical_participant / canonical_describes)
+            if canonical_describes > 0
+            else (inf if canonical_participant > 0 else 0.0)
+        )
+        frame_args_per_event = (
+            (has_frame_arguments / canonical_describes)
+            if canonical_describes > 0
+            else (inf if has_frame_arguments > 0 else 0.0)
+        )
+        self._add_upper_bound_check(
+            result,
+            label="Cost-model: EVENT_PARTICIPANT per described event",
+            actual=participants_per_event,
+            maximum=t.max_event_participants_per_described_event,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="Cost-model: HAS_FRAME_ARGUMENT per described event",
+            actual=frame_args_per_event,
+            maximum=t.max_frame_arguments_per_described_event,
         )
         if legacy_describes > canonical_describes:
             logger.warning(
@@ -524,6 +552,18 @@ class PhaseAssertions:
             actual=count_endpoint_violations(self._graph, "REFERS_TO"),
             maximum=t.max_event_endpoint_contract_violations,
         )
+        self._add_upper_bound_check(
+            result,
+            label="Endpoint contract violations (MODIFIES)",
+            actual=count_endpoint_violations(self._graph, "MODIFIES"),
+            maximum=t.max_event_endpoint_contract_violations,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="Endpoint contract violations (AFFECTS)",
+            actual=count_endpoint_violations(self._graph, "AFFECTS"),
+            maximum=t.max_event_endpoint_contract_violations,
+        )
         if self._enforce_provenance_contracts:
             self._add_provenance_contract_check(
                 result,
@@ -545,6 +585,16 @@ class PhaseAssertions:
                 rel_type="EVENT_PARTICIPANT",
                 label="EVENT_PARTICIPANT relationships missing provenance contract fields",
             )
+            self._add_provenance_contract_check(
+                result,
+                rel_type="MODIFIES",
+                label="MODIFIES relationships missing provenance contract fields",
+            )
+            self._add_provenance_contract_check(
+                result,
+                rel_type="AFFECTS",
+                label="AFFECTS relationships missing provenance contract fields",
+            )
 
         return self._finalize(result)
 
@@ -557,6 +607,12 @@ class PhaseAssertions:
             "TLINK relationships",
             self._count("MATCH ()-[r:TLINK]->() RETURN count(r) AS c"),
             t.min_tlink_rels,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="Cost-model: TLINK relationships upper bound",
+            actual=result.checks[-1]["actual"],
+            maximum=t.max_tlink_rels,
         )
         self._add_upper_bound_check(
             result,

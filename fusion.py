@@ -103,3 +103,67 @@ def fuse_entities_cross_document(
         },
     ).data()
     return int(rows[0].get("c", 0)) if rows else 0
+
+
+def propagate_coreference_identity_cross_document(
+        graph,
+        confidence: float = 0.72,
+        evidence_source: str = "refinement_phase",
+        rule_id: str = "cross_document_coref_identity_v1",
+        require_type_compatibility: bool = True,
+        min_key_length: int = 3,
+) -> int:
+        """Create `SAME_AS` links across documents using coref-derived identity keys.
+
+        This pass complements `kb_id`-based fusion by using normalized mention
+        heads/surface forms from coreference artifacts where a stable external id is
+        unavailable. It is intentionally conservative and only links entities across
+        distinct documents.
+        """
+        _validate_confidence(confidence)
+
+        query = """
+        MATCH (d1:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)
+                    -[:PARTICIPATES_IN]->(m1)-[:REFERS_TO]->(e1:Entity)
+        MATCH (d2:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)
+                    -[:PARTICIPATES_IN]->(m2)-[:REFERS_TO]->(e2:Entity)
+        WHERE d1.id <> d2.id
+            AND e1 <> e2
+            AND id(e1) < id(e2)
+            AND (m1:NamedEntity OR m1:CorefMention OR m1:Antecedent)
+            AND (m2:NamedEntity OR m2:CorefMention OR m2:Antecedent)
+        WITH e1, e2,
+                 toLower(trim(coalesce(m1.head, m1.normal_term, m1.value, m1.text, ''))) AS k1,
+                 toLower(trim(coalesce(m2.head, m2.normal_term, m2.value, m2.text, ''))) AS k2
+        WHERE k1 <> ''
+            AND k2 <> ''
+            AND k1 = k2
+            AND size(k1) >= $min_key_length
+            AND (coalesce(e1.kb_id, '') = '' OR coalesce(e2.kb_id, '') = '')
+            AND (
+                        $require_type_compatibility = false
+                        OR coalesce(e1.type, '') = ''
+                        OR coalesce(e2.type, '') = ''
+                        OR toUpper(coalesce(e1.type, '')) = toUpper(coalesce(e2.type, ''))
+                    )
+        MERGE (e1)-[r:SAME_AS]->(e2)
+        ON CREATE SET
+            r.confidence = $confidence,
+            r.evidence_source = $evidence_source,
+            r.rule_id = $rule_id,
+            r.identity_key = k1,
+            r.type_compatibility_required = $require_type_compatibility,
+            r.created_at = datetime()
+        RETURN count(r) AS c
+        """
+        rows = graph.run(
+                query,
+                {
+                        "confidence": confidence,
+                        "evidence_source": evidence_source,
+                        "rule_id": rule_id,
+                        "require_type_compatibility": bool(require_type_compatibility),
+                        "min_key_length": max(1, int(min_key_length)),
+                },
+        ).data()
+        return int(rows[0].get("c", 0)) if rows else 0
