@@ -47,10 +47,10 @@
     "NUMERIC": { "purpose": "Canonical numeric participant type, typically represented as a dynamic label on selected NamedEntity mentions", "key_properties": ["id", "value", "type"] },
     "VALUE": { "purpose": "Canonical value expression node/label used for quantified participants", "key_properties": ["id", "type", "value"] },
     "TIMEX": { "purpose": "Temporal expression", "key_properties": ["tid", "doc_id", "type", "value", "text"] },
-    "TEvent": { "purpose": "Temporal event", "key_properties": ["eiid", "doc_id", "begin", "end", "class", "tense"] },
+    "TEvent": { "purpose": "Temporal event", "key_properties": ["eiid", "doc_id", "begin", "end", "class", "tense", "factuality"] },
     "EventMention": {
       "purpose": "Mention-level event instantiation linked to canonical TEvent",
-      "key_properties": ["id", "doc_id", "pred", "tense", "aspect", "class", "start_tok", "end_tok", "start_char", "end_char"]
+      "key_properties": ["id", "doc_id", "pred", "tense", "aspect", "class", "factuality", "start_tok", "end_tok", "start_char", "end_char"]
     },
     "Evidence": { "purpose": "Provenance/evidence node for relation extraction", "key_properties": ["id", "type"] },
     "Relationship": { "purpose": "High-level relation node between Entities", "key_properties": ["id", "type"] }
@@ -311,6 +311,7 @@
     "aspect": ["NONE", "PROGRESSIVE", "PERFECTIVE", "PERFECTIVE_PROGRESSIVE"],
     "polarity": ["POS", "NEG"],
     "certainty": ["CERTAIN", "PROBABLE", "POSSIBLE", "UNCERTAIN"],
+    "factuality": ["ASSERTED", "REPORTED", "HYPOTHETICAL", "NEGATED", "COUNTERFACTUAL"],
     "modality_defaults": ["NONE", "MUST", "MAY", "MIGHT", "SHOULD", "WOULD", "COULD", "CAN", "WILL", "SHALL"],
     "normalization_policy": "uppercase_enforced"
   },

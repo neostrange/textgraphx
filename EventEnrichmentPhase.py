@@ -69,6 +69,7 @@ class EventEnrichmentPhase():
             "aspect": ("temporal_phase", 0.90),
             "polarity": ("temporal_phase", 0.90),
             "time": ("temporal_phase", 0.90),
+            "factuality": ("event_enrichment", 0.70),
         }
         return defaults.get(field_name, ("temporal_phase", 0.90))
 
@@ -79,7 +80,7 @@ class EventEnrichmentPhase():
         are preferred over secondary mention-level backfills. Conflicting
         values are retained as explicit conflict metadata for auditability.
         """
-        if field_name not in {"certainty", "aspect", "polarity", "time"}:
+        if field_name not in {"certainty", "aspect", "polarity", "time", "factuality"}:
             raise ValueError("Unsupported TEvent field for conflict resolution")
 
         default_existing_source, default_existing_conf = self._tevent_field_defaults(field_name)
@@ -834,11 +835,45 @@ class EventEnrichmentPhase():
         rows = graph.run(query_polarity).data()
         polarity_count = rows[0].get("polarity_formalized", 0) if rows else 0
 
+        # Derive event factuality from negation/modality/attribution cues.
+        # This is additive and intentionally conservative.
+        query_factuality = """
+        MATCH (em:EventMention)
+        OPTIONAL MATCH (f:Frame)-[:INSTANTIATES]->(em)
+        OPTIONAL MATCH (f)<-[:PARTICIPANT|HAS_FRAME_ARGUMENT]-(fa_neg:FrameArgument {type: 'ARGM-NEG'})
+        OPTIONAL MATCH (f)<-[:PARTICIPANT|HAS_FRAME_ARGUMENT]-(fa_dsp:FrameArgument {type: 'ARGM-DSP'})
+        WITH em,
+             count(DISTINCT fa_neg) AS neg_count,
+             count(DISTINCT fa_dsp) AS dsp_count,
+             toUpper(coalesce(em.certainty, '')) AS certainty,
+             toUpper(coalesce(em.polarity, '')) AS polarity,
+             toUpper(coalesce(em.time, '')) AS time_cls,
+             toUpper(coalesce(em.scopeType, '')) AS scope_type,
+             toUpper(coalesce(em.special_cases, '')) AS special_case
+        SET em.factuality = CASE
+            WHEN polarity = 'NEG' OR neg_count > 0 THEN 'NEGATED'
+            WHEN scope_type = 'REPORTED_SCOPE' OR special_case = 'REPORTED_SPEECH' OR dsp_count > 0 THEN 'REPORTED'
+            WHEN certainty IN ['POSSIBLE', 'PROBABLE', 'UNCERTAIN'] OR time_cls = 'FUTURE' THEN 'HYPOTHETICAL'
+            ELSE 'ASSERTED'
+        END,
+            em.factualitySource = 'event_enrichment',
+            em.factualityConfidence = CASE
+                WHEN polarity = 'NEG' OR neg_count > 0 THEN 0.80
+                WHEN scope_type = 'REPORTED_SCOPE' OR special_case = 'REPORTED_SPEECH' OR dsp_count > 0 THEN 0.74
+                WHEN certainty IN ['POSSIBLE', 'PROBABLE', 'UNCERTAIN'] OR time_cls = 'FUTURE' THEN 0.68
+                ELSE 0.70
+            END
+        RETURN count(*) AS factuality_enriched
+        """
+        rows = graph.run(query_factuality).data()
+        factuality_count = rows[0].get("factuality_enriched", 0) if rows else 0
+
         # Authority-aware sync for canonical event attributes.
         self._resolve_tevent_field_conflicts("certainty", incoming_source="event_enrichment", incoming_confidence=0.70)
         self._resolve_tevent_field_conflicts("aspect", incoming_source="event_enrichment", incoming_confidence=0.65)
         self._resolve_tevent_field_conflicts("polarity", incoming_source="event_enrichment", incoming_confidence=0.65)
         self._resolve_tevent_field_conflicts("time", incoming_source="event_enrichment", incoming_confidence=0.70)
+        self._resolve_tevent_field_conflicts("factuality", incoming_source="event_enrichment", incoming_confidence=0.70)
 
         # Normalize mention-level event vocabulary to ontology contract.
         self.normalize_eventmention_vocabulary()
@@ -902,11 +937,26 @@ class EventEnrichmentPhase():
         graph.run(query_doc_id).data()
         
         # Log enrichment summary
-        total = certainty_count + time_count + special_count + aspect_count + polarity_count + clause_scope_count
+        total = (
+            certainty_count
+            + time_count
+            + special_count
+            + aspect_count
+            + polarity_count
+            + clause_scope_count
+            + factuality_count
+        )
         logger.info(
             "enrich_event_mention_properties: enriched %d event mentions "
-            "(certainty=%d, time=%d, special_cases=%d, aspect=%d, polarity=%d, clause_scope=%d)",
-            total, certainty_count, time_count, special_count, aspect_count, polarity_count, clause_scope_count
+            "(certainty=%d, time=%d, special_cases=%d, aspect=%d, polarity=%d, clause_scope=%d, factuality=%d)",
+            total,
+            certainty_count,
+            time_count,
+            special_count,
+            aspect_count,
+            polarity_count,
+            clause_scope_count,
+            factuality_count,
         )
 
         # Log endpoint contract status for runtime observability.

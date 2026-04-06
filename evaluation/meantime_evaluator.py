@@ -155,7 +155,7 @@ def parse_meantime_xml(xml_path: str) -> NormalizedDocument:
                 span=span,
                 attrs=_attrs_from_element(
                     el,
-                    ("pos", "tense", "aspect", "certainty", "polarity", "time", "pred", "external_ref"),
+                    ("pos", "tense", "aspect", "certainty", "polarity", "time", "factuality", "pred", "external_ref"),
                 ),
             )
             doc.event_mentions.add(mention)
@@ -357,7 +357,7 @@ def build_document_from_neo4j(
              RETURN DISTINCT m.start_tok AS start_tok, m.end_tok AS end_tok,
                  m.pos AS pos, m.tense AS tense, m.aspect AS aspect,
                  m.certainty AS certainty, m.polarity AS polarity,
-                 m.time AS time, m.pred AS pred,
+                 m.time AS time, m.factuality AS factuality, m.pred AS pred,
                  coalesce(m.external_ref, m.externalRef) AS external_ref,
                  2 AS source_priority
              UNION
@@ -379,7 +379,7 @@ def build_document_from_neo4j(
                  coalesce(m.end_tok, trig_end) AS end_tok,
                  m.pos AS pos, m.tense AS tense, m.aspect AS aspect,
                  m.certainty AS certainty, m.polarity AS polarity,
-                 m.time AS time, pred AS pred,
+                 m.time AS time, m.factuality AS factuality, pred AS pred,
                  coalesce(m.external_ref, m.externalRef, m.eid, m.eiid) AS external_ref,
                  1 AS source_priority
                          UNION
@@ -400,13 +400,14 @@ def build_document_from_neo4j(
                                  '' AS certainty,
                                  '' AS polarity,
                                  '' AS time,
+                                 '' AS factuality,
                                  f.headword AS pred,
                                  '' AS external_ref,
                                  0 AS source_priority
          }
-         WITH start_tok, end_tok, pos, tense, aspect, certainty, polarity, time, pred, external_ref, source_priority
+         WITH start_tok, end_tok, pos, tense, aspect, certainty, polarity, time, factuality, pred, external_ref, source_priority
          WHERE start_tok IS NOT NULL AND end_tok IS NOT NULL
-         RETURN DISTINCT start_tok, end_tok, pos, tense, aspect, certainty, polarity, time, pred, external_ref, source_priority
+         RETURN DISTINCT start_tok, end_tok, pos, tense, aspect, certainty, polarity, time, factuality, pred, external_ref, source_priority
          ORDER BY start_tok, end_tok, source_priority DESC
         """,
         {"doc_id": doc_id_int},
@@ -753,6 +754,7 @@ def _canonicalize_event_attrs(row: Dict[str, Any]) -> Tuple[Tuple[str, str], ...
     certainty = str(row.get("certainty") or "").strip().upper() or "CERTAIN"
     polarity = str(row.get("polarity") or "").strip().upper() or "POS"
     time = str(row.get("time") or "").strip().upper() or "NON_FUTURE"
+    factuality = str(row.get("factuality") or "").strip().upper()
     pred = str(row.get("pred") or "").strip().lower()
     external_ref = str(row.get("external_ref") or row.get("externalRef") or "").strip()
 
@@ -788,6 +790,8 @@ def _canonicalize_event_attrs(row: Dict[str, Any]) -> Tuple[Tuple[str, str], ...
     attrs_map["certainty"] = certainty
     attrs_map["polarity"] = polarity
     attrs_map["time"] = time
+    if factuality:
+        attrs_map["factuality"] = factuality
     return tuple(sorted(attrs_map.items()))
 
 

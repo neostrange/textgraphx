@@ -161,3 +161,21 @@ def test_canonicalize_event_attrs_keeps_external_ref_when_present():
         )
     )
     assert attrs["external_ref"] == "ev:123"
+
+
+def test_canonicalize_event_attrs_keeps_factuality_when_present():
+    attrs = dict(
+        _canonicalize_event_attrs(
+            {
+                "pos": "VB",
+                "tense": "PAST",
+                "certainty": "CERTAIN",
+                "polarity": "POS",
+                "time": "NON_FUTURE",
+                "factuality": "REPORTED",
+                "pred": "say",
+            }
+        )
+    )
+
+    assert attrs["factuality"] == "REPORTED"

@@ -140,6 +140,7 @@ nodes:
     - end
     - class
     - tense
+    - factuality
   EventMention:
     purpose: Mention-level event instantiation linked to canonical TEvent
     key_properties:
@@ -149,6 +150,7 @@ nodes:
     - tense
     - aspect
     - class
+    - factuality
     - start_tok
     - end_tok
     - start_char
