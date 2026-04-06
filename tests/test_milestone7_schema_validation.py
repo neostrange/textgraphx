@@ -97,6 +97,38 @@ class TestSchemaInvariants:
         missing = expected - mappings
         assert not missing, f"argument_type_vocabulary missing ARGM codes: {sorted(missing)}"
 
+    def test_has_lemma_is_canonical_and_refers_to_no_longer_covers_tag_edges(self):
+        payload = _payload()
+        canonical_rels = set(payload["schema_tiers"]["canonical"]["relationship_types"])
+        assert "HAS_LEMMA" in canonical_rels, (
+            "HAS_LEMMA must be listed in schema_tiers.canonical.relationship_types"
+        )
+
+        refers_pairs = {
+            tuple(pair)
+            for pair in payload["relation_endpoint_contract"]["REFERS_TO"]["allowed_pairs"]
+        }
+        has_lemma_pairs = {
+            tuple(pair)
+            for pair in payload["relation_endpoint_contract"]["HAS_LEMMA"]["allowed_pairs"]
+        }
+        assert ("TagOccurrence", "Tag") not in refers_pairs, (
+            "TagOccurrence->Tag must not remain in REFERS_TO endpoint contract"
+        )
+        assert ("TagOccurrence", "Tag") in has_lemma_pairs, (
+            "TagOccurrence->Tag must be governed by HAS_LEMMA endpoint contract"
+        )
+
+    def test_span_aliases_do_not_overlap_token_and_char_spaces(self):
+        aliases = _payload()["span_contract"]["legacy_aliases"]
+        token_aliases = set(aliases.get("start_tok", [])) | set(aliases.get("end_tok", []))
+        char_aliases = set(aliases.get("start_char", [])) | set(aliases.get("end_char", []))
+        overlap = token_aliases & char_aliases
+        assert not overlap, (
+            "span_contract.legacy_aliases must keep token and character aliases disjoint; "
+            f"overlap found: {sorted(overlap)}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Category 2 – Migration manifest (lock the migration sequence in ontology)

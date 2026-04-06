@@ -47,6 +47,7 @@ class PhaseThresholds:
     # --- refinement ---
     min_named_entities_with_head: int = 0     # NamedEntity nodes that have head assigned
     min_refers_to_rels: int = 0               # REFERS_TO relationships created
+    min_has_lemma_rels: int = 0               # HAS_LEMMA relationships created
     min_nominal_semantic_heads: int = 0       # EntityMention nominal semantic heads populated
 
     # --- temporal ---
@@ -282,6 +283,13 @@ class PhaseAssertions:
                 "MATCH ()-[r:REFERS_TO]->() RETURN count(r) AS c"
             ),
             t.min_refers_to_rels,
+        )
+        result.add_check(
+            "HAS_LEMMA relationships",
+            self._count(
+                "MATCH ()-[r:HAS_LEMMA]->() RETURN count(r) AS c"
+            ),
+            t.min_has_lemma_rels,
         )
         result.add_check(
             "EntityMention nodes with nominal semantic head",
