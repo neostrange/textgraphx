@@ -299,6 +299,12 @@ relation_endpoint_contract:
   AFFECTS:
     sources: [Entity, NUMERIC, FrameArgument]
     targets: [TEvent, EventMention]
+  CLINK:
+    sources: [TEvent]
+    targets: [TEvent]
+  SLINK:
+    sources: [TEvent]
+    targets: [TEvent]
 
 semantic_enrichment_properties:
   NamedEntity:
@@ -335,6 +341,10 @@ diagnostics:
   query: MATCH ()-[r:PARTICIPATES_IN]-() RETURN count(r) AS cnt
 - name: IS_RELATED_TO_rels
   query: MATCH ()-[r:IS_RELATED_TO]-() RETURN count(r) AS cnt
+- name: Legacy_Tag_REFERS_TO_rels
+  query: MATCH (:TagOccurrence)-[r:REFERS_TO]->(:Tag) RETURN count(r) AS cnt
+- name: HAS_LEMMA_rels
+  query: MATCH (:TagOccurrence)-[r:HAS_LEMMA]->(:Tag) RETURN count(r) AS cnt
 - name: Evidence_nodes
   query: MATCH (n:Evidence) RETURN count(n) AS cnt
 - name: Relationship_nodes

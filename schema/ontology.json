@@ -285,6 +285,16 @@
       "targets": ["TEvent", "EventMention"],
       "status": "canonical"
     },
+    "CLINK": {
+      "sources": ["TEvent"],
+      "targets": ["TEvent"],
+      "status": "canonical"
+    },
+    "SLINK": {
+      "sources": ["TEvent"],
+      "targets": ["TEvent"],
+      "status": "canonical"
+    },
     "TLINK": {
       "sources": ["TEvent", "TIMEX"],
       "targets": ["TEvent", "TIMEX"],

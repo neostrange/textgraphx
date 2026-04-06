@@ -76,6 +76,7 @@ class PhaseThresholds:
     min_tlink_rels: int = 0                  # TLINK relationships
     max_tlink_rels: int = 10**9              # TLINK absolute upper bound (cost-model)
     max_tlink_consistency_violations: int = 10**9  # Contradictory unsuppressed TLINK pairs
+    max_refinement_endpoint_contract_violations: int = 10**9
     max_event_endpoint_contract_violations: int = 10**9
     max_tlink_endpoint_contract_violations: int = 10**9
 
@@ -302,6 +303,18 @@ class PhaseAssertions:
                 """
             ),
             t.min_nominal_semantic_heads,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="Endpoint contract violations (REFERS_TO)",
+            actual=count_endpoint_violations(self._graph, "REFERS_TO"),
+            maximum=t.max_refinement_endpoint_contract_violations,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="Endpoint contract violations (HAS_LEMMA)",
+            actual=count_endpoint_violations(self._graph, "HAS_LEMMA"),
+            maximum=t.max_refinement_endpoint_contract_violations,
         )
 
         return self._finalize(result)
@@ -570,6 +583,18 @@ class PhaseAssertions:
             result,
             label="Endpoint contract violations (AFFECTS)",
             actual=count_endpoint_violations(self._graph, "AFFECTS"),
+            maximum=t.max_event_endpoint_contract_violations,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="Endpoint contract violations (CLINK)",
+            actual=count_endpoint_violations(self._graph, "CLINK"),
+            maximum=t.max_event_endpoint_contract_violations,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="Endpoint contract violations (SLINK)",
+            actual=count_endpoint_violations(self._graph, "SLINK"),
             maximum=t.max_event_endpoint_contract_violations,
         )
         if self._enforce_provenance_contracts:
