@@ -56,7 +56,7 @@ The ontology includes explicit machine-readable reasoning contracts that should 
 
 ### Relation endpoint contract
 
-`schema/ontology.json.relation_endpoint_contract` defines allowed source/target type pairs for high-impact relationships (`EVENT_PARTICIPANT`, `REFERS_TO`, `INSTANTIATES`, `TLINK`).
+`schema/ontology.json.relation_endpoint_contract` defines allowed source/target type pairs for high-impact relationships (`EVENT_PARTICIPANT`, `REFERS_TO`, `HAS_LEMMA`, `INSTANTIATES`, `TLINK`).
 
 Practical use:
 
@@ -129,6 +129,7 @@ Relationship types:
 - `PARTICIPATES_IN`
 - `HAS_FRAME_ARGUMENT`
 - `REFERS_TO`
+- `HAS_LEMMA`
 - `PARTICIPANT`
 - `EVENT_PARTICIPANT`
 - `TRIGGERS`
@@ -302,7 +303,7 @@ Several relationship types are overloaded across different subgraphs. The tables
 
 | Relationship | Endpoint pattern | Properties | Meaning |
 | --- | --- | --- | --- |
-| `REFERS_TO` | `TagOccurrence -> Tag` | none | Optional lemma grouping edge for non-stop tokens. |
+| `HAS_LEMMA` | `TagOccurrence -> Tag` | none | Optional lemma grouping edge for non-stop tokens. |
 | `REFERS_TO` | `EntityMention -> Entity` | none | Explicit mention-to-canonical link used by refinement-generated nominal mentions and by the maintained mention layer. |
 | `REFERS_TO` | `EventMention -> TEvent` | none | Mention-to-canonical event link created by `EventEnrichmentPhase.create_event_mentions()`. |
 | `REFERS_TO` | `NamedEntity -> Entity` | `type`: usually `evoke` | Canonical link from a surface mention to an entity abstraction. |

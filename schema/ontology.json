@@ -18,14 +18,14 @@
     "Tag": { "purpose": "Lemma grouping node", "key_properties": ["id"] },
     "NamedEntity": {
       "purpose": "NER mention (surface)",
-      "key_properties": ["id", "type", "value", "index", "end_index", "kb_id", "score", "normal_term", "head", "headTokenIndex"],
+      "key_properties": ["id", "type", "value", "index", "end_index", "kb_id", "score", "normal_term", "head", "headTokenIndex", "ent_class", "nominalSemanticHead", "wnLexname", "wn_supersense"],
       "id_convention": "<doc>_<start>_<end>_<type>"
     },
     "EntityMention": {
       "purpose": "Mention-level entity span abstraction",
       "key_properties": ["id", "doc_id", "value", "head", "headTokenIndex", "start_tok", "end_tok", "start_char", "end_char"]
     },
-    "Entity": { "purpose": "Canonical/disambiguated entity", "key_properties": ["id", "type", "kb_id"] },
+    "Entity": { "purpose": "Canonical/disambiguated entity", "key_properties": ["id", "type", "kb_id", "wnLexname", "wn_supersense"] },
     "Frame": {
       "purpose": "SRL predicate frame",
       "key_properties": ["id", "headword", "headTokenIndex", "text", "startIndex", "endIndex"],
@@ -59,7 +59,8 @@
     "CONTAINS_SENTENCE": "AnnotatedText -> Sentence",
     "HAS_TOKEN": "Sentence -> TagOccurrence",
     "HAS_NEXT": "TagOccurrence -> TagOccurrence (properties: sentence)",
-    "REFERS_TO": "Mention node -> Entity (or TagOccurrence -> Tag)",
+    "REFERS_TO": "Mention node -> canonical node (EntityMention/EventMention/NamedEntity/FrameArgument -> Entity|TEvent|NamedEntity|NUMERIC)",
+    "HAS_LEMMA": "TagOccurrence -> Tag",
     "PARTICIPATES_IN": "TagOccurrence -> (NamedEntity|Frame|FrameArgument|CorefMention|Antecedent|NounChunk)",
     "PARTICIPANT": "FrameArgument -> Frame (properties: type, prep?) [transitioning — see deprecated_relationships]",
     "IS_DEPENDENT": "TagOccurrence -> TagOccurrence (properties: type)",
@@ -110,6 +111,7 @@
         "IS_DEPENDENT",
         "PARTICIPATES_IN",
         "REFERS_TO",
+        "HAS_LEMMA",
         "PARTICIPANT",
         "TRIGGERS",
         "DESCRIBES",
@@ -200,24 +202,28 @@
     ],
     "legacy_aliases": {
       "start_tok": [
+        "start_tok",
         "startIndex",
-        "index",
-        "begin"
+        "headTokenIndex"
       ],
       "end_tok": [
-        "endIndex",
-        "end_index",
-        "end"
+        "end_tok",
+        "endIndex"
       ],
       "start_char": [
+        "start_char",
         "index",
-        "begin"
+        "begin",
+        "char_begin"
       ],
       "end_char": [
+        "end_char",
         "end_index",
-        "end"
+        "end",
+        "char_end"
       ]
-    }
+    },
+    "note": "legacy aliases are now disambiguated; do not reuse an alias across token and character spaces."
   },
   "deprecated_relationships": {
     "DESCRIBES": {
@@ -239,7 +245,12 @@
         ["NamedEntity", "Entity"],
         ["FrameArgument", "Entity"],
         ["FrameArgument", "NamedEntity"],
-        ["FrameArgument", "NUMERIC"],
+        ["FrameArgument", "NUMERIC"]
+      ],
+      "status": "canonical"
+    },
+    "HAS_LEMMA": {
+      "allowed_pairs": [
         ["TagOccurrence", "Tag"]
       ],
       "status": "canonical"
@@ -279,6 +290,11 @@
       "targets": ["TEvent", "TIMEX"],
       "status": "canonical"
     }
+  },
+  "semantic_enrichment_properties": {
+    "NamedEntity": ["nominalSemanticHead", "wnLexname", "wn_supersense", "ent_class"],
+    "Entity": ["wnLexname", "wn_supersense"],
+    "FrameArgument": ["wnLexname", "wn_supersense", "semanticHead"]
   },
   "event_attribute_vocabulary": {
     "tense": ["PAST", "PRESENT", "FUTURE", "NONE", "INFINITIVE", "PRESPART", "PASTPART"],

@@ -311,7 +311,8 @@ Primary relationships
 - TRIGGERS: TagOccurrence -> TIMEX|TEvent
 - DESCRIBES: Frame -> TEvent
 - TLINK: TEvent/TIMEX -> TEvent/TIMEX (temporal relations with `relType` / `id`)
-- REFERS_TO: NamedEntity -> Entity and also TagOccurrence -> Tag
+- REFERS_TO: mention-level canonical links (NamedEntity/EventMention/EntityMention/FrameArgument -> canonical targets)
+- HAS_LEMMA: TagOccurrence -> Tag
 - IS_RELATED_TO: NamedEntity -> NamedEntity (mention-level relation, properties `root`, `type`)
 - Evidence provenance edges: SOURCE / DESTINATION, and Relationship node attached with FROM / TO and HAS_EVIDENCE
 
@@ -491,7 +492,7 @@ License: See `textgraphx/LICENSE` (the project includes a license file)
 
             - Tokenization & TagOccurrence creation (spaCy pipeline)
                 - Creates/updates: `Sentence`, `TagOccurrence` nodes (token-level properties: text, lemma, pos, upos, tok_index_doc, tok_index_sent, index, is_stop, morphological features)
-                - Relationships: `AnnotatedText` -[:CONTAINS_SENTENCE]-> `Sentence`, `Sentence` -[:HAS_TOKEN]-> `TagOccurrence`, `TagOccurrence` -[:HAS_NEXT]-> `TagOccurrence`, `TagOccurrence` -[:REFERS_TO]-> `Tag` (lemma grouping)
+                - Relationships: `AnnotatedText` -[:CONTAINS_SENTENCE]-> `Sentence`, `Sentence` -[:HAS_TOKEN]-> `TagOccurrence`, `TagOccurrence` -[:HAS_NEXT]-> `TagOccurrence`, `TagOccurrence` -[:HAS_LEMMA]-> `Tag` (lemma grouping)
                 - Files: `textgraphx/text_processing_components/TagOccurrenceCreator.py`, `textgraphx/text_processing_components/TagOccurrenceQueryExecutor.py`
                 - Notes: provides the token indices (`tok_index_doc`) that downstream phases use to MERGE PARTICIPATES_IN links deterministically.
 
