@@ -72,6 +72,8 @@
     "INSTANTIATES": "Frame -> EventMention (canonical frame-to-mention event instantiation)",
     "HAS_FRAME_ARGUMENT": "FrameArgument -> Frame (canonical replacement for PARTICIPANT in this context)",
     "EVENT_PARTICIPANT": "Entity|NUMERIC|FrameArgument|VALUE -> TEvent|EventMention (canonical replacement for PARTICIPANT in participant context)",
+    "MODIFIES": "FrameArgument -> TEvent|EventMention (non-core semantic modifier relation)",
+    "AFFECTS": "Entity|NUMERIC|VALUE|FrameArgument -> TEvent|EventMention (causal/influence relation)",
     "CLINK": "TEvent -> TEvent (properties: source)",
     "SLINK": "TEvent -> TEvent (properties: source)",
     "IS_RELATED_TO": "NamedEntity -> NamedEntity (properties: root, type)",
@@ -118,6 +120,8 @@
         "FRAME_DESCRIBES_EVENT",
         "HAS_FRAME_ARGUMENT",
         "EVENT_PARTICIPANT",
+        "MODIFIES",
+        "AFFECTS",
         "CLINK",
         "SLINK"
       ]
@@ -258,6 +262,16 @@
     "INSTANTIATES": {
       "sources": ["Frame"],
       "targets": ["EventMention"],
+      "status": "canonical"
+    },
+    "MODIFIES": {
+      "sources": ["FrameArgument"],
+      "targets": ["TEvent", "EventMention"],
+      "status": "canonical"
+    },
+    "AFFECTS": {
+      "sources": ["Entity", "NUMERIC", "VALUE", "FrameArgument"],
+      "targets": ["TEvent", "EventMention"],
       "status": "canonical"
     },
     "TLINK": {

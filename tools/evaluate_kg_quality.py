@@ -18,6 +18,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Directory containing dataset/gold files used for dataset hashing context.",
     )
     parser.add_argument(
+        "--max-docs",
+        type=int,
+        default=0,
+        help="Optional cap for number of dataset files (sorted) to evaluate; 0 means all files.",
+    )
+    parser.add_argument(
         "--output-dir",
         default="out/evaluation",
         help="Directory where reports will be written.",
@@ -73,11 +79,24 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _dataset_files(dataset_dir: Path) -> list[Path]:
+def _dataset_files(dataset_dir: Path, max_docs: int = 0) -> list[Path]:
     files: list[Path] = []
     for pattern in ("*.xml", "*.naf", "*.txt"):
         files.extend(sorted(dataset_dir.glob(pattern)))
-    return sorted(set(files))
+    selected = sorted(set(files))
+    if max_docs and max_docs > 0:
+        return selected[: max(1, int(max_docs))]
+    return selected
+
+
+def _quality_tier(overall_quality: float) -> str:
+    if overall_quality >= 0.90:
+        return "PRODUCTION_READY"
+    if overall_quality >= 0.80:
+        return "ACCEPTABLE"
+    if overall_quality >= 0.70:
+        return "NEEDS_WORK"
+    return "RESEARCH_PHASE"
 
 
 def _determinism_flag(mode: str):
@@ -118,7 +137,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     if not dataset_dir.exists() or not dataset_dir.is_dir():
         raise ValueError(f"Dataset directory not found: {dataset_dir}")
 
-    dataset_paths = _dataset_files(dataset_dir)
+    dataset_paths = _dataset_files(dataset_dir, max_docs=int(args.max_docs or 0))
     if not dataset_paths:
         raise ValueError(f"No dataset files found in: {dataset_dir}")
 
@@ -156,6 +175,7 @@ def main(argv: Iterable[str] | None = None) -> int:
 
         summary = {
             "overall_quality": suite.overall_quality(),
+            "quality_tier": _quality_tier(suite.overall_quality()),
             "conclusive": suite.conclusiveness()[0],
             "reasons": suite.conclusiveness()[1],
             "documents": len(dataset_paths),

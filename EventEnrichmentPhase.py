@@ -211,6 +211,8 @@ class EventEnrichmentPhase():
             "HAS_FRAME_ARGUMENT",
             "FRAME_DESCRIBES_EVENT",
             "REFERS_TO",
+            "MODIFIES",
+            "AFFECTS",
         ]
         violations = {rel: count_endpoint_violations(self.graph, rel) for rel in rels}
         total = sum(violations.values())
@@ -523,6 +525,57 @@ class EventEnrichmentPhase():
         if data:
             return data[0].get("linked", 0)
         return 0
+
+    def add_semantic_relation_types(self):
+        """Materialize additional semantic relations from SRL evidence.
+
+        Adds:
+        - MODIFIES: modifier FrameArgument -> described event for ARGM-* roles
+        - AFFECTS: causative/purpose entities or values -> described event
+        """
+        logger.debug("add_semantic_relation_types")
+        graph = self.graph
+
+        query_modifies = """
+                    MATCH (f:Frame)<-[:PARTICIPANT|HAS_FRAME_ARGUMENT]-(fa:FrameArgument)
+                    OPTIONAL MATCH (f)-[:FRAME_DESCRIBES_EVENT]->(event_c:TEvent)
+                    OPTIONAL MATCH (f)-[:DESCRIBES]->(event_l:TEvent)
+                    WITH fa, coalesce(event_c, event_l) AS event
+                    WHERE event IS NOT NULL
+                      AND fa.type STARTS WITH 'ARGM-'
+                    MERGE (fa)-[r:MODIFIES]->(event)
+                    SET r.type = fa.type,
+                        r.source = 'srl_modifier',
+                        (CASE WHEN fa.syntacticType IN ['IN'] THEN r END).prep = fa.head
+                    RETURN count(r) AS linked
+        """
+        rows_modifies = graph.run(query_modifies).data()
+        modifies_count = rows_modifies[0].get("linked", 0) if rows_modifies else 0
+
+        query_affects = """
+                    MATCH (f:Frame)<-[:PARTICIPANT|HAS_FRAME_ARGUMENT]-(fa:FrameArgument)-[:REFERS_TO]->(src)
+                    OPTIONAL MATCH (f)-[:FRAME_DESCRIBES_EVENT]->(event_c:TEvent)
+                    OPTIONAL MATCH (f)-[:DESCRIBES]->(event_l:TEvent)
+                    WITH fa, src, coalesce(event_c, event_l) AS event
+                    WHERE event IS NOT NULL
+                      AND src <> event
+                      AND fa.type IN ['ARGM-CAU', 'ARGM-PRP', 'ARGM-MNR']
+                      AND (src:Entity OR src:NUMERIC OR src:VALUE OR src:FrameArgument)
+                    MERGE (src)-[r:AFFECTS]->(event)
+                    SET r.argumentType = fa.type,
+                        r.source = 'srl_semantic_relation',
+                        (CASE WHEN fa.syntacticType IN ['IN'] THEN r END).prep = fa.head
+                    RETURN count(r) AS linked
+        """
+        rows_affects = graph.run(query_affects).data()
+        affects_count = rows_affects[0].get("linked", 0) if rows_affects else 0
+
+        logger.info(
+            "add_semantic_relation_types: MODIFIES=%d, AFFECTS=%d",
+            modifies_count,
+            affects_count,
+        )
+        return {"modifies": modifies_count, "affects": affects_count}
 
 
     def derive_slinks_from_reported_speech(self):

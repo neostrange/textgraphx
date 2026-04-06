@@ -61,8 +61,11 @@ def _phase_thresholds_for_mode(phase_name: str):
     elif phase_name == "event_enrichment":
         thresholds.max_legacy_to_canonical_describes_ratio = 1.0
         thresholds.max_legacy_to_canonical_participant_ratio = 1.0
+        thresholds.max_event_participants_per_described_event = 30.0
+        thresholds.max_frame_arguments_per_described_event = 40.0
         thresholds.max_event_endpoint_contract_violations = 0
     elif phase_name == "tlinks":
+        thresholds.max_tlink_rels = 250000
         thresholds.max_tlink_consistency_violations = 0
         thresholds.max_tlink_endpoint_contract_violations = 0
 
@@ -588,10 +591,12 @@ class RefinementPhaseWrapper:
 
                 cross_sentence_links = 0
                 cross_document_links = 0
+                coref_identity_links = 0
                 with log_subsection(self.logger, "Cross-sentence/cross-document fusion"):
                     from textgraphx.fusion import (
                         fuse_entities_cross_sentence,
                         fuse_entities_cross_document,
+                        propagate_coreference_identity_cross_document,
                     )
                     from textgraphx.config import get_config
 
@@ -601,10 +606,14 @@ class RefinementPhaseWrapper:
                     cross_sentence_links = fuse_entities_cross_sentence(refiner.graph)
                     if enable_cross_document_fusion:
                         cross_document_links = fuse_entities_cross_document(refiner.graph)
+                        coref_identity_links = propagate_coreference_identity_cross_document(
+                            refiner.graph
+                        )
                     self.logger.info(
-                        "Fusion links created: CO_OCCURS_WITH=%s, SAME_AS=%s (cross-doc enabled=%s)",
+                        "Fusion links created: CO_OCCURS_WITH=%s, SAME_AS(kb_id)=%s, SAME_AS(coref_identity)=%s (cross-doc enabled=%s)",
                         cross_sentence_links,
                         cross_document_links,
+                        coref_identity_links,
                         enable_cross_document_fusion,
                     )
                 
@@ -628,6 +637,7 @@ class RefinementPhaseWrapper:
                     "entities_refined": self.entities_refined,
                     "cross_sentence_links": cross_sentence_links,
                     "cross_document_links": cross_document_links,
+                    "coref_identity_links": coref_identity_links,
                     "cross_document_fusion_enabled": enable_cross_document_fusion,
                     "assertions_passed": assertions_passed,
                 }
@@ -830,6 +840,7 @@ class EventEnrichmentPhaseWrapper:
                     ("Adding labels to non-core frame arguments", enricher.add_label_to_non_core_fa),
                     ("Deriving causal links from ARGM-CAU", enricher.derive_clinks_from_causal_arguments),
                     ("Deriving subordinating links from ARGM-DSP", enricher.derive_slinks_from_reported_speech),
+                    ("Adding semantic relation types (MODIFIES/AFFECTS)", enricher.add_semantic_relation_types),
                     ("Enriching event mention properties (PHASE 2)", enricher.enrich_event_mention_properties),
                 ]
                 
@@ -881,6 +892,24 @@ class EventEnrichmentPhaseWrapper:
                         confidence=0.65,
                         evidence_source="event_enrichment",
                         rule_id="participant_linking",
+                        source_kind="rule",
+                        conflict_policy="additive",
+                    )
+                    stamp_inferred_relationships(
+                        enricher.graph,
+                        rel_type="MODIFIES",
+                        confidence=0.60,
+                        evidence_source="event_enrichment",
+                        rule_id="semantic_relation_types",
+                        source_kind="rule",
+                        conflict_policy="additive",
+                    )
+                    stamp_inferred_relationships(
+                        enricher.graph,
+                        rel_type="AFFECTS",
+                        confidence=0.60,
+                        evidence_source="event_enrichment",
+                        rule_id="semantic_relation_types",
                         source_kind="rule",
                         conflict_policy="additive",
                     )
