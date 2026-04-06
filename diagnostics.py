@@ -77,6 +77,24 @@ DIAGNOSTIC_QUERY_REGISTRY: Dict[str, DiagnosticQuery] = {
         description="Coverage of event nodes carrying external_ref identifiers.",
         expected_fields=["total_event_nodes", "event_nodes_with_external_ref", "coverage_ratio"],
     ),
+    "factuality_coverage": DiagnosticQuery(
+        name="factuality_coverage",
+        query_pack_name="factuality_coverage",
+        description="Coverage of EventMention nodes with factuality labels.",
+        expected_fields=["total_event_mentions", "event_mentions_with_factuality", "coverage_ratio"],
+    ),
+    "factuality_attribution_violations": DiagnosticQuery(
+        name="factuality_attribution_violations",
+        query_pack_name="factuality_attribution_violations",
+        description="Counts EventMention factuality records missing attribution contract fields.",
+        expected_fields=["missing_source_count", "missing_confidence_count", "missing_contract_count"],
+    ),
+    "factuality_alignment_violations": DiagnosticQuery(
+        name="factuality_alignment_violations",
+        query_pack_name="factuality_alignment_violations",
+        description="Counts factuality drift between EventMention and canonical TEvent.",
+        expected_fields=["mention_factuality", "tevent_factuality", "violation_count"],
+    ),
     "glink_relation_inventory": DiagnosticQuery(
         name="glink_relation_inventory",
         query_pack_name="glink_relation_inventory",
@@ -153,6 +171,21 @@ def query_event_external_ref_coverage(graph: Any) -> List[Dict[str, Any]]:
     return _execute_registered_query(graph, "event_external_ref_coverage")
 
 
+def query_factuality_coverage(graph: Any) -> List[Dict[str, Any]]:
+    """Return coverage of factuality labels on EventMention nodes."""
+    return _execute_registered_query(graph, "factuality_coverage")
+
+
+def query_factuality_attribution_violations(graph: Any) -> List[Dict[str, Any]]:
+    """Return counts of factuality attribution contract gaps on EventMention nodes."""
+    return _execute_registered_query(graph, "factuality_attribution_violations")
+
+
+def query_factuality_alignment_violations(graph: Any) -> List[Dict[str, Any]]:
+    """Return factuality mismatches between EventMention and canonical TEvent."""
+    return _execute_registered_query(graph, "factuality_alignment_violations")
+
+
 def query_glink_relation_inventory(graph: Any) -> List[Dict[str, Any]]:
     """Return GLINK relation distribution by relType."""
     return _execute_registered_query(graph, "glink_relation_inventory")
@@ -174,6 +207,9 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
     entity_state_type_distribution = query_entity_state_type_distribution(graph)
     entity_specificity_coverage = query_entity_specificity_coverage(graph)
     event_external_ref_coverage = query_event_external_ref_coverage(graph)
+    factuality_coverage = query_factuality_coverage(graph)
+    factuality_attribution_violations = query_factuality_attribution_violations(graph)
+    factuality_alignment_violations = query_factuality_alignment_violations(graph)
     glink_relation_inventory = query_glink_relation_inventory(graph)
 
     total_endpoint_violations = sum(int(row.get("violation_count", 0) or 0) for row in endpoint_violations)
@@ -194,6 +230,14 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
     entity_specificity_coverage_ratio = float(specificity_row.get("coverage_ratio", 0.0) or 0.0)
     total_event_nodes_with_external_ref = int(external_ref_row.get("event_nodes_with_external_ref", 0) or 0)
     event_external_ref_coverage_ratio = float(external_ref_row.get("coverage_ratio", 0.0) or 0.0)
+    factuality_row = factuality_coverage[0] if factuality_coverage else {}
+    total_mentions_with_factuality = int(factuality_row.get("event_mentions_with_factuality", 0) or 0)
+    factuality_coverage_ratio = float(factuality_row.get("coverage_ratio", 0.0) or 0.0)
+    attribution_row = factuality_attribution_violations[0] if factuality_attribution_violations else {}
+    total_factuality_attribution_violations = int(attribution_row.get("missing_contract_count", 0) or 0)
+    total_factuality_alignment_violations = sum(
+        int(row.get("violation_count", 0) or 0) for row in factuality_alignment_violations
+    )
     total_glinks = sum(int(row.get("glink_count", 0) or 0) for row in glink_relation_inventory)
 
     return {
@@ -206,6 +250,9 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
         "entity_state_type_distribution": entity_state_type_distribution,
         "entity_specificity_coverage": entity_specificity_coverage,
         "event_external_ref_coverage": event_external_ref_coverage,
+        "factuality_coverage": factuality_coverage,
+        "factuality_attribution_violations": factuality_attribution_violations,
+        "factuality_alignment_violations": factuality_alignment_violations,
         "glink_relation_inventory": glink_relation_inventory,
         "tlink_consistency_violations": tlink_violations,
         "totals": {
@@ -219,6 +266,10 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
             "entity_specificity_coverage_ratio": entity_specificity_coverage_ratio,
             "event_nodes_with_external_ref_count": total_event_nodes_with_external_ref,
             "event_external_ref_coverage_ratio": event_external_ref_coverage_ratio,
+            "event_mentions_with_factuality_count": total_mentions_with_factuality,
+            "factuality_coverage_ratio": factuality_coverage_ratio,
+            "factuality_attribution_violation_count": total_factuality_attribution_violations,
+            "factuality_alignment_violation_count": total_factuality_alignment_violations,
             "glink_count": total_glinks,
             "tlink_conflict_count": total_tlink_conflicts,
         },

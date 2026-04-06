@@ -71,6 +71,10 @@ class PhaseThresholds:
     max_legacy_to_canonical_participant_ratio: float = inf
     max_event_participants_per_described_event: float = inf
     max_frame_arguments_per_described_event: float = inf
+    max_event_mentions_missing_factuality: int = 10**9
+    max_event_mentions_missing_factuality_attribution: int = 10**9
+    max_tevents_missing_factuality: int = 10**9
+    max_factuality_alignment_violations: int = 10**9
 
     # --- tlinks ---
     min_tlink_rels: int = 0                  # TLINK relationships
@@ -596,6 +600,71 @@ class PhaseAssertions:
             label="Endpoint contract violations (SLINK)",
             actual=count_endpoint_violations(self._graph, "SLINK"),
             maximum=t.max_event_endpoint_contract_violations,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="EventMention nodes missing factuality",
+            actual=self._count(
+                """
+                MATCH (em:EventMention)
+                WHERE em.factuality IS NULL
+                   OR trim(toString(em.factuality)) = ''
+                RETURN count(em) AS c
+                """
+            ),
+            maximum=t.max_event_mentions_missing_factuality,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="EventMention factuality records missing attribution",
+            actual=self._count(
+                """
+                MATCH (em:EventMention)
+                WHERE em.factuality IS NOT NULL
+                  AND trim(toString(em.factuality)) <> ''
+                  AND (
+                      em.factualitySource IS NULL
+                      OR trim(toString(em.factualitySource)) = ''
+                      OR em.factualityConfidence IS NULL
+                  )
+                RETURN count(em) AS c
+                """
+            ),
+            maximum=t.max_event_mentions_missing_factuality_attribution,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="TEvent nodes missing factuality after mention sync",
+            actual=self._count(
+                """
+                MATCH (em:EventMention)-[:REFERS_TO]->(te:TEvent)
+                WHERE em.factuality IS NOT NULL
+                  AND trim(toString(em.factuality)) <> ''
+                  AND (
+                      te.factuality IS NULL
+                      OR trim(toString(te.factuality)) = ''
+                  )
+                RETURN count(DISTINCT te) AS c
+                """
+            ),
+            maximum=t.max_tevents_missing_factuality,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="EventMention/TEvent factuality alignment violations",
+            actual=self._count(
+                """
+                MATCH (em:EventMention)-[:REFERS_TO]->(te:TEvent)
+                WHERE em.factuality IS NOT NULL
+                  AND trim(toString(em.factuality)) <> ''
+                  AND te.factuality IS NOT NULL
+                  AND trim(toString(te.factuality)) <> ''
+                  AND toUpper(toString(em.factuality)) <> toUpper(toString(te.factuality))
+                  AND coalesce(te.factualityConflictFlag, false) = false
+                RETURN count(*) AS c
+                """
+            ),
+            maximum=t.max_factuality_alignment_violations,
         )
         if self._enforce_provenance_contracts:
             self._add_provenance_contract_check(

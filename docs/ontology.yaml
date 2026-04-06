@@ -347,6 +347,19 @@ diagnostics:
   query: MATCH (:TagOccurrence)-[r:REFERS_TO]->(:Tag) RETURN count(r) AS cnt
 - name: HAS_LEMMA_rels
   query: MATCH (:TagOccurrence)-[r:HAS_LEMMA]->(:Tag) RETURN count(r) AS cnt
+- name: EventMention_missing_factuality
+  query: MATCH (em:EventMention) WHERE em.factuality IS NULL OR trim(toString(em.factuality))
+    = '' RETURN count(em) AS cnt
+- name: EventMention_factuality_missing_attribution
+  query: MATCH (em:EventMention) WHERE em.factuality IS NOT NULL AND trim(toString(em.factuality))
+    <> '' AND (em.factualitySource IS NULL OR trim(toString(em.factualitySource))
+    = '' OR em.factualityConfidence IS NULL) RETURN count(em) AS cnt
+- name: Factuality_alignment_violations
+  query: MATCH (em:EventMention)-[:REFERS_TO]->(te:TEvent) WHERE em.factuality IS
+    NOT NULL AND trim(toString(em.factuality)) <> '' AND te.factuality IS NOT NULL
+    AND trim(toString(te.factuality)) <> '' AND toUpper(toString(em.factuality))
+    <> toUpper(toString(te.factuality)) AND coalesce(te.factualityConflictFlag,
+    false) = false RETURN count(*) AS cnt
 - name: Evidence_nodes
   query: MATCH (n:Evidence) RETURN count(n) AS cnt
 - name: Relationship_nodes

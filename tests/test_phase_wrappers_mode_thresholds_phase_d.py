@@ -13,6 +13,10 @@ def test_phase_wrappers_define_mode_threshold_helper():
     assert "strict_modes" in src
     assert "review" in src and "testing" in src and "test" in src and "ci" in src
     assert "thresholds.max_tlink_consistency_violations = 0" in src
+    assert "thresholds.max_event_mentions_missing_factuality = 0" in src
+    assert "thresholds.max_event_mentions_missing_factuality_attribution = 0" in src
+    assert "thresholds.max_tevents_missing_factuality = 0" in src
+    assert "thresholds.max_factuality_alignment_violations = 0" in src
 
 
 @pytest.mark.unit

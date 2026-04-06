@@ -64,6 +64,10 @@ def _phase_thresholds_for_mode(phase_name: str):
         thresholds.max_event_participants_per_described_event = 30.0
         thresholds.max_frame_arguments_per_described_event = 40.0
         thresholds.max_event_endpoint_contract_violations = 0
+        thresholds.max_event_mentions_missing_factuality = 0
+        thresholds.max_event_mentions_missing_factuality_attribution = 0
+        thresholds.max_tevents_missing_factuality = 0
+        thresholds.max_factuality_alignment_violations = 0
     elif phase_name == "tlinks":
         thresholds.max_tlink_rels = 250000
         thresholds.max_tlink_consistency_violations = 0
