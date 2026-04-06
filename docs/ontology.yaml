@@ -49,13 +49,31 @@ nodes:
     - normal_term
     - head
     - headTokenIndex
+    - ent_class
+    - nominalSemanticHead
+    - wnLexname
+    - wn_supersense
     id_convention: <doc>_<start>_<end>_<type>
+  EntityMention:
+    purpose: Mention-level entity span abstraction
+    key_properties:
+    - id
+    - doc_id
+    - value
+    - head
+    - headTokenIndex
+    - start_tok
+    - end_tok
+    - start_char
+    - end_char
   Entity:
     purpose: Canonical/disambiguated entity
     key_properties:
     - id
     - type
     - kb_id
+    - wnLexname
+    - wn_supersense
   Frame:
     purpose: SRL predicate frame
     key_properties:
@@ -122,6 +140,19 @@ nodes:
     - end
     - class
     - tense
+  EventMention:
+    purpose: Mention-level event instantiation linked to canonical TEvent
+    key_properties:
+    - id
+    - doc_id
+    - pred
+    - tense
+    - aspect
+    - class
+    - start_tok
+    - end_tok
+    - start_char
+    - end_char
   Evidence:
     purpose: Provenance/evidence node for relation extraction
     key_properties:
@@ -136,14 +167,21 @@ relationships:
   CONTAINS_SENTENCE: AnnotatedText -> Sentence
   HAS_TOKEN: Sentence -> TagOccurrence
   HAS_NEXT: 'TagOccurrence -> TagOccurrence (properties: sentence)'
-  REFERS_TO: Mention node -> Entity (or TagOccurrence -> Tag)
+  REFERS_TO: 'Mention node -> canonical node (EntityMention/EventMention/NamedEntity/FrameArgument -> Entity|TEvent|NamedEntity|NUMERIC)'
+  HAS_LEMMA: TagOccurrence -> Tag
   PARTICIPATES_IN: TagOccurrence -> (NamedEntity|Frame|FrameArgument|CorefMention|Antecedent|NounChunk)
-  PARTICIPANT: 'FrameArgument -> Frame (properties: type, prep?)'
+  PARTICIPANT: 'FrameArgument -> Frame (properties: type, prep?) [transitioning]'
   IS_DEPENDENT: 'TagOccurrence -> TagOccurrence (properties: type)'
   COREF: CorefMention -> Antecedent
-  TRIGGERS: TagOccurrence -> TIMEX|TEvent
-  DESCRIBES: Frame -> TEvent
-  TLINK: 'TEvent/TIMEX -> TEvent/TIMEX (properties: id, relType)'
+  TRIGGERS: TagOccurrence -> TIMEX|TEvent|EventMention
+  DESCRIBES: Frame -> TEvent [transitioning]
+  FRAME_DESCRIBES_EVENT: Frame -> TEvent
+  INSTANTIATES: Frame -> EventMention
+  HAS_FRAME_ARGUMENT: FrameArgument -> Frame
+  EVENT_PARTICIPANT: 'Entity|NUMERIC|FrameArgument -> TEvent|EventMention'
+  MODIFIES: FrameArgument -> TEvent|EventMention
+  AFFECTS: 'Entity|NUMERIC|FrameArgument -> TEvent|EventMention'
+  TLINK: 'TEvent/TIMEX -> TEvent/TIMEX (properties: id, relType, signalID)'
   IS_RELATED_TO: 'NamedEntity -> NamedEntity (properties: root, type)'
   SOURCE: ne <- Evidence
   DESTINATION: ne <- Evidence
@@ -157,14 +195,17 @@ schema_tiers:
     - AnnotatedText
     - Sentence
     - TagOccurrence
+    - EntityMention
     - NamedEntity
     - Entity
     - Frame
     - FrameArgument
+    - EventMention
     - Antecedent
     - CorefMention
     - TIMEX
     - TEvent
+    - NUMERIC
     relationship_types:
     - CONTAINS_SENTENCE
     - HAS_TOKEN
@@ -172,9 +213,16 @@ schema_tiers:
     - IS_DEPENDENT
     - PARTICIPATES_IN
     - REFERS_TO
+    - HAS_LEMMA
     - PARTICIPANT
     - TRIGGERS
     - DESCRIBES
+    - FRAME_DESCRIBES_EVENT
+    - INSTANTIATES
+    - HAS_FRAME_ARGUMENT
+    - EVENT_PARTICIPANT
+    - MODIFIES
+    - AFFECTS
     - CREATED_ON
     - TLINK
     - COREF
@@ -212,19 +260,59 @@ span_contract:
   - end_char
   legacy_aliases:
     start_tok:
+    - start_tok
     - startIndex
-    - index
-    - begin
+    - headTokenIndex
     end_tok:
+    - end_tok
     - endIndex
-    - end_index
-    - end
     start_char:
+    - start_char
     - index
     - begin
+    - char_begin
     end_char:
+    - end_char
     - end_index
     - end
+    - char_end
+  note: legacy aliases are now disambiguated; do not reuse an alias across token and character spaces.
+
+relation_endpoint_contract:
+  REFERS_TO:
+    allowed_pairs:
+    - [EntityMention, Entity]
+    - [EventMention, TEvent]
+    - [NamedEntity, Entity]
+    - [FrameArgument, Entity]
+    - [FrameArgument, NamedEntity]
+    - [FrameArgument, NUMERIC]
+  HAS_LEMMA:
+    allowed_pairs:
+    - [TagOccurrence, Tag]
+  EVENT_PARTICIPANT:
+    sources: [Entity, NUMERIC, FrameArgument]
+    targets: [TEvent, EventMention]
+  MODIFIES:
+    sources: [FrameArgument]
+    targets: [TEvent, EventMention]
+  AFFECTS:
+    sources: [Entity, NUMERIC, FrameArgument]
+    targets: [TEvent, EventMention]
+
+semantic_enrichment_properties:
+  NamedEntity:
+  - nominalSemanticHead
+  - wnLexname
+  - wn_supersense
+  - ent_class
+  Entity:
+  - wnLexname
+  - wn_supersense
+  FrameArgument:
+  - wnLexname
+  - wn_supersense
+  - semanticHead
 diagnostics:
 - name: TagOccurrence
   query: MATCH (n:TagOccurrence) RETURN count(n) AS cnt
