@@ -1342,7 +1342,7 @@ class DBpediaEnrichmentPhaseWrapper:
                 with log_subsection(self.logger, "Collecting named entities for DBpedia Spotlight analysis"):
                     rows = graph.run(
                         """
-                        MATCH (d:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok:TagOccurrence)-[:PARTICIPATES_IN]->(n:NamedEntity)
+                        MATCH (d:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok:TagOccurrence)-[:IN_MENTION]->(n:NamedEntity)
                         WHERE coalesce(d.text, '') <> ''
                         WITH d, n,
                              min(toInteger(tok.index)) AS start_char,
@@ -1579,6 +1579,26 @@ class TlinksRecognizerWrapper:
                     else:
                         self.logger.debug("✓ Completed: TLINK conflict suppression (%d suppressed)", suppressed_tlinks)
 
+                anchor_suppressed_tlinks = 0
+                anchor_shadow_inconsistencies = 0
+                with log_subsection(self.logger, "Validate TLINK anchor consistency"):
+                    anchor_rows = recognizer.enforce_tlink_anchor_consistency(shadow_only=tlink_shadow_mode)
+                    if anchor_rows:
+                        if tlink_shadow_mode:
+                            anchor_shadow_inconsistencies = anchor_rows[0].get("inconsistent_count", 0)
+                        else:
+                            anchor_suppressed_tlinks = anchor_rows[0].get("suppressed_count", 0)
+                    if tlink_shadow_mode:
+                        self.logger.debug(
+                            "✓ Completed: TLINK anchor consistency shadow scan (%d inconsistent)",
+                            anchor_shadow_inconsistencies,
+                        )
+                    else:
+                        self.logger.debug(
+                            "✓ Completed: TLINK anchor consistency suppression (%d suppressed)",
+                            anchor_suppressed_tlinks,
+                        )
+
                 with log_subsection(self.logger, "Validate TLINK endpoint contract"):
                     endpoint_violations = recognizer.endpoint_contract_violations()
                     self.logger.debug(
@@ -1622,8 +1642,10 @@ class TlinksRecognizerWrapper:
                     "constraint_inverse_created": constraint_summary.get("inverse_created", 0),
                     "constraint_bidirectional_conflicts": constraint_summary.get("bidirectional_conflicts", 0),
                     "suppressed_tlinks": suppressed_tlinks,
+                    "anchor_suppressed_tlinks": anchor_suppressed_tlinks,
                     "tlink_shadow_mode": tlink_shadow_mode,
                     "shadow_conflicts": shadow_conflicts,
+                    "anchor_shadow_inconsistencies": anchor_shadow_inconsistencies,
                     "endpoint_violations": endpoint_violations,
                     "assertions_passed": assertions_passed,
                     "provenance_violations": provenance_violations,

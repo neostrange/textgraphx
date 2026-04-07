@@ -595,7 +595,7 @@ class TextProcessor(object):
             WITH kw, keyword
             MATCH (text:AnnotatedText)
             WHERE text.id = $documentId
-            MERGE (text)<-[:DESCRIBES {rank: keyword.rank}]-(kw)
+            MERGE (text)<-[:KEYWORD_DESCRIBES_DOCUMENT {rank: keyword.rank}]-(kw)
         """
         self.execute_query(ne_query, {"documentId": document_id, "keywords": keywords})
 

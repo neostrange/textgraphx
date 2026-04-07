@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Iterable
 
@@ -129,6 +130,31 @@ def _ensure_any_export_requested(args) -> tuple[bool, bool, bool]:
     return args.json, args.csv, args.markdown
 
 
+def _build_operator_summary(summary: dict) -> str | None:
+    """Build concise operator summary without affecting JSON stdout payload."""
+    if not isinstance(summary, dict):
+        return None
+    required = (
+        "tlink_anchor_inconsistent_count",
+        "tlink_anchor_self_link_count",
+        "tlink_anchor_endpoint_violation_count",
+        "tlink_anchor_filter_suppressed_count",
+        "tlink_missing_anchor_metadata_count",
+    )
+    if not all(k in summary for k in required):
+        return None
+    return (
+        "KG quality operator summary: "
+        f"quality={summary.get('overall_quality', 0.0):.4f} "
+        f"tier={summary.get('quality_tier', 'UNKNOWN')} "
+        f"tlink_anchor_inconsistent={int(summary.get('tlink_anchor_inconsistent_count', 0))} "
+        f"self_links={int(summary.get('tlink_anchor_self_link_count', 0))} "
+        f"endpoint_violations={int(summary.get('tlink_anchor_endpoint_violation_count', 0))} "
+        f"anchor_suppressed={int(summary.get('tlink_anchor_filter_suppressed_count', 0))} "
+        f"missing_anchor_metadata={int(summary.get('tlink_missing_anchor_metadata_count', 0))}"
+    )
+
+
 def main(argv: Iterable[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(list(argv) if argv is not None else None)
@@ -190,6 +216,14 @@ def main(argv: Iterable[str] | None = None) -> int:
             summary["event_external_ref_coverage_ratio"] = totals.get("event_external_ref_coverage_ratio", 0.0)
             summary["event_nodes_with_external_ref_count"] = totals.get("event_nodes_with_external_ref_count", 0)
             summary["glink_count"] = totals.get("glink_count", 0)
+            summary["tlink_anchor_inconsistent_count"] = totals.get("tlink_anchor_inconsistent_count", 0)
+            summary["tlink_anchor_self_link_count"] = totals.get("tlink_anchor_self_link_count", 0)
+            summary["tlink_anchor_endpoint_violation_count"] = totals.get("tlink_anchor_endpoint_violation_count", 0)
+            summary["tlink_anchor_filter_suppressed_count"] = totals.get("tlink_anchor_filter_suppressed_count", 0)
+            summary["tlink_missing_anchor_metadata_count"] = totals.get("tlink_missing_anchor_metadata_count", 0)
+        operator_line = _build_operator_summary(summary)
+        if operator_line:
+            print(operator_line, file=sys.stderr)
         print(json.dumps(summary, indent=2))
     finally:
         close_fn = getattr(graph, "close", None)

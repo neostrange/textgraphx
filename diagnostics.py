@@ -41,6 +41,24 @@ DIAGNOSTIC_QUERY_REGISTRY: Dict[str, DiagnosticQuery] = {
         description="Counts relationship endpoint contract violations by relation type.",
         expected_fields=["rel_type", "violation_count"],
     ),
+    "referential_integrity_violations": DiagnosticQuery(
+        name="referential_integrity_violations",
+        query_pack_name="referential_integrity_violations",
+        description="Counts missing canonical mention/event referential chains.",
+        expected_fields=["contract", "violation_count"],
+    ),
+    "identity_contract_violations": DiagnosticQuery(
+        name="identity_contract_violations",
+        query_pack_name="identity_contract_violations",
+        description="Counts missing or incomplete identity fields on canonical span-bearing nodes.",
+        expected_fields=["identity_rule", "violation_count"],
+    ),
+    "numeric_value_transition_inventory": DiagnosticQuery(
+        name="numeric_value_transition_inventory",
+        query_pack_name="numeric_value_transition_inventory",
+        description="Inventories transitional NUMERIC/VALUE label usage versus canonical VALUE nodes.",
+        expected_fields=["metric", "item_count"],
+    ),
     "provenance_contract_violations": DiagnosticQuery(
         name="provenance_contract_violations",
         query_pack_name="provenance_contract_violations",
@@ -52,6 +70,12 @@ DIAGNOSTIC_QUERY_REGISTRY: Dict[str, DiagnosticQuery] = {
         query_pack_name="tlink_consistency_violations",
         description="Detects contradictory unsuppressed TLINK pairs.",
         expected_fields=["rel_type_1", "rel_type_2", "conflict_count"],
+    ),
+    "tlink_anchor_consistency_inventory": DiagnosticQuery(
+        name="tlink_anchor_consistency_inventory",
+        query_pack_name="tlink_anchor_consistency_inventory",
+        description="Inventories TLINK anchor consistency flags and anchor-filter suppression counts.",
+        expected_fields=["metric", "item_count"],
     ),
     "entity_state_coverage": DiagnosticQuery(
         name="entity_state_coverage",
@@ -151,6 +175,21 @@ def query_endpoint_contract_violations(graph: Any) -> List[Dict[str, Any]]:
     return _execute_registered_query(graph, "endpoint_contract_violations")
 
 
+def query_referential_integrity_violations(graph: Any) -> List[Dict[str, Any]]:
+    """Return missing canonical referential chain counts."""
+    return _execute_registered_query(graph, "referential_integrity_violations")
+
+
+def query_identity_contract_violations(graph: Any) -> List[Dict[str, Any]]:
+    """Return missing identity field counts for canonical nodes."""
+    return _execute_registered_query(graph, "identity_contract_violations")
+
+
+def query_numeric_value_transition_inventory(graph: Any) -> List[Dict[str, Any]]:
+    """Return transitional NUMERIC/VALUE inventory counts."""
+    return _execute_registered_query(graph, "numeric_value_transition_inventory")
+
+
 def query_entity_state_coverage(graph: Any) -> List[Dict[str, Any]]:
     """Return entity-state enrichment coverage metrics."""
     return _execute_registered_query(graph, "entity_state_coverage")
@@ -201,8 +240,12 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
     phase_summary = query_phase_execution_summary(graph)
     assertion_violations = query_phase_assertion_violations(graph)
     endpoint_violations = query_endpoint_contract_violations(graph)
+    referential_violations = query_referential_integrity_violations(graph)
+    identity_violations = query_identity_contract_violations(graph)
+    numeric_value_transition = query_numeric_value_transition_inventory(graph)
     provenance_violations = _execute_registered_query(graph, "provenance_contract_violations")
     tlink_violations = _execute_registered_query(graph, "tlink_consistency_violations")
+    tlink_anchor_inventory = _execute_registered_query(graph, "tlink_anchor_consistency_inventory")
     entity_state_coverage = query_entity_state_coverage(graph)
     entity_state_type_distribution = query_entity_state_type_distribution(graph)
     entity_specificity_coverage = query_entity_specificity_coverage(graph)
@@ -213,11 +256,21 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
     glink_relation_inventory = query_glink_relation_inventory(graph)
 
     total_endpoint_violations = sum(int(row.get("violation_count", 0) or 0) for row in endpoint_violations)
+    total_referential_violations = sum(int(row.get("violation_count", 0) or 0) for row in referential_violations)
+    total_identity_violations = sum(int(row.get("violation_count", 0) or 0) for row in identity_violations)
+    numeric_value_transition_counts = {
+        str(row.get("metric", "")): int(row.get("item_count", 0) or 0)
+        for row in numeric_value_transition
+    }
     total_assertion_violations = sum(int(row.get("violation_count", 0) or 0) for row in assertion_violations)
     total_provenance_violations = sum(
         int(row.get("missing_contract_count", 0) or 0) for row in provenance_violations
     )
     total_tlink_conflicts = sum(int(row.get("conflict_count", 0) or 0) for row in tlink_violations)
+    tlink_anchor_counts = {
+        str(row.get("metric", "")): int(row.get("item_count", 0) or 0)
+        for row in tlink_anchor_inventory
+    }
     state_row = entity_state_coverage[0] if entity_state_coverage else {}
     total_entity_mentions_with_state = int(state_row.get("entity_mentions_with_state", 0) or 0)
     entity_state_coverage_ratio = float(state_row.get("coverage_ratio", 0.0) or 0.0)
@@ -245,6 +298,9 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
         "phase_execution_summary": phase_summary,
         "phase_assertion_violations": assertion_violations,
         "endpoint_contract_violations": endpoint_violations,
+        "referential_integrity_violations": referential_violations,
+        "identity_contract_violations": identity_violations,
+        "numeric_value_transition_inventory": numeric_value_transition,
         "provenance_contract_violations": provenance_violations,
         "entity_state_coverage": entity_state_coverage,
         "entity_state_type_distribution": entity_state_type_distribution,
@@ -255,8 +311,15 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
         "factuality_alignment_violations": factuality_alignment_violations,
         "glink_relation_inventory": glink_relation_inventory,
         "tlink_consistency_violations": tlink_violations,
+        "tlink_anchor_consistency_inventory": tlink_anchor_inventory,
         "totals": {
             "endpoint_violation_count": total_endpoint_violations,
+            "referential_integrity_violation_count": total_referential_violations,
+            "identity_contract_violation_count": total_identity_violations,
+            "namedentity_numeric_label_count": numeric_value_transition_counts.get("namedentity_numeric_labels", 0),
+            "namedentity_value_label_count": numeric_value_transition_counts.get("namedentity_value_labels", 0),
+            "canonical_value_node_count": numeric_value_transition_counts.get("canonical_value_nodes", 0),
+            "namedentity_value_tagged_history_count": numeric_value_transition_counts.get("namedentity_value_tagged_history", 0),
             "assertion_violation_count": total_assertion_violations,
             "provenance_violation_count": total_provenance_violations,
             "entity_mentions_with_state_count": total_entity_mentions_with_state,
@@ -272,5 +335,10 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
             "factuality_alignment_violation_count": total_factuality_alignment_violations,
             "glink_count": total_glinks,
             "tlink_conflict_count": total_tlink_conflicts,
+            "tlink_anchor_inconsistent_count": tlink_anchor_counts.get("inconsistent_tlinks", 0),
+            "tlink_anchor_self_link_count": tlink_anchor_counts.get("self_link_tlinks", 0),
+            "tlink_anchor_endpoint_violation_count": tlink_anchor_counts.get("endpoint_violation_tlinks", 0),
+            "tlink_anchor_filter_suppressed_count": tlink_anchor_counts.get("anchor_filter_suppressed_tlinks", 0),
+            "tlink_missing_anchor_metadata_count": tlink_anchor_counts.get("missing_anchor_metadata_tlinks", 0),
         },
     }

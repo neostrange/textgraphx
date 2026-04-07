@@ -76,6 +76,10 @@ class FeatureFlags:
     create_refinement_run: bool = True
     compute_token_ids: bool = False
     enable_dbpedia_enrichment: bool = False
+    # When False (default) the transitional :NUMERIC/:VALUE label-writing passes
+    # are skipped. Enable only when running legacy pipelines that still rely on
+    # the dynamic label reads.
+    fill_numeric_labels: bool = False
 
 
 @dataclass
@@ -221,6 +225,9 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
                 features.enable_dbpedia_enrichment = _coerce_bool(
                     cp.get('features', 'enable_dbpedia_enrichment', fallback=str(features.enable_dbpedia_enrichment))
                 )
+                features.fill_numeric_labels = _coerce_bool(
+                    cp.get('features', 'fill_numeric_labels', fallback=str(features.fill_numeric_labels))
+                )
             if cp.has_section('runtime'):
                 runtime.mode = cp.get('runtime', 'mode', fallback=runtime.mode).strip().lower()
                 runtime.strict_transition_gate = _coerce_optional_bool(
@@ -316,6 +323,9 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
             features.enable_dbpedia_enrichment = bool(
                 feat_map.get('enable_dbpedia_enrichment', features.enable_dbpedia_enrichment)
             )
+            features.fill_numeric_labels = bool(
+                feat_map.get('fill_numeric_labels', features.fill_numeric_labels)
+            )
             runtime_map = tom.get('runtime', {})
             runtime.mode = str(runtime_map.get('mode', runtime.mode)).strip().lower()
             if 'strict_transition_gate' in runtime_map:
@@ -393,6 +403,10 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
         if os.getenv('TEXTGRAPHX_ENABLE_DBPEDIA_ENRICHMENT') is not None:
             features.enable_dbpedia_enrichment = _coerce_bool(
                 os.getenv('TEXTGRAPHX_ENABLE_DBPEDIA_ENRICHMENT')
+            )
+        if os.getenv('TEXTGRAPHX_FILL_NUMERIC_LABELS') is not None:
+            features.fill_numeric_labels = _coerce_bool(
+                os.getenv('TEXTGRAPHX_FILL_NUMERIC_LABELS')
             )
 
         runtime.mode = (os.getenv('TEXTGRAPHX_RUNTIME_MODE') or runtime.mode).strip().lower()
@@ -529,6 +543,7 @@ output_dir = out
 create_refinement_run = true
 compute_token_ids = false
 enable_dbpedia_enrichment = false
+fill_numeric_labels = false
 
 [runtime]
 mode = production
@@ -568,6 +583,7 @@ output_dir = "out"
 create_refinement_run = true
 compute_token_ids = false
 enable_dbpedia_enrichment = false
+fill_numeric_labels = false
 
 [runtime]
 mode = "production"

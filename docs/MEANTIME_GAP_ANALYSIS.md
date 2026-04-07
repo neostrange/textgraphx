@@ -1,21 +1,24 @@
 # TextGraphX vs MEANTIME NAF Schema Gap Analysis
 
-**Date:** 2026-04-03  
+**Date:** 2026-04-03 (updated 2026-04-06)  
 **Purpose:** Identify structural and semantic gaps between TextGraphX and MEANTIME NAF schema to guide future alignment work.
 
 ---
 
 ## Executive Summary
 
-TextGraphX implements a solid foundation aligned with MEANTIME NAF's core document-grounded, token-anchored model. However, several key semantic distinctions and annotation capabilities are missing:
+TextGraphX implements a solid foundation aligned with MEANTIME NAF's core document-grounded, token-anchored model. Several key semantic distinctions and annotation capabilities were originally missing; the majority have now been closed:
 
-- **Missing markable types:** ENTITY_MENTION, EVENT_MENTION (as distinct types), SIGNAL, C-SIGNAL
-- **Missing edge types:** HAS_PARTICIPANT (SRL), CLINK, SLINK, GLINK
-- **Missing properties:** Event class taxonomy, event tense/aspect/modality, temporal signal references, causal signal references
-- **Structural gaps:** No explicit distinction between canonical entities/events and their textual mentions
-- **Vocabulary gaps:** No governance for semantic role frameworks (PropBank, FrameNet, Kyoto) or temporal relation types
+- ~~**Missing markable types:** ENTITY_MENTION, EVENT_MENTION (as distinct types), SIGNAL, C-SIGNAL~~ **✅ Closed (Phase 1–3)**
+- ~~**Missing edge types:** HAS_PARTICIPANT (SRL), CLINK, SLINK, GLINK~~ **✅ Closed (Phases 4–5 + TemporalPhase)**
+- ~~**Missing properties:** Event class taxonomy, event tense/aspect/modality, temporal signal references~~ **✅ Closed (Phase 2)**
+- ~~**Structural gaps:** No explicit distinction between canonical entities/events and their textual mentions~~ **✅ Closed (Phase 1)**
+- ~~**Vocabulary gaps:** No governance for semantic role frameworks~~ **✅ Closed — ontology.json governs all type constraints**
 
-**Impact:** TextGraphX can model documents and basic events, but lacks fine-grained temporal and causal reasoning, explicit mention-to-entity and mention-to-event reification, and sophisticated event property tracking needed for MEANTIME-compliant evaluation.
+**Current outstanding gaps** (future enhancements, non-blocking):
+- Complex temporal realization: subordinate TIMEX anchoring (`anchorTimeID`, `beginPoint`/`endPoint`)
+- VALUE node type classification (`PERCENT`, `MONEY`, `QUANTITY`)
+- `functionInDocument` attribute on TIMEX3 nodes
 
 ### 2026-04-03 Transition Status Addendum
 
@@ -543,12 +546,15 @@ GLINK (grammatical): TEvent -[:GLINK]-> TEvent (for GRAMMATICAL ↔ content)
 
 ### Remaining Gaps (Future Enhancements Beyond Phase 5)
 
-TextGraphX now provides solid MEANTIME-aligned foundation for document-centric semantic modeling. The following advanced features remain for future major milestone (M8+):
+All originally critical gaps (CLINK, SLINK, GLINK, mention-layer, event properties, signals, participants, value nodes) have been resolved across Phases 1–5. The following minor features remain as non-blocking future refinements:
 
-1. **Causal reasoning** (CLINK relations with causal signal IDs)
-2. **Subordination** (SLINK relations)
-3. **Grammatical structure** (GLINK relations)
-4. **Complex temporal realization** (subordinate TIMEX expressions, temporal anchoring)
+1. **Complex temporal realization** — subordinate TIMEX expressions with `anchorTimeID`, `beginPoint`, and `endPoint` attributes (TIMEX3 interval anchoring)
+2. **VALUE node type classification** — distinguish `PERCENT`, `MONEY`, `QUANTITY` subtypes on `NUMERIC`/`VALUE` nodes
+3. **`functionInDocument` on TIMEX3** — mark document creation time TIMEX nodes with `functionInDocument=CREATION_TIME`
+
+~~1. **Causal reasoning** (CLINK relations with causal signal IDs)~~ ✅ Done — `EventEnrichmentPhase.derive_clinks_from_causal_arguments()`  
+~~2. **Subordination** (SLINK relations)~~ ✅ Done — `EventEnrichmentPhase.derive_slinks_from_reported_speech()`  
+~~3. **Grammatical structure** (GLINK relations)~~ ✅ Done — `TemporalPhase.materialize_glinks()`, registered in ontology
 
 ### Technical Achievement
 

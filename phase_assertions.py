@@ -49,6 +49,9 @@ class PhaseThresholds:
     min_refers_to_rels: int = 0               # REFERS_TO relationships created
     min_has_lemma_rels: int = 0               # HAS_LEMMA relationships created
     min_nominal_semantic_heads: int = 0       # EntityMention nominal semantic heads populated
+    max_entity_mentions_missing_refers_to_entity: int = 10**9
+    max_named_entities_missing_token_identity: int = 10**9
+    max_entity_mentions_missing_identity_fields: int = 10**9
 
     # --- temporal ---
     min_tevents: int = 0                      # TEvent nodes (0: temporal service optional)
@@ -75,6 +78,9 @@ class PhaseThresholds:
     max_event_mentions_missing_factuality_attribution: int = 10**9
     max_tevents_missing_factuality: int = 10**9
     max_factuality_alignment_violations: int = 10**9
+    max_event_mentions_missing_refers_to_tevent: int = 10**9
+    max_frames_missing_instantiates_eventmention: int = 10**9
+    max_event_mentions_missing_token_identity: int = 10**9
 
     # --- tlinks ---
     min_tlink_rels: int = 0                  # TLINK relationships
@@ -319,6 +325,46 @@ class PhaseAssertions:
             label="Endpoint contract violations (HAS_LEMMA)",
             actual=count_endpoint_violations(self._graph, "HAS_LEMMA"),
             maximum=t.max_refinement_endpoint_contract_violations,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="EntityMention nodes missing REFERS_TO->Entity",
+            actual=self._count(
+                """
+                MATCH (em:EntityMention)
+                WHERE NOT EXISTS { MATCH (em)-[:REFERS_TO]->(:Entity) }
+                RETURN count(em) AS c
+                """
+            ),
+            maximum=t.max_entity_mentions_missing_refers_to_entity,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="NamedEntity nodes missing token identity fields",
+            actual=self._count(
+                """
+                MATCH (ne:NamedEntity)
+                WHERE ne.token_id IS NULL
+                   OR ne.token_start IS NULL
+                   OR ne.token_end IS NULL
+                RETURN count(ne) AS c
+                """
+            ),
+            maximum=t.max_named_entities_missing_token_identity,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="EntityMention nodes missing doc/span identity fields",
+            actual=self._count(
+                """
+                MATCH (em:EntityMention)
+                WHERE em.doc_id IS NULL
+                   OR em.start_tok IS NULL
+                   OR em.end_tok IS NULL
+                RETURN count(em) AS c
+                """
+            ),
+            maximum=t.max_entity_mentions_missing_identity_fields,
         )
 
         return self._finalize(result)
@@ -600,6 +646,45 @@ class PhaseAssertions:
             label="Endpoint contract violations (SLINK)",
             actual=count_endpoint_violations(self._graph, "SLINK"),
             maximum=t.max_event_endpoint_contract_violations,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="EventMention nodes missing REFERS_TO->TEvent",
+            actual=self._count(
+                """
+                MATCH (em:EventMention)
+                WHERE NOT EXISTS { MATCH (em)-[:REFERS_TO]->(:TEvent) }
+                RETURN count(em) AS c
+                """
+            ),
+            maximum=t.max_event_mentions_missing_refers_to_tevent,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="Frame nodes with described events missing INSTANTIATES->EventMention",
+            actual=self._count(
+                """
+                MATCH (f:Frame)
+                WHERE EXISTS { MATCH (f)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]->(:TEvent) }
+                  AND NOT EXISTS { MATCH (f)-[:INSTANTIATES]->(:EventMention) }
+                RETURN count(DISTINCT f) AS c
+                """
+            ),
+            maximum=t.max_frames_missing_instantiates_eventmention,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="EventMention nodes missing token identity fields",
+            actual=self._count(
+                """
+                MATCH (em:EventMention)
+                WHERE em.token_id IS NULL
+                   OR em.token_start IS NULL
+                   OR em.token_end IS NULL
+                RETURN count(em) AS c
+                """
+            ),
+            maximum=t.max_event_mentions_missing_token_identity,
         )
         self._add_upper_bound_check(
             result,

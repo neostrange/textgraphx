@@ -77,6 +77,7 @@
     "AFFECTS": "Entity|NUMERIC|VALUE|FrameArgument -> TEvent|EventMention (causal/influence relation)",
     "CLINK": "TEvent -> TEvent (properties: source)",
     "SLINK": "TEvent -> TEvent (properties: source)",
+    "GLINK": "TEvent -> TEvent (properties: id, relType, signalID, origin, rule) — grammatical link from TTK",
     "IS_RELATED_TO": "NamedEntity -> NamedEntity (properties: root, type)",
     "SOURCE": "ne <- Evidence",
     "DESTINATION": "ne <- Evidence",
@@ -125,7 +126,8 @@
         "MODIFIES",
         "AFFECTS",
         "CLINK",
-        "SLINK"
+        "SLINK",
+        "GLINK"
       ]
     },
     "optional": {
@@ -243,6 +245,7 @@
         ["EntityMention", "Entity"],
         ["EventMention", "TEvent"],
         ["NamedEntity", "Entity"],
+        ["NamedEntity", "VALUE"],
         ["FrameArgument", "Entity"],
         ["FrameArgument", "NamedEntity"],
         ["FrameArgument", "NUMERIC"]
@@ -294,6 +297,12 @@
       "sources": ["TEvent"],
       "targets": ["TEvent"],
       "status": "canonical"
+    },
+    "GLINK": {
+      "sources": ["TEvent"],
+      "targets": ["TEvent"],
+      "status": "canonical",
+      "note": "Grammatical link extracted by TTK. Additive: only links pre-existing TEvent nodes."
     },
     "TLINK": {
       "sources": ["TEvent", "TIMEX"],
@@ -373,9 +382,9 @@
   },
   "dynamic_label_policy": {
     "NUMERIC": {
-      "status": "canonical",
-      "description": "NUMERIC is a first-class node label for numeric literal spans produced by the NER pipeline. It participates in EVENT_PARTICIPANT relationships and is an allowed source in PARTICIPANT edges.",
-      "query_guidance": "Query by label :NUMERIC for numeric participants; do not rely on argumentType for this distinction."
+      "status": "transitional",
+      "description": "NUMERIC is a transitional fallback label applied to selected NamedEntity mentions for compatibility during canonical VALUE migration. Read-side logic may still encounter it in EVENT_PARTICIPANT and related participant-resolution paths, but canonical queries should prefer VALUE or Entity-backed participants first.",
+      "query_guidance": "Prefer canonical :VALUE nodes, optionally combined with Entity-backed participants, for numeric or quantified arguments. Treat direct :NUMERIC reads as legacy fallback inventory rather than the primary query path."
     },
     "VALUE": {
       "status": "canonical",

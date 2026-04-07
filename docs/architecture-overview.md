@@ -163,6 +163,10 @@ What happens here:
 - Links `Frame` nodes to `EventMention` nodes through `INSTANTIATES`.
 - Adds core participants from `FrameArgument` nodes to events through `PARTICIPANT` edges.
 - Adds canonical `EVENT_PARTICIPANT` edges alongside `PARTICIPANT` where the maintained mention/event layer expects them.
+- Stamps participant-edge provenance metadata at write time for both edge families (`confidence`, `evidence_source`, `rule_id`, `authority_tier`, `source_kind`, `conflict_policy`, `created_at`) so phase assertions can validate contracts without relying only on post-pass bulk stamping.
+- Resolves participant sources through a centralized compatibility path that prefers canonical `Entity`/`VALUE` nodes and falls back to legacy `NamedEntity:NUMERIC|VALUE` matches only when needed.
+- Uses that same canonical-first compatibility path when estimating low-confidence event support, so VALUE-backed participants contribute support evidence alongside Entity-backed participants.
+- Keeps the direct `tag_numeric_entities()` and `tag_value_entities()` write paths only as transitional compatibility steps; they now emit deprecation warnings and are measurable through diagnostics inventory.
 - Adds non-core participants and labels them with human-readable argument types.
 - Keeps temporal arguments separate from the non-core participant bucket so temporal reasoning stays visible.
 
@@ -185,6 +189,8 @@ What happens here:
 - Uses six explicit matching cases that look for repeated syntactic/temporal patterns around `TEvent` and `TIMEX` nodes.
 - Normalizes TLINK relation inventory to canonical TimeML labels and applies conservative transitive closure (`BEFORE/AFTER/IDENTITY` subset).
 - Suppresses contradictory TLINK pairs using confidence-first conflict policy and validates TLINK endpoint contracts against ontology typing rules.
+- Enforces TLINK anchor consistency by annotating anchor types/pairs and suppressing inconsistent links (self-links or endpoint-contract violations) outside shadow mode.
+- Emits TLINK anchor-consistency inventory diagnostics so suppression impact and metadata completeness are visible in runtime metrics.
 
 This phase is currently a heuristic layer on top of the temporal graph, not a learned temporal reasoner.
 
@@ -193,7 +199,10 @@ This phase is currently a heuristic layer on top of the temporal graph, not a le
 - The script-level pipeline order is currently: `GraphBasedNLP.py` -> `RefinementPhase.py` -> `TemporalPhase.py` -> `EventEnrichmentPhase.py` -> `TlinksRecognizer.py` (via `scripts/run_pipeline.sh`).
 - Temporal extraction and temporal linking are split across phases: `TemporalPhase` materializes `DCT`, `TIMEX`, `TEvent`, and `Signal`; `EventEnrichmentPhase` materializes `EventMention`; `TlinksRecognizer` runs the TLINK heuristics over those existing temporal nodes.
 - Runtime phase assertions now enforce ontology endpoint contracts and strict legacy-to-canonical edge-ratio thresholds in testing/review modes.
-- Full-stack quality exports now embed runtime diagnostics payloads, including entity-state coverage, entity specificity coverage, event external-ref coverage, and GLINK inventory totals, so semantic-state progress is visible in JSON/Markdown reports and CLI summaries.
+- Runtime diagnostics and phase assertions now also expose hard-contract checks for referential-chain integrity and identity-field completeness on mention/event layers.
+- Runtime diagnostics now also expose NUMERIC/VALUE transition inventory totals so legacy label usage can be reduced with explicit telemetry rather than guesswork.
+- Full-stack quality exports now embed runtime diagnostics payloads, including entity-state coverage, entity specificity coverage, event external-ref coverage, GLINK inventory totals, and TLINK anchor-consistency totals, so semantic-state and temporal-link consistency progress are visible in JSON/Markdown reports and CLI summaries.
+- Recommended CI profile for transition/consistency gates in `textgraphx.tools.check_quality_gate`: `--max-tlink-anchor-inconsistent-increase 0`, `--max-tlink-missing-anchor-metadata 0`, `--max-participation-in-frame-missing-increase 0`, `--max-participation-in-mention-missing-increase 0`, and explicit overall-quality tolerance.
 - External NLP services are still hardcoded in multiple modules (`TextProcessor.py`, `TemporalPhase.py`, `util/RestCaller.py`, `util/CallAllenNlpCoref.py`).
 - Refinement is broad and rule-heavy; it is not a single pass but a sequence of many targeted Cypher transforms.
 

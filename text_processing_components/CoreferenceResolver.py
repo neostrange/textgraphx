@@ -44,7 +44,7 @@ class CoreferenceResolver:
         NER pipeline has already materialized a mention for the same span.
         """
         query = """
-        MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:PARTICIPATES_IN]->(ne:NamedEntity)
+                MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:IN_MENTION]->(ne:NamedEntity)
         WHERE coalesce(ne.start_tok, ne.token_start, ne.index) = $start
           AND coalesce(ne.end_tok, ne.token_end, ne.end_index) = $end
         RETURN ne.id AS node_id

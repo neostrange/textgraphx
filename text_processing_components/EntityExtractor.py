@@ -62,17 +62,21 @@ class EntityExtractor:
             if not matched:
                 # compute token-index based id (entity.start / entity.end are token positions expected)
                 ne_id = make_ne_id(text_id, start_index, end_index - 1, label)
+                # Compute token_id independently so it remains stable even if
+                # ne_id is later remapped to a canonical/NEL URI.
+                ne_token_id = make_ne_id(text_id, start_index, end_index - 1, label)
                 create_entity_query = """
                     MERGE (ne:NamedEntity {id: $id})
                     SET ne.type = $type, 
                         ne.value = $value, 
                         ne.start_index = $start_index, 
                         ne.end_index = $end_index,
-                        ne.token_id = $id, ne.token_start = $start_index, ne.token_end = $end_index
+                        ne.token_id = $token_id, ne.token_start = $start_index, ne.token_end = $end_index
                     WITH ne
                     MATCH (text:AnnotatedText)-[:CONTAINS_SENTENCE]->(sentence:Sentence)-[:HAS_TOKEN]->(tagOccurrence:TagOccurrence)
                     WHERE text.id = $documentId AND tagOccurrence.tok_index_doc >= $start_index AND tagOccurrence.tok_index_doc <= $end_index - 1
                     MERGE (ne)<-[:PARTICIPATES_IN]-(tagOccurrence)
+                    MERGE (ne)<-[:IN_MENTION]-(tagOccurrence)
                 """
                 self.neo4j_repo.execute_query(create_entity_query, {
                     "documentId": text_id,
@@ -81,6 +85,7 @@ class EntityExtractor:
                     "type": label,
                     "value": entity['text'],
                     "id": ne_id,
+                                    "token_id": ne_token_id,
                 })
 
     def fetch_named_entities(self, document_id):

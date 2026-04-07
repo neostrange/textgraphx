@@ -20,6 +20,7 @@ from pathlib import Path
 
 from textgraphx.evaluation.meantime_evaluator import (
     EvaluationMapping,
+    NormalizedDocument,
     aggregate_reports,
     build_dual_scorecards_from_aggregate,
     build_dual_scorecards_from_report,
@@ -119,7 +120,33 @@ def _build_parser() -> argparse.ArgumentParser:
         default=2,
         help="Number of repeated projection runs for determinism checks (Neo4j prediction mode only).",
     )
+    parser.add_argument(
+        "--relation-scope",
+        type=str,
+        default="tlink,has_participant",
+        help=(
+            "Comma-separated relation kinds to include in scoring (for example: tlink,has_participant). "
+            "Use 'all' to include all projected relations."
+        ),
+    )
     return parser
+
+
+def _parse_relation_scope(raw: str | None) -> set[str] | None:
+    if raw is None:
+        raw = "tlink,has_participant"
+    value = str(raw).strip().lower()
+    if not value or value == "all":
+        return None
+    parts = {p.strip().lower() for p in value.split(",") if p.strip()}
+    return parts or None
+
+
+def _apply_relation_scope(doc: NormalizedDocument, allowed: set[str] | None) -> NormalizedDocument:
+    if allowed is None:
+        return doc
+    doc.relations = {r for r in doc.relations if r.kind in allowed}
+    return doc
 
 
 def _build_operator_summary(report: dict) -> str | None:
@@ -168,6 +195,7 @@ def _load_mapping(path: str | None) -> EvaluationMapping:
 
 def _evaluate_single(args: argparse.Namespace, mapping: EvaluationMapping) -> dict:
     gold_doc = parse_meantime_xml(args.gold)
+    relation_scope = _parse_relation_scope(getattr(args, "relation_scope", None))
 
     if args.pred_xml:
         predicted_doc = parse_meantime_xml(args.pred_xml)
@@ -202,6 +230,9 @@ def _evaluate_single(args: argparse.Namespace, mapping: EvaluationMapping) -> di
             if hasattr(graph, "close"):
                 graph.close()
 
+    gold_doc = _apply_relation_scope(gold_doc, relation_scope)
+    predicted_doc = _apply_relation_scope(predicted_doc, relation_scope)
+
     base = evaluate_documents(
         gold_doc=gold_doc,
         predicted_doc=predicted_doc,
@@ -221,6 +252,7 @@ def _evaluate_single(args: argparse.Namespace, mapping: EvaluationMapping) -> di
         "discourse_only": bool(getattr(args, "discourse_only", False)),
         "entity_filter": "DiscourseEntity label" if getattr(args, "discourse_only", False) else "none",
         "event_filter": "none",
+        "relation_scope": "all" if relation_scope is None else sorted(relation_scope),
         "nominal_profile_mode": str(getattr(args, "nominal_profile_mode", "all")),
         "gold_like_nominal_filter": bool(getattr(args, "gold_like_nominal_filter", False)),
     }
@@ -241,6 +273,7 @@ def _evaluate_batch(args: argparse.Namespace, mapping: EvaluationMapping) -> dic
         from textgraphx.neo4j_client import make_graph_from_config
 
         graph = make_graph_from_config()
+    relation_scope = _parse_relation_scope(getattr(args, "relation_scope", None))
     try:
         for gold_path in gold_files:
             gold_doc = parse_meantime_xml(str(gold_path))
@@ -271,6 +304,9 @@ def _evaluate_batch(args: argparse.Namespace, mapping: EvaluationMapping) -> dic
                         gold_like_nominal_filter=getattr(args, "gold_like_nominal_filter", False),
                         nominal_profile_mode=getattr(args, "nominal_profile_mode", "all"),
                     )
+
+            gold_doc = _apply_relation_scope(gold_doc, relation_scope)
+            predicted_doc = _apply_relation_scope(predicted_doc, relation_scope)
 
             reports.append(
                 evaluate_documents(
@@ -320,6 +356,7 @@ def _evaluate_batch(args: argparse.Namespace, mapping: EvaluationMapping) -> dic
             "discourse_only": bool(getattr(args, "discourse_only", False)),
             "entity_filter": "DiscourseEntity label" if getattr(args, "discourse_only", False) else "none",
             "event_filter": "none",
+            "relation_scope": "all" if relation_scope is None else sorted(relation_scope),
             "nominal_profile_mode": str(getattr(args, "nominal_profile_mode", "all")),
             "gold_like_nominal_filter": bool(getattr(args, "gold_like_nominal_filter", False)),
         },

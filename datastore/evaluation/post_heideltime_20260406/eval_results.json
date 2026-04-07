@@ -1,0 +1,1872 @@
+{
+  "counts": {
+    "gold": {
+      "entity": 17,
+      "event": 17,
+      "relation": 21,
+      "timex": 4
+    },
+    "predicted": {
+      "entity": 140,
+      "event": 74,
+      "relation": 131,
+      "timex": 13
+    }
+  },
+  "diagnostics": {
+    "avg_f1": 0.20115387757516687,
+    "doc_id": "76437",
+    "layers": [
+      {
+        "errors": {
+          "boundary_mismatch": 1,
+          "endpoint_mismatch": 0,
+          "missing": 2,
+          "spurious": 125,
+          "type_mismatch": 0
+        },
+        "examples": {
+          "boundary_mismatch": [
+            {
+              "gold": {
+                "attrs": {
+                  "syntactic_type": "NOM"
+                },
+                "kind": "entity",
+                "span": [
+                  79,
+                  80,
+                  81,
+                  82,
+                  83
+                ]
+              },
+              "predicted": {
+                "attrs": {
+                  "ent_class": "SPC",
+                  "syntactic_type": "NOM"
+                },
+                "kind": "entity",
+                "span": [
+                  79,
+                  80
+                ]
+              }
+            }
+          ],
+          "missing": [
+            {
+              "gold": {
+                "attrs": {
+                  "syntactic_type": "NAM"
+                },
+                "kind": "entity",
+                "span": [
+                  57,
+                  58,
+                  59,
+                  60,
+                  61
+                ]
+              }
+            },
+            {
+              "gold": {
+                "attrs": {
+                  "syntactic_type": "PRO"
+                },
+                "kind": "entity",
+                "span": [
+                  88
+                ]
+              }
+            }
+          ],
+          "spurious": [
+            {
+              "predicted": {
+                "attrs": {
+                  "ent_class": "SPC",
+                  "syntactic_type": "NOM"
+                },
+                "kind": "entity",
+                "span": [
+                  5,
+                  6
+                ]
+              }
+            },
+            {
+              "predicted": {
+                "attrs": {
+                  "ent_class": "SPC",
+                  "syntactic_type": "NAM"
+                },
+                "kind": "entity",
+                "span": [
+                  7,
+                  8,
+                  9,
+                  10
+                ]
+              }
+            },
+            {
+              "predicted": {
+                "attrs": {
+                  "ent_class": "GEN",
+                  "syntactic_type": "NOM"
+                },
+                "kind": "entity",
+                "span": [
+                  15
+                ]
+              }
+            },
+            {
+              "predicted": {
+                "attrs": {
+                  "ent_class": "SPC",
+                  "syntactic_type": "NOM"
+                },
+                "kind": "entity",
+                "span": [
+                  19
+                ]
+              }
+            },
+            {
+              "predicted": {
+                "attrs": {
+                  "ent_class": "SPC",
+                  "syntactic_type": "NOM"
+                },
+                "kind": "entity",
+                "span": [
+                  41
+                ]
+              }
+            }
+          ],
+          "type_mismatch": []
+        },
+        "f1": 0.178343949044586,
+        "fn": 3,
+        "fp": 126,
+        "layer": "entity",
+        "precision": 0.1,
+        "recall": 0.8235294117647058,
+        "tp": 14
+      },
+      {
+        "errors": {
+          "boundary_mismatch": 0,
+          "endpoint_mismatch": 0,
+          "missing": 4,
+          "spurious": 61,
+          "type_mismatch": 0
+        },
+        "examples": {
+          "boundary_mismatch": [],
+          "missing": [
+            {
+              "gold": {
+                "attrs": {
+                  "certainty": "CERTAIN",
+                  "polarity": "POS",
+                  "pos": "NOUN",
+                  "pred": "crisis",
+                  "time": "NON_FUTURE"
+                },
+                "kind": "event",
+                "span": [
+                  6
+                ]
+              }
+            },
+            {
+              "gold": {
+                "attrs": {
+                  "certainty": "CERTAIN",
+                  "polarity": "POS",
+                  "pos": "NOUN",
+                  "pred": "sell-off",
+                  "time": "NON_FUTURE"
+                },
+                "kind": "event",
+                "span": [
+                  20
+                ]
+              }
+            },
+            {
+              "gold": {
+                "attrs": {
+                  "pos": "NOUN",
+                  "pred": "tie"
+                },
+                "kind": "event",
+                "span": [
+                  102
+                ]
+              }
+            },
+            {
+              "gold": {
+                "attrs": {
+                  "aspect": "NONE",
+                  "certainty": "POSSIBLE",
+                  "polarity": "POS",
+                  "pos": "OTHER",
+                  "pred": "insolvent",
+                  "tense": "NONE",
+                  "time": "FUTURE"
+                },
+                "kind": "event",
+                "span": [
+                  105
+                ]
+              }
+            }
+          ],
+          "spurious": [
+            {
+              "predicted": {
+                "attrs": {
+                  "certainty": "CERTAIN",
+                  "polarity": "POS",
+                  "pos": "VERB",
+                  "pred": "are",
+                  "time": "NON_FUTURE"
+                },
+                "kind": "event",
+                "span": [
+                  84
+                ]
+              }
+            },
+            {
+              "predicted": {
+                "attrs": {
+                  "certainty": "CERTAIN",
+                  "polarity": "POS",
+                  "pos": "VERB",
+                  "pred": "will",
+                  "time": "NON_FUTURE"
+                },
+                "kind": "event",
+                "span": [
+                  103
+                ]
+              }
+            },
+            {
+              "predicted": {
+                "attrs": {
+                  "aspect": "NONE",
+                  "certainty": "CERTAIN",
+                  "polarity": "POS",
+                  "pos": "VERB",
+                  "pred": "transfer",
+                  "tense": "PAST",
+                  "time": "NON_FUTURE"
+                },
+                "kind": "event",
+                "span": [
+                  113
+                ]
+              }
+            },
+            {
+              "predicted": {
+                "attrs": {
+                  "aspect": "NONE",
+                  "certainty": "CERTAIN",
+                  "polarity": "POS",
+                  "pos": "VERB",
+                  "pred": "follow",
+                  "tense": "PRESPART",
+                  "time": "NON_FUTURE"
+                },
+                "kind": "event",
+                "span": [
+                  121
+                ]
+              }
+            },
+            {
+              "predicted": {
+                "attrs": {
+                  "aspect": "NONE",
+                  "certainty": "CERTAIN",
+                  "polarity": "POS",
+                  "pos": "VERB",
+                  "pred": "authorize",
+                  "tense": "PAST",
+                  "time": "NON_FUTURE"
+                },
+                "kind": "event",
+                "span": [
+                  128
+                ]
+              }
+            }
+          ],
+          "type_mismatch": []
+        },
+        "f1": 0.28571428571428575,
+        "fn": 4,
+        "fp": 61,
+        "layer": "event",
+        "precision": 0.17567567567567569,
+        "recall": 0.7647058823529411,
+        "tp": 13
+      },
+      {
+        "errors": {
+          "boundary_mismatch": 0,
+          "endpoint_mismatch": 0,
+          "missing": 2,
+          "spurious": 11,
+          "type_mismatch": 0
+        },
+        "examples": {
+          "boundary_mismatch": [],
+          "missing": [
+            {
+              "gold": {
+                "attrs": {
+                  "functionInDocument": "NONE",
+                  "type": "DATE",
+                  "value": "2007-08-10"
+                },
+                "kind": "timex",
+                "span": [
+                  38,
+                  39,
+                  40,
+                  41
+                ]
+              }
+            },
+            {
+              "gold": {
+                "attrs": {
+                  "functionInDocument": "NONE",
+                  "type": "DATE",
+                  "value": "2007-08-10"
+                },
+                "kind": "timex",
+                "span": [
+                  50,
+                  51
+                ]
+              }
+            }
+          ],
+          "spurious": [
+            {
+              "predicted": {
+                "attrs": {
+                  "functionInDocument": "NONE",
+                  "type": "DATE",
+                  "value": "2007-08-09"
+                },
+                "kind": "timex",
+                "span": [
+                  107
+                ]
+              }
+            },
+            {
+              "predicted": {
+                "attrs": {
+                  "functionInDocument": "NONE",
+                  "type": "DATE",
+                  "value": "2007-08-10"
+                },
+                "kind": "timex",
+                "span": [
+                  146
+                ]
+              }
+            },
+            {
+              "predicted": {
+                "attrs": {
+                  "functionInDocument": "NONE",
+                  "type": "DATE",
+                  "value": "2007-08-10"
+                },
+                "kind": "timex",
+                "span": [
+                  168
+                ]
+              }
+            },
+            {
+              "predicted": {
+                "attrs": {
+                  "functionInDocument": "NONE",
+                  "type": "DATE",
+                  "value": "2007-W32"
+                },
+                "kind": "timex",
+                "span": [
+                  188,
+                  189
+                ]
+              }
+            },
+            {
+              "predicted": {
+                "attrs": {
+                  "functionInDocument": "NONE",
+                  "type": "DATE",
+                  "value": "2007-08-10"
+                },
+                "kind": "timex",
+                "span": [
+                  204
+                ]
+              }
+            }
+          ],
+          "type_mismatch": []
+        },
+        "f1": 0.23529411764705882,
+        "fn": 2,
+        "fp": 11,
+        "layer": "timex",
+        "precision": 0.15384615384615385,
+        "recall": 0.5,
+        "tp": 2
+      },
+      {
+        "errors": {
+          "boundary_mismatch": 0,
+          "endpoint_mismatch": 1,
+          "missing": 12,
+          "spurious": 122,
+          "type_mismatch": 0
+        },
+        "examples": {
+          "endpoint_mismatch": [
+            {
+              "gold": "('has_participant', 'event', (73,), 'entity', (69, 70, 71, 72), ())",
+              "predicted": "('has_participant', 'event', (73,), 'entity', (69, 70, 71), ())"
+            }
+          ],
+          "missing": [
+            {
+              "gold": "('has_participant', 'event', (26,), 'entity', (28, 29, 30), ())"
+            },
+            {
+              "gold": "('has_participant', 'event', (62,), 'entity', (57, 58, 59, 60, 61), ())"
+            },
+            {
+              "gold": "('tlink', 'event', (14,), 'event', (37,), (('reltype', 'BEFORE'),))"
+            },
+            {
+              "gold": "('tlink', 'event', (37,), 'event', (43,), (('reltype', 'AFTER'),))"
+            },
+            {
+              "gold": "('tlink', 'event', (37,), 'event', (62,), (('reltype', 'AFTER'),))"
+            }
+          ],
+          "spurious": [
+            {
+              "predicted": "('clink', 'event', (230,), 'event', (233,), ())"
+            },
+            {
+              "predicted": "('clink', 'event', (230,), 'event', (237,), ())"
+            },
+            {
+              "predicted": "('clink', 'event', (233,), 'event', (237,), ())"
+            },
+            {
+              "predicted": "('clink', 'event', (237,), 'event', (233,), ())"
+            },
+            {
+              "predicted": "('has_participant', 'event', (104,), 'entity', (97, 98, 99, 100, 101, 102), ())"
+            }
+          ],
+          "type_mismatch": []
+        },
+        "f1": 0.10526315789473685,
+        "fn": 13,
+        "fp": 123,
+        "layer": "relation",
+        "precision": 0.061068702290076333,
+        "recall": 0.38095238095238093,
+        "tp": 8
+      }
+    ],
+    "mode": "relaxed",
+    "suggestions": [
+      "entity: boundary mismatches detected - verify token span anchoring (`start_tok`, `end_tok`) and overlap threshold.",
+      "entity: low F1 (0.178) - inspect extraction and matching rules for this layer.",
+      "entity: precision is weaker than recall - investigate over-generation and filtering criteria.",
+      "event: low F1 (0.286) - inspect extraction and matching rules for this layer.",
+      "event: precision is weaker than recall - investigate over-generation and filtering criteria.",
+      "relation: low F1 (0.105) - inspect extraction and matching rules for this layer.",
+      "relation: precision is weaker than recall - investigate over-generation and filtering criteria.",
+      "timex: low F1 (0.235) - inspect extraction and matching rules for this layer.",
+      "timex: precision is weaker than recall - investigate over-generation and filtering criteria."
+    ],
+    "weak_layers": [
+      "entity",
+      "event",
+      "timex",
+      "relation"
+    ]
+  },
+  "doc_id": "76437",
+  "evaluation_scope": {
+    "discourse_only": false,
+    "entity_filter": "none",
+    "event_filter": "none",
+    "gold_like_nominal_filter": false,
+    "nominal_profile_mode": "all",
+    "relation_scope": "all"
+  },
+  "projection_determinism": {
+    "baseline_signature": "215970893e10e2653a2444a174e9a417fe10e32c42fda3b7a633621102c162bf",
+    "deterministic": true,
+    "doc_id": "76437",
+    "mismatch_runs": [],
+    "runs": 2
+  },
+  "relaxed": {
+    "entity": {
+      "errors": {
+        "boundary_mismatch": 1,
+        "missing": 2,
+        "spurious": 125,
+        "type_mismatch": 0
+      },
+      "examples": {
+        "boundary_mismatch": [
+          {
+            "gold": {
+              "attrs": {
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                79,
+                80,
+                81,
+                82,
+                83
+              ]
+            },
+            "predicted": {
+              "attrs": {
+                "ent_class": "SPC",
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                79,
+                80
+              ]
+            }
+          }
+        ],
+        "missing": [
+          {
+            "gold": {
+              "attrs": {
+                "syntactic_type": "NAM"
+              },
+              "kind": "entity",
+              "span": [
+                57,
+                58,
+                59,
+                60,
+                61
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {
+                "syntactic_type": "PRO"
+              },
+              "kind": "entity",
+              "span": [
+                88
+              ]
+            }
+          }
+        ],
+        "spurious": [
+          {
+            "predicted": {
+              "attrs": {
+                "ent_class": "SPC",
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                5,
+                6
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "ent_class": "SPC",
+                "syntactic_type": "NAM"
+              },
+              "kind": "entity",
+              "span": [
+                7,
+                8,
+                9,
+                10
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "ent_class": "GEN",
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                15
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "ent_class": "SPC",
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                19
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "ent_class": "SPC",
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                41
+              ]
+            }
+          }
+        ],
+        "type_mismatch": []
+      },
+      "f1": 0.178343949044586,
+      "fn": 3,
+      "fp": 126,
+      "matched_pairs": 14,
+      "mode": "relaxed",
+      "precision": 0.1,
+      "recall": 0.8235294117647058,
+      "tp": 14
+    },
+    "event": {
+      "errors": {
+        "boundary_mismatch": 0,
+        "missing": 4,
+        "spurious": 61,
+        "type_mismatch": 0
+      },
+      "examples": {
+        "boundary_mismatch": [],
+        "missing": [
+          {
+            "gold": {
+              "attrs": {
+                "certainty": "CERTAIN",
+                "polarity": "POS",
+                "pos": "NOUN",
+                "pred": "crisis",
+                "time": "NON_FUTURE"
+              },
+              "kind": "event",
+              "span": [
+                6
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {
+                "certainty": "CERTAIN",
+                "polarity": "POS",
+                "pos": "NOUN",
+                "pred": "sell-off",
+                "time": "NON_FUTURE"
+              },
+              "kind": "event",
+              "span": [
+                20
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {
+                "pos": "NOUN",
+                "pred": "tie"
+              },
+              "kind": "event",
+              "span": [
+                102
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {
+                "aspect": "NONE",
+                "certainty": "POSSIBLE",
+                "polarity": "POS",
+                "pos": "OTHER",
+                "pred": "insolvent",
+                "tense": "NONE",
+                "time": "FUTURE"
+              },
+              "kind": "event",
+              "span": [
+                105
+              ]
+            }
+          }
+        ],
+        "spurious": [
+          {
+            "predicted": {
+              "attrs": {
+                "certainty": "CERTAIN",
+                "polarity": "POS",
+                "pos": "VERB",
+                "pred": "are",
+                "time": "NON_FUTURE"
+              },
+              "kind": "event",
+              "span": [
+                84
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "certainty": "CERTAIN",
+                "polarity": "POS",
+                "pos": "VERB",
+                "pred": "will",
+                "time": "NON_FUTURE"
+              },
+              "kind": "event",
+              "span": [
+                103
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "aspect": "NONE",
+                "certainty": "CERTAIN",
+                "polarity": "POS",
+                "pos": "VERB",
+                "pred": "transfer",
+                "tense": "PAST",
+                "time": "NON_FUTURE"
+              },
+              "kind": "event",
+              "span": [
+                113
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "aspect": "NONE",
+                "certainty": "CERTAIN",
+                "polarity": "POS",
+                "pos": "VERB",
+                "pred": "follow",
+                "tense": "PRESPART",
+                "time": "NON_FUTURE"
+              },
+              "kind": "event",
+              "span": [
+                121
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "aspect": "NONE",
+                "certainty": "CERTAIN",
+                "polarity": "POS",
+                "pos": "VERB",
+                "pred": "authorize",
+                "tense": "PAST",
+                "time": "NON_FUTURE"
+              },
+              "kind": "event",
+              "span": [
+                128
+              ]
+            }
+          }
+        ],
+        "type_mismatch": []
+      },
+      "f1": 0.28571428571428575,
+      "fn": 4,
+      "fp": 61,
+      "matched_pairs": 13,
+      "mode": "relaxed",
+      "precision": 0.17567567567567569,
+      "recall": 0.7647058823529411,
+      "tp": 13
+    },
+    "relation": {
+      "errors": {
+        "endpoint_mismatch": 1,
+        "missing": 12,
+        "spurious": 122,
+        "type_mismatch": 0
+      },
+      "examples": {
+        "endpoint_mismatch": [
+          {
+            "gold": "('has_participant', 'event', (73,), 'entity', (69, 70, 71, 72), ())",
+            "predicted": "('has_participant', 'event', (73,), 'entity', (69, 70, 71), ())"
+          }
+        ],
+        "missing": [
+          {
+            "gold": "('has_participant', 'event', (26,), 'entity', (28, 29, 30), ())"
+          },
+          {
+            "gold": "('has_participant', 'event', (62,), 'entity', (57, 58, 59, 60, 61), ())"
+          },
+          {
+            "gold": "('tlink', 'event', (14,), 'event', (37,), (('reltype', 'BEFORE'),))"
+          },
+          {
+            "gold": "('tlink', 'event', (37,), 'event', (43,), (('reltype', 'AFTER'),))"
+          },
+          {
+            "gold": "('tlink', 'event', (37,), 'event', (62,), (('reltype', 'AFTER'),))"
+          }
+        ],
+        "spurious": [
+          {
+            "predicted": "('clink', 'event', (230,), 'event', (233,), ())"
+          },
+          {
+            "predicted": "('clink', 'event', (230,), 'event', (237,), ())"
+          },
+          {
+            "predicted": "('clink', 'event', (233,), 'event', (237,), ())"
+          },
+          {
+            "predicted": "('clink', 'event', (237,), 'event', (233,), ())"
+          },
+          {
+            "predicted": "('has_participant', 'event', (104,), 'entity', (97, 98, 99, 100, 101, 102), ())"
+          }
+        ],
+        "type_mismatch": []
+      },
+      "f1": 0.10526315789473685,
+      "fn": 13,
+      "fp": 123,
+      "mode": "relaxed",
+      "precision": 0.061068702290076333,
+      "recall": 0.38095238095238093,
+      "tp": 8
+    },
+    "timex": {
+      "errors": {
+        "boundary_mismatch": 0,
+        "missing": 2,
+        "spurious": 11,
+        "type_mismatch": 0
+      },
+      "examples": {
+        "boundary_mismatch": [],
+        "missing": [
+          {
+            "gold": {
+              "attrs": {
+                "functionInDocument": "NONE",
+                "type": "DATE",
+                "value": "2007-08-10"
+              },
+              "kind": "timex",
+              "span": [
+                38,
+                39,
+                40,
+                41
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {
+                "functionInDocument": "NONE",
+                "type": "DATE",
+                "value": "2007-08-10"
+              },
+              "kind": "timex",
+              "span": [
+                50,
+                51
+              ]
+            }
+          }
+        ],
+        "spurious": [
+          {
+            "predicted": {
+              "attrs": {
+                "functionInDocument": "NONE",
+                "type": "DATE",
+                "value": "2007-08-09"
+              },
+              "kind": "timex",
+              "span": [
+                107
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "functionInDocument": "NONE",
+                "type": "DATE",
+                "value": "2007-08-10"
+              },
+              "kind": "timex",
+              "span": [
+                146
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "functionInDocument": "NONE",
+                "type": "DATE",
+                "value": "2007-08-10"
+              },
+              "kind": "timex",
+              "span": [
+                168
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "functionInDocument": "NONE",
+                "type": "DATE",
+                "value": "2007-W32"
+              },
+              "kind": "timex",
+              "span": [
+                188,
+                189
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "functionInDocument": "NONE",
+                "type": "DATE",
+                "value": "2007-08-10"
+              },
+              "kind": "timex",
+              "span": [
+                204
+              ]
+            }
+          }
+        ],
+        "type_mismatch": []
+      },
+      "f1": 0.23529411764705882,
+      "fn": 2,
+      "fp": 11,
+      "matched_pairs": 2,
+      "mode": "relaxed",
+      "precision": 0.15384615384615385,
+      "recall": 0.5,
+      "tp": 2
+    }
+  },
+  "scorecards": {
+    "beyond_timeml_reasoning": {
+      "composite": 0.013186813186813197,
+      "event_gain": 0.043956043956043994,
+      "relation_gain": 0.0,
+      "relaxed_event_f1": 0.28571428571428575,
+      "relaxed_relation_f1": 0.10526315789473685,
+      "strict_event_f1": 0.24175824175824176,
+      "strict_relation_f1": 0.10526315789473685,
+      "weights": {
+        "event_gain": 0.3,
+        "relation_gain": 0.7
+      }
+    },
+    "time_ml_compliance": {
+      "composite": 0.1635763617187766,
+      "strict_event_f1": 0.24175824175824176,
+      "strict_relation_f1": 0.10526315789473685,
+      "strict_timex_f1": 0.11764705882352941,
+      "weights": {
+        "event": 0.4,
+        "relation": 0.3,
+        "timex": 0.3
+      }
+    }
+  },
+  "strict": {
+    "entity": {
+      "errors": {
+        "boundary_mismatch": 8,
+        "missing": 3,
+        "spurious": 126,
+        "type_mismatch": 6
+      },
+      "examples": {
+        "boundary_mismatch": [
+          {
+            "gold": {
+              "attrs": {},
+              "kind": "entity",
+              "span": [
+                23,
+                24,
+                25
+              ]
+            },
+            "predicted": {
+              "attrs": {
+                "ent_class": "SPC",
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                24,
+                25,
+                26
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {},
+              "kind": "entity",
+              "span": [
+                32,
+                33,
+                34,
+                35,
+                36
+              ]
+            },
+            "predicted": {
+              "attrs": {
+                "ent_class": "SPC",
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                33,
+                34,
+                35,
+                36
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {
+                "syntactic_type": "NAM"
+              },
+              "kind": "entity",
+              "span": [
+                57,
+                58,
+                59,
+                60,
+                61
+              ]
+            },
+            "predicted": {
+              "attrs": {
+                "ent_class": "SPC",
+                "syntactic_type": "NAM"
+              },
+              "kind": "entity",
+              "span": [
+                58
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {
+                "syntactic_type": "NAM"
+              },
+              "kind": "entity",
+              "span": [
+                69,
+                70,
+                71,
+                72
+              ]
+            },
+            "predicted": {
+              "attrs": {
+                "ent_class": "GEN",
+                "syntactic_type": "PTV"
+              },
+              "kind": "entity",
+              "span": [
+                72
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                79,
+                80,
+                81,
+                82,
+                83
+              ]
+            },
+            "predicted": {
+              "attrs": {
+                "ent_class": "SPC",
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                83
+              ]
+            }
+          }
+        ],
+        "missing": [
+          {
+            "gold": {
+              "attrs": {
+                "syntactic_type": "NAM"
+              },
+              "kind": "entity",
+              "span": [
+                58
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                82,
+                83
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {
+                "syntactic_type": "PRO"
+              },
+              "kind": "entity",
+              "span": [
+                88
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                88,
+                89,
+                90
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                93
+              ]
+            }
+          }
+        ],
+        "spurious": [
+          {
+            "predicted": {
+              "attrs": {
+                "ent_class": "SPC",
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                5,
+                6
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "ent_class": "SPC",
+                "syntactic_type": "NAM"
+              },
+              "kind": "entity",
+              "span": [
+                7,
+                8,
+                9,
+                10
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "ent_class": "GEN",
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                15
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "ent_class": "SPC",
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                19
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "ent_class": "SPC",
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                41
+              ]
+            }
+          }
+        ],
+        "type_mismatch": [
+          {
+            "gold": {
+              "attrs": {
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                1
+              ]
+            },
+            "predicted": {
+              "attrs": {
+                "ent_class": "GEN",
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                1
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                11,
+                12,
+                13
+              ]
+            },
+            "predicted": {
+              "attrs": {
+                "ent_class": "SPC",
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                11,
+                12,
+                13
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {
+                "syntactic_type": "NAM"
+              },
+              "kind": "entity",
+              "span": [
+                28,
+                29,
+                30
+              ]
+            },
+            "predicted": {
+              "attrs": {
+                "ent_class": "SPC",
+                "syntactic_type": "NAM"
+              },
+              "kind": "entity",
+              "span": [
+                28,
+                29,
+                30
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {
+                "syntactic_type": "NAM"
+              },
+              "kind": "entity",
+              "span": [
+                69
+              ]
+            },
+            "predicted": {
+              "attrs": {
+                "ent_class": "SPC",
+                "syntactic_type": "NAM"
+              },
+              "kind": "entity",
+              "span": [
+                69
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                86
+              ]
+            },
+            "predicted": {
+              "attrs": {
+                "ent_class": "GEN",
+                "syntactic_type": "NOM"
+              },
+              "kind": "entity",
+              "span": [
+                86
+              ]
+            }
+          }
+        ]
+      },
+      "f1": 0.0,
+      "fn": 17,
+      "fp": 140,
+      "matched_pairs": 0,
+      "mode": "strict",
+      "precision": 0.0,
+      "recall": 0.0,
+      "tp": 0
+    },
+    "event": {
+      "errors": {
+        "boundary_mismatch": 0,
+        "missing": 4,
+        "spurious": 61,
+        "type_mismatch": 2
+      },
+      "examples": {
+        "boundary_mismatch": [],
+        "missing": [
+          {
+            "gold": {
+              "attrs": {
+                "certainty": "CERTAIN",
+                "polarity": "POS",
+                "pos": "NOUN",
+                "pred": "crisis",
+                "time": "NON_FUTURE"
+              },
+              "kind": "event",
+              "span": [
+                6
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {
+                "certainty": "CERTAIN",
+                "polarity": "POS",
+                "pos": "NOUN",
+                "pred": "sell-off",
+                "time": "NON_FUTURE"
+              },
+              "kind": "event",
+              "span": [
+                20
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {
+                "pos": "NOUN",
+                "pred": "tie"
+              },
+              "kind": "event",
+              "span": [
+                102
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {
+                "aspect": "NONE",
+                "certainty": "POSSIBLE",
+                "polarity": "POS",
+                "pos": "OTHER",
+                "pred": "insolvent",
+                "tense": "NONE",
+                "time": "FUTURE"
+              },
+              "kind": "event",
+              "span": [
+                105
+              ]
+            }
+          }
+        ],
+        "spurious": [
+          {
+            "predicted": {
+              "attrs": {
+                "certainty": "CERTAIN",
+                "polarity": "POS",
+                "pos": "VERB",
+                "pred": "are",
+                "time": "NON_FUTURE"
+              },
+              "kind": "event",
+              "span": [
+                84
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "certainty": "CERTAIN",
+                "polarity": "POS",
+                "pos": "VERB",
+                "pred": "will",
+                "time": "NON_FUTURE"
+              },
+              "kind": "event",
+              "span": [
+                103
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "aspect": "NONE",
+                "certainty": "CERTAIN",
+                "polarity": "POS",
+                "pos": "VERB",
+                "pred": "transfer",
+                "tense": "PAST",
+                "time": "NON_FUTURE"
+              },
+              "kind": "event",
+              "span": [
+                113
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "aspect": "NONE",
+                "certainty": "CERTAIN",
+                "polarity": "POS",
+                "pos": "VERB",
+                "pred": "follow",
+                "tense": "PRESPART",
+                "time": "NON_FUTURE"
+              },
+              "kind": "event",
+              "span": [
+                121
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "aspect": "NONE",
+                "certainty": "CERTAIN",
+                "polarity": "POS",
+                "pos": "VERB",
+                "pred": "authorize",
+                "tense": "PAST",
+                "time": "NON_FUTURE"
+              },
+              "kind": "event",
+              "span": [
+                128
+              ]
+            }
+          }
+        ],
+        "type_mismatch": [
+          {
+            "gold": {
+              "attrs": {
+                "certainty": "CERTAIN",
+                "polarity": "POS",
+                "pos": "VERB",
+                "pred": "fear",
+                "tense": "PRESENT",
+                "time": "NON_FUTURE"
+              },
+              "kind": "event",
+              "span": [
+                95
+              ]
+            },
+            "predicted": {
+              "attrs": {
+                "aspect": "NONE",
+                "certainty": "CERTAIN",
+                "polarity": "POS",
+                "pos": "VERB",
+                "pred": "fear",
+                "tense": "PRESENT",
+                "time": "NON_FUTURE"
+              },
+              "kind": "event",
+              "span": [
+                95
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {
+                "aspect": "NONE",
+                "certainty": "POSSIBLE",
+                "polarity": "POS",
+                "pos": "VERB",
+                "pred": "be",
+                "tense": "FUTURE",
+                "time": "FUTURE"
+              },
+              "kind": "event",
+              "span": [
+                104
+              ]
+            },
+            "predicted": {
+              "attrs": {
+                "certainty": "CERTAIN",
+                "polarity": "POS",
+                "pos": "VERB",
+                "pred": "be",
+                "time": "NON_FUTURE"
+              },
+              "kind": "event",
+              "span": [
+                104
+              ]
+            }
+          }
+        ]
+      },
+      "f1": 0.24175824175824176,
+      "fn": 6,
+      "fp": 63,
+      "matched_pairs": 11,
+      "mode": "strict",
+      "precision": 0.14864864864864866,
+      "recall": 0.6470588235294118,
+      "tp": 11
+    },
+    "relation": {
+      "errors": {
+        "endpoint_mismatch": 1,
+        "missing": 12,
+        "spurious": 122,
+        "type_mismatch": 0
+      },
+      "examples": {
+        "endpoint_mismatch": [
+          {
+            "gold": "('has_participant', 'event', (73,), 'entity', (69, 70, 71, 72), ())",
+            "predicted": "('has_participant', 'event', (73,), 'entity', (69, 70, 71), ())"
+          }
+        ],
+        "missing": [
+          {
+            "gold": "('has_participant', 'event', (26,), 'entity', (28, 29, 30), ())"
+          },
+          {
+            "gold": "('has_participant', 'event', (62,), 'entity', (57, 58, 59, 60, 61), ())"
+          },
+          {
+            "gold": "('tlink', 'event', (14,), 'event', (37,), (('reltype', 'BEFORE'),))"
+          },
+          {
+            "gold": "('tlink', 'event', (37,), 'event', (43,), (('reltype', 'AFTER'),))"
+          },
+          {
+            "gold": "('tlink', 'event', (37,), 'event', (62,), (('reltype', 'AFTER'),))"
+          }
+        ],
+        "spurious": [
+          {
+            "predicted": "('clink', 'event', (230,), 'event', (233,), ())"
+          },
+          {
+            "predicted": "('clink', 'event', (230,), 'event', (237,), ())"
+          },
+          {
+            "predicted": "('clink', 'event', (233,), 'event', (237,), ())"
+          },
+          {
+            "predicted": "('clink', 'event', (237,), 'event', (233,), ())"
+          },
+          {
+            "predicted": "('has_participant', 'event', (104,), 'entity', (97, 98, 99, 100, 101, 102), ())"
+          }
+        ],
+        "type_mismatch": []
+      },
+      "f1": 0.10526315789473685,
+      "fn": 13,
+      "fp": 123,
+      "mode": "strict",
+      "precision": 0.061068702290076333,
+      "recall": 0.38095238095238093,
+      "tp": 8
+    },
+    "timex": {
+      "errors": {
+        "boundary_mismatch": 0,
+        "missing": 2,
+        "spurious": 11,
+        "type_mismatch": 1
+      },
+      "examples": {
+        "boundary_mismatch": [],
+        "missing": [
+          {
+            "gold": {
+              "attrs": {
+                "functionInDocument": "NONE",
+                "type": "DATE",
+                "value": "2007-08-10"
+              },
+              "kind": "timex",
+              "span": [
+                38,
+                39,
+                40,
+                41
+              ]
+            }
+          },
+          {
+            "gold": {
+              "attrs": {
+                "functionInDocument": "NONE",
+                "type": "DATE",
+                "value": "2007-08-10"
+              },
+              "kind": "timex",
+              "span": [
+                50,
+                51
+              ]
+            }
+          }
+        ],
+        "spurious": [
+          {
+            "predicted": {
+              "attrs": {
+                "functionInDocument": "NONE",
+                "type": "DATE",
+                "value": "2007-08-09"
+              },
+              "kind": "timex",
+              "span": [
+                107
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "functionInDocument": "NONE",
+                "type": "DATE",
+                "value": "2007-08-10"
+              },
+              "kind": "timex",
+              "span": [
+                146
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "functionInDocument": "NONE",
+                "type": "DATE",
+                "value": "2007-08-10"
+              },
+              "kind": "timex",
+              "span": [
+                168
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "functionInDocument": "NONE",
+                "type": "DATE",
+                "value": "2007-W32"
+              },
+              "kind": "timex",
+              "span": [
+                188,
+                189
+              ]
+            }
+          },
+          {
+            "predicted": {
+              "attrs": {
+                "functionInDocument": "NONE",
+                "type": "DATE",
+                "value": "2007-08-10"
+              },
+              "kind": "timex",
+              "span": [
+                204
+              ]
+            }
+          }
+        ],
+        "type_mismatch": [
+          {
+            "gold": {
+              "attrs": {
+                "functionInDocument": "CREATION_TIME",
+                "type": "DATE",
+                "value": "2007-08-10"
+              },
+              "kind": "timex",
+              "span": [
+                7,
+                8,
+                9,
+                10
+              ]
+            },
+            "predicted": {
+              "attrs": {
+                "functionInDocument": "NONE",
+                "type": "DATE",
+                "value": "2007-08-10"
+              },
+              "kind": "timex",
+              "span": [
+                7,
+                8,
+                9,
+                10
+              ]
+            }
+          }
+        ]
+      },
+      "f1": 0.11764705882352941,
+      "fn": 3,
+      "fp": 12,
+      "matched_pairs": 1,
+      "mode": "strict",
+      "precision": 0.07692307692307693,
+      "recall": 0.25,
+      "tp": 1
+    }
+  }
+}

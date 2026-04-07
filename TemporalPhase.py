@@ -14,6 +14,11 @@ import xml.etree.ElementTree as ET
 
 import requests
 
+try:
+    from nltk.corpus import wordnet as _wn  # type: ignore
+except Exception:
+    _wn = None
+
 if __name__ == '__main__' and __package__ is None:
     repo_root = os.path.dirname(os.path.dirname(__file__))
     if repo_root not in sys.path:
@@ -24,6 +29,23 @@ from textgraphx.neo4j_client import make_graph_from_config
 from textgraphx.reasoning_contracts import normalize_event_attr
 
 logger = logging.getLogger(__name__)
+
+_EVENTIVE_NOMINAL_ALLOWLIST = {
+    "crisis",
+    "tie",
+    "ties",
+    "sell-off",
+    "selloff",
+}
+
+_NON_EVENTIVE_NOMINAL_DENYLIST = {
+    "liquidity",
+    "statement",
+    "out",
+    "times",
+}
+
+_EVENTIVE_NOUN_LEXNAMES = {"noun.event", "noun.act", "noun.process"}
 
 
 def _iter_signal_elements(xml_text):
@@ -67,6 +89,21 @@ def _iter_relation_elements(xml_text, relation_name):
     for elem in root.iter():
         tag = elem.tag.split("}")[-1] if isinstance(elem.tag, str) else str(elem.tag)
         if str(tag).strip().upper() == relation_name:
+            yield elem
+
+
+def _iter_timex_elements(xml_text):
+    if not xml_text or not xml_text.strip():
+        return
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError as exc:
+        logger.warning("TIMEX XML parsing failed: %s", exc)
+        return
+
+    for elem in root.iter():
+        tag = elem.tag.split("}")[-1] if isinstance(elem.tag, str) else str(elem.tag)
+        if str(tag).strip().upper() == "TIMEX3":
             yield elem
 
 
@@ -161,7 +198,8 @@ class TemporalPhase:
 
         payload = {"input": text}
         if dct:
-            payload["dct"] = str(dct)
+            # HeidelTime requires YYYY-MM-DD; strip any time component
+            payload["dct"] = str(dct).split("T")[0]
         headers = {"Content-type": "application/json", "Accept": "text/plain"}
 
         try:
@@ -205,15 +243,104 @@ class TemporalPhase:
         MERGE (ta)-[:TRIGGERS]->(t)
         RETURN count(DISTINCT t) AS timex_count
         """
-        self.graph.run(
+        rows = self.graph.run(
             query,
             parameters={"xml_path": f"{doc_id}.xml", "doc_id": doc_id},
         ).data()
+        merged = int(rows[0].get("timex_count", 0) or 0) if rows else 0
+        self._log_timex_diagnostics(doc_id, source="apoc", merged=merged)
+        return ""
+
+    def _materialize_timexes_from_heideltime(self, doc_id):
+        """Project TIMEX3 nodes from HeidelTime service output onto the token graph."""
+        result_xml = self.callHeidelTimeService(self.get_doc_text_and_dct(doc_id))
+        query = """
+        MERGE (t:TIMEX {tid: $tid, doc_id: toInteger($doc_id)})
+        SET t.type = $type,
+            t.value = $value,
+            t.text = $text,
+            t.start_char = toInteger($start_char),
+            t.end_char = toInteger($end_char),
+            t.start_index = toInteger($start_char),
+            t.end_index = toInteger($end_char),
+            t.functionInDocument = coalesce($function_in_document, t.functionInDocument),
+            t.anchorTimeID = coalesce($anchor_time_id, t.anchorTimeID),
+            t.beginPoint = coalesce($begin_point, t.beginPoint),
+            t.endPoint = coalesce($end_point, t.endPoint)
+        WITH t
+        MATCH (a:AnnotatedText {id: toInteger($doc_id)})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(ta:TagOccurrence)
+        WHERE ta.index >= toInteger(t.start_char) AND ta.end_index <= toInteger(t.end_char)
+        WITH t, collect(ta) AS tas, min(ta.tok_index_doc) AS min_tok, max(ta.tok_index_doc) AS max_tok
+        SET t.start_tok = min_tok,
+            t.end_tok = max_tok
+        FOREACH (token IN tas | MERGE (token)-[:TRIGGERS]->(t))
+        """
+
+        parsed = 0
+        for timex in _iter_timex_elements(result_xml or ""):
+            begin = timex.attrib.get("begin") or timex.attrib.get("start_index")
+            end = timex.attrib.get("end") or timex.attrib.get("end_index")
+            if begin is None or end is None or not str(begin).isdigit() or not str(end).isdigit():
+                continue
+            parsed += 1
+            self.graph.run(
+                query,
+                parameters={
+                    "doc_id": doc_id,
+                    "tid": timex.attrib.get("tid", ""),
+                    "type": timex.attrib.get("type", ""),
+                    "value": timex.attrib.get("value", ""),
+                    "text": (timex.text or "").strip(),
+                    "start_char": int(begin),
+                    "end_char": int(end),
+                    "function_in_document": timex.attrib.get("functionInDocument"),
+                    "anchor_time_id": timex.attrib.get("anchorTimeID"),
+                    "begin_point": timex.attrib.get("beginPoint"),
+                    "end_point": timex.attrib.get("endPoint"),
+                },
+            )
+        self._log_timex_diagnostics(doc_id, source="heideltime", parsed=parsed)
         return ""
 
     def materialize_timexes_fallback(self, doc_id):
         logger.debug("materialize_timexes_fallback %s", doc_id)
-        return self.materialize_timexes(doc_id)
+        apoc_ok = False
+        try:
+            self.materialize_timexes(doc_id)
+            apoc_ok = True
+        except Exception as exc:
+            logger.warning(
+                "materialize_timexes: APOC path failed for doc_id=%s (%s); using HeidelTime fallback",
+                doc_id,
+                exc,
+            )
+
+        if apoc_ok:
+            # APOC ran without exception — check whether it actually materialised
+            # any non-DCT TIMEX nodes. If not, the TTK XML was unavailable and we
+            # need HeidelTime to fill the gap.
+            try:
+                rows = self.graph.run(
+                    """
+                    MATCH (t:TIMEX {doc_id: toInteger($doc_id)})
+                    WHERE coalesce(t.functionInDocument, '') <> 'CREATION_TIME'
+                    RETURN count(t) AS non_dct
+                    """,
+                    parameters={"doc_id": doc_id},
+                ).data()
+                non_dct = int((rows[0].get("non_dct") or 0)) if rows else 0
+            except Exception:
+                non_dct = 0
+
+            if non_dct == 0:
+                logger.info(
+                    "APOC produced 0 non-DCT TIMEX nodes for doc_id=%s; using HeidelTime fallback",
+                    doc_id,
+                )
+                return self._materialize_timexes_from_heideltime(doc_id)
+            return ""
+
+        return self._materialize_timexes_from_heideltime(doc_id)
 
     # Backward-compatible API used by existing runtime tests.
     def create_timexes2(self, doc_id):
@@ -232,8 +359,6 @@ class TemporalPhase:
             t.text = $text,
             t.start_char = toInteger($start_char),
             t.end_char = toInteger($end_char),
-            t.start_tok = toInteger($start_tok),
-            t.end_tok = toInteger($end_tok),
             t.start_index = toInteger($start_char),
             t.end_index = toInteger($end_char),
             t.functionInDocument = coalesce($function_in_document, t.functionInDocument),
@@ -243,47 +368,86 @@ class TemporalPhase:
         WITH t
         MATCH (a:AnnotatedText {id: toInteger($doc_id)})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(ta:TagOccurrence)
         WHERE ta.index >= toInteger(t.start_char) AND ta.end_index <= toInteger(t.end_char)
-        FOREACH (token IN collect(ta) | MERGE (token)-[:TRIGGERS]->(t))
+        WITH t, collect(ta) AS tas, min(ta.tok_index_doc) AS min_tok, max(ta.tok_index_doc) AS max_tok
+        SET t.start_tok = min_tok,
+            t.end_tok = max_tok
+        FOREACH (token IN tas | MERGE (token)-[:TRIGGERS]->(t))
         """
 
-        for timex in _iter_event_elements(result_xml or ""):
-            # _iter_event_elements does not emit TIMEX entries; keep loop here for defensive compatibility.
-            del timex
-
-        if result_xml and result_xml.strip():
-            try:
-                root = ET.fromstring(result_xml)
-            except ET.ParseError:
-                logger.warning("TIMEX XML parsing failed in create_timexes2")
-                return ""
-
-            for elem in root.iter():
-                tag = elem.tag.split("}")[-1] if isinstance(elem.tag, str) else elem.tag
-                if tag != "TIMEX3":
-                    continue
-                begin = elem.attrib.get("begin")
-                end = elem.attrib.get("end")
-                if begin is None or end is None or not str(begin).isdigit() or not str(end).isdigit():
-                    continue
-                self.graph.run(
-                    query,
-                    parameters={
-                        "doc_id": doc_id,
-                        "tid": elem.attrib.get("tid", ""),
-                        "type": elem.attrib.get("type", ""),
-                        "value": elem.attrib.get("value", ""),
-                        "text": (elem.text or "").strip(),
-                        "start_char": int(begin),
-                        "end_char": int(end),
-                        "start_tok": int(begin),
-                        "end_tok": int(end),
-                        "function_in_document": elem.attrib.get("functionInDocument"),
-                        "anchor_time_id": elem.attrib.get("anchorTimeID"),
-                        "begin_point": elem.attrib.get("beginPoint"),
-                        "end_point": elem.attrib.get("endPoint"),
-                    },
-                )
+        parsed = 0
+        for timex in _iter_timex_elements(result_xml or ""):
+            begin = timex.attrib.get("begin") or timex.attrib.get("start_index")
+            end = timex.attrib.get("end") or timex.attrib.get("end_index")
+            if begin is None or end is None or not str(begin).isdigit() or not str(end).isdigit():
+                continue
+            parsed += 1
+            self.graph.run(
+                query,
+                parameters={
+                    "doc_id": doc_id,
+                    "tid": timex.attrib.get("tid", ""),
+                    "type": timex.attrib.get("type", ""),
+                    "value": timex.attrib.get("value", ""),
+                    "text": (timex.text or "").strip(),
+                    "start_char": int(begin),
+                    "end_char": int(end),
+                    "function_in_document": timex.attrib.get("functionInDocument"),
+                    "anchor_time_id": timex.attrib.get("anchorTimeID"),
+                    "begin_point": timex.attrib.get("beginPoint"),
+                    "end_point": timex.attrib.get("endPoint"),
+                },
+            )
+        self._log_timex_diagnostics(doc_id, source="python_fallback", parsed=parsed)
         return ""
+
+    def _log_timex_diagnostics(self, doc_id, source, merged=None, parsed=None):
+        """Log concise TIMEX materialization diagnostics per document."""
+        try:
+            rows = self.graph.run(
+                """
+                MATCH (t:TIMEX {doc_id: toInteger($doc_id)})
+                OPTIONAL MATCH (tok:TagOccurrence)-[:TRIGGERS]->(t)
+                RETURN count(DISTINCT t) AS timex_nodes,
+                       count(DISTINCT CASE WHEN tok IS NOT NULL THEN t END) AS timex_with_tokens,
+                       count(DISTINCT tok) AS trigger_tokens
+                """,
+                parameters={"doc_id": doc_id},
+            ).data()
+            stats = rows[0] if rows else {}
+            logger.info(
+                "TIMEX diagnostics doc=%s source=%s parsed=%s merged=%s timex_nodes=%s timex_with_tokens=%s trigger_tokens=%s",
+                doc_id,
+                source,
+                parsed if parsed is not None else "n/a",
+                merged if merged is not None else "n/a",
+                stats.get("timex_nodes", 0),
+                stats.get("timex_with_tokens", 0),
+                stats.get("trigger_tokens", 0),
+            )
+        except Exception:
+            logger.exception("Failed TIMEX diagnostics logging for doc_id=%s", doc_id)
+
+    @staticmethod
+    def _is_eventive_nominal(form):
+        token = (form or "").strip().lower()
+        if not token:
+            return False
+        if token in _EVENTIVE_NOMINAL_ALLOWLIST:
+            return True
+        if token in _NON_EVENTIVE_NOMINAL_DENYLIST:
+            return False
+        if "-" in token and token.endswith("off"):
+            return True
+
+        if _wn is None:
+            # If lexical resources are unavailable, avoid aggressive filtering.
+            return True
+
+        synsets = _wn.synsets(token, pos=_wn.NOUN)
+        if not synsets:
+            return False
+        lexnames = {s.lexname() for s in synsets}
+        return bool(lexnames & _EVENTIVE_NOUN_LEXNAMES)
 
     def materialize_signals(self, doc_id):
         logger.debug("materialize_signals %s", doc_id)
@@ -367,11 +531,29 @@ class TemporalPhase:
         """
 
         created = 0
+        auxiliary_verbs = {
+            "be", "am", "is", "are", "was", "were", "been", "being",
+            "do", "does", "did", "done",
+            "have", "has", "had",
+            "will", "would", "shall", "should", "may", "might", "must", "can", "could",
+        }
         for event in _iter_event_elements(result_xml):
             begin = event.attrib.get("begin")
             end = event.attrib.get("end")
             if begin is None or end is None or not str(begin).isdigit() or not str(end).isdigit():
                 continue
+
+            raw_pos = (event.attrib.get("pos") or "").strip().upper()
+            form_lc = (event.attrib.get("form") or "").strip().lower()
+
+            # Drop adjective predicates and bare auxiliaries to reduce event-layer over-generation.
+            if raw_pos in {"JJ", "JJR", "JJS"}:
+                continue
+            if raw_pos.startswith("VB") and form_lc in auxiliary_verbs:
+                continue
+            if raw_pos in {"NN", "NNS"} and not self._is_eventive_nominal(form_lc):
+                continue
+
             eid = event.attrib.get("eid") or "unknown"
             eiid = event.attrib.get("eiid") or f"e_{eid}_{begin}"
             self.graph.run(
@@ -387,7 +569,7 @@ class TemporalPhase:
                     "epos": event.attrib.get("epos"),
                     "form": event.attrib.get("form"),
                     "modality": event.attrib.get("modality"),
-                    "polarity": normalize_event_attr("polarity", event.attrib.get("polarity")),
+                    "polarity": normalize_event_attr("polarity", event.attrib.get("polarity") or "POS") or "POS",
                     "pos": event.attrib.get("pos"),
                     "pred": event.attrib.get("form"),
                     "tense": normalize_event_attr("tense", event.attrib.get("tense")),
@@ -406,7 +588,8 @@ class TemporalPhase:
             WHERE f.start_tok IS NOT NULL AND f.end_tok IS NOT NULL
             WITH f, 'frame_' + toString(toInteger($doc_id)) + '_' + toString(f.start_tok) + '_' + toString(f.end_tok) AS fallback_eiid
             MERGE (event:TEvent {doc_id: toInteger($doc_id), eiid: fallback_eiid})
-            SET event.begin = coalesce(event.begin, toInteger(f.start_char), toInteger(f.startIndex)),
+            SET event.eid = coalesce(event.eid, fallback_eiid),
+                event.begin = coalesce(event.begin, toInteger(f.start_char), toInteger(f.startIndex)),
                 event.end = coalesce(event.end, toInteger(f.end_char), toInteger(f.endIndex)),
                 event.start_char = coalesce(event.start_char, toInteger(f.start_char), toInteger(f.startIndex)),
                 event.end_char = coalesce(event.end_char, toInteger(f.end_char), toInteger(f.endIndex)),

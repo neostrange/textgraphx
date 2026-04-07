@@ -68,7 +68,7 @@ class TlinksRecognizer:
         logger.debug("create_tlinks_case1")
         query = """
             MATCH p= (e1:TEvent)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(f1:Frame)<-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(fa:FrameArgument {type: 'ARGM-TMP'})
-                <-[:PARTICIPATES_IN]-(et:TagOccurrence)-[:PARTICIPATES_IN]->(f2:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(e2:TEvent)
+                <-[:IN_FRAME]-(et:TagOccurrence)-[:IN_FRAME]->(f2:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(e2:TEvent)
             WHERE fa.headTokenIndex = et.tok_index_doc AND fa.signal = 'after'
             WITH *
             MATCH (e1),(e2)
@@ -83,7 +83,7 @@ class TlinksRecognizer:
         logger.debug("create_tlinks_case2")
         query = """
             MATCH p= (e1:TEvent)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(f1:Frame)<-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(fa:FrameArgument {type: 'ARGM-TMP'})
-                <-[:PARTICIPATES_IN]-(et:TagOccurrence {pos: 'VBG'})-[:PARTICIPATES_IN]->(f2:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(e2:TEvent)
+                <-[:IN_FRAME]-(et:TagOccurrence {pos: 'VBG'})-[:IN_FRAME]->(f2:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(e2:TEvent)
             WHERE fa.complement = et.text AND fa.syntacticType = 'EVENTIVE'
             WITH *
             MERGE (e1)-[tl:TLINK]-(e2)
@@ -98,7 +98,7 @@ class TlinksRecognizer:
     def create_tlinks_case3(self):
         logger.debug("create_tlinks_case3")
         query = """ MATCH p= (e1:TEvent)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(f1:Frame)<-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(fa:FrameArgument where fa.type = 'ARGM-TMP')
-                <-[:PARTICIPATES_IN]-(et:TagOccurrence where et.pos = 'VBG')-[:PARTICIPATES_IN]->(f2:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(e2:TEvent)
+                <-[:IN_FRAME]-(et:TagOccurrence where et.pos = 'VBG')-[:IN_FRAME]->(f2:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(e2:TEvent)
                     where fa.headTokenIndex = et.tok_index_doc and fa.syntacticType = 'EVENTIVE'
                     with *
                     merge (e1)-[tl:TLINK]-(e2)
@@ -113,7 +113,7 @@ class TlinksRecognizer:
 
     def create_tlinks_case4(self):
         logger.debug("create_tlinks_case4")
-        query = """ MATCH p = (t:TIMEX)<-[:TRIGGERS]-(h:TagOccurrence where h.pos in ['NN','NNP'])-[:PARTICIPATES_IN]->
+        query = """ MATCH p = (t:TIMEX)<-[:TRIGGERS]-(h:TagOccurrence where h.pos in ['NN','NNP'])-[:IN_FRAME]->
             (fa:FrameArgument {type: 'ARGM-TMP'})-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(f:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]->(e:TEvent)
                     WHERE fa.headTokenIndex = h.tok_index_doc
                     MERGE (e)-[tlink:TLINK]->(t)
@@ -124,7 +124,7 @@ class TlinksRecognizer:
 
     def create_tlinks_case5(self):
         logger.debug("create_tlinks_case5")
-        query = """ MATCH p = (t:TIMEX)<-[:TRIGGERS]-(pobj:TagOccurrence where pobj.pos in ['NN','NNP'])-[:PARTICIPATES_IN]->(fa:FrameArgument {type: 'ARGM-TMP', syntacticType: 'IN'})-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(f:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]->(e:TEvent)
+        query = """ MATCH p = (t:TIMEX)<-[:TRIGGERS]-(pobj:TagOccurrence where pobj.pos in ['NN','NNP'])-[:IN_FRAME]->(fa:FrameArgument {type: 'ARGM-TMP', syntacticType: 'IN'})-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(f:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]->(e:TEvent)
                     WHERE fa.complementIndex = pobj.tok_index_doc
 
                     MERGE (e)-[tlink:TLINK]->(t)
@@ -376,6 +376,87 @@ class TlinksRecognizer:
             shadow_only,
         )
         return summary
+
+    def enforce_tlink_anchor_consistency(self, shadow_only: bool = False):
+        """Validate TLINK anchors and optionally suppress inconsistent links.
+
+        Consistency requires:
+        - endpoints are in {TEvent, TIMEX}
+        - source and target are not the same node
+
+        In non-shadow mode, inconsistent unsuppressed TLINKs are retained but
+        marked as suppressed with explicit anchor-consistency metadata.
+        """
+        logger.debug("enforce_tlink_anchor_consistency")
+        query_prefix = """
+        MATCH (src)-[r:TLINK]->(dst)
+        WITH src, dst, r,
+             CASE
+                WHEN src:TEvent THEN 'TEvent'
+                WHEN src:TIMEX THEN 'TIMEX'
+                ELSE 'OTHER'
+             END AS source_anchor_type,
+             CASE
+                WHEN dst:TEvent THEN 'TEvent'
+                WHEN dst:TIMEX THEN 'TIMEX'
+                ELSE 'OTHER'
+             END AS target_anchor_type,
+             CASE WHEN id(src) = id(dst) THEN true ELSE false END AS is_self_link,
+             CASE WHEN (src:TEvent OR src:TIMEX) AND (dst:TEvent OR dst:TIMEX) THEN true ELSE false END AS endpoint_contract_ok
+        WITH src, dst, r, source_anchor_type, target_anchor_type, is_self_link, endpoint_contract_ok,
+             (NOT endpoint_contract_ok OR is_self_link) AS inconsistent
+        SET r.sourceAnchorType = source_anchor_type,
+            r.targetAnchorType = target_anchor_type,
+            r.anchorPair = source_anchor_type + '->' + target_anchor_type,
+            r.anchorConsistency = NOT inconsistent,
+            r.anchorConsistencyReason = CASE
+                WHEN is_self_link THEN 'self_link'
+                WHEN NOT endpoint_contract_ok THEN 'endpoint_contract_violation'
+                ELSE 'ok'
+            END
+        """
+        if shadow_only:
+            query = (
+                query_prefix
+                + """
+                RETURN count(CASE WHEN inconsistent THEN 1 END) AS inconsistent_count,
+                       count(CASE WHEN is_self_link THEN 1 END) AS self_link_count,
+                       count(CASE WHEN NOT endpoint_contract_ok THEN 1 END) AS endpoint_violation_count
+                """
+            )
+        else:
+            query = (
+                query_prefix
+                + """
+                WITH r, inconsistent, is_self_link, endpoint_contract_ok
+                WHERE inconsistent AND coalesce(r.suppressed, false) = false
+                SET r.suppressed = true,
+                    r.suppressedBy = 'tlink_anchor_consistency_filter',
+                    r.suppressedAt = datetime().epochMillis,
+                    r.suppressionPolicy = 'anchor_consistency',
+                    r.suppressionReason = CASE
+                        WHEN is_self_link THEN 'anchor_inconsistency:self_link'
+                        WHEN NOT endpoint_contract_ok THEN 'anchor_inconsistency:endpoint_contract_violation'
+                        ELSE 'anchor_inconsistency:unknown'
+                    END
+                RETURN count(r) AS suppressed_count
+                """
+            )
+        rows = self._run_query(query)
+        if rows:
+            if shadow_only:
+                logger.info(
+                    "enforce_tlink_anchor_consistency: inconsistent=%d self_links=%d endpoint_violations=%d (shadow)",
+                    rows[0].get("inconsistent_count", 0),
+                    rows[0].get("self_link_count", 0),
+                    rows[0].get("endpoint_violation_count", 0),
+                )
+            else:
+                logger.info(
+                    "enforce_tlink_anchor_consistency: suppressed %d inconsistent TLINKs",
+                    rows[0].get("suppressed_count", 0),
+                )
+        return rows
 
     def get_doc_text_and_dct(self, doc_id):
         """Retrieve document text and creation time from AnnotatedText node."""

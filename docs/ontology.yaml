@@ -184,6 +184,9 @@ relationships:
   MODIFIES: FrameArgument -> TEvent|EventMention
   AFFECTS: 'Entity|NUMERIC|FrameArgument -> TEvent|EventMention'
   TLINK: 'TEvent/TIMEX -> TEvent/TIMEX (properties: id, relType, signalID)'
+  CLINK: 'TEvent -> TEvent (properties: source)'
+  SLINK: 'TEvent -> TEvent (properties: source)'
+  GLINK: 'TEvent -> TEvent (properties: id, relType, signalID, origin, rule) — grammatical link from TTK'
   IS_RELATED_TO: 'NamedEntity -> NamedEntity (properties: root, type)'
   SOURCE: ne <- Evidence
   DESTINATION: ne <- Evidence
@@ -227,6 +230,9 @@ schema_tiers:
     - AFFECTS
     - CREATED_ON
     - TLINK
+    - CLINK
+    - SLINK
+    - GLINK
     - COREF
   optional:
     node_labels:
@@ -286,6 +292,7 @@ relation_endpoint_contract:
     - [EntityMention, Entity]
     - [EventMention, TEvent]
     - [NamedEntity, Entity]
+    - [NamedEntity, VALUE]
     - [FrameArgument, Entity]
     - [FrameArgument, NamedEntity]
     - [FrameArgument, NUMERIC]
@@ -307,6 +314,11 @@ relation_endpoint_contract:
   SLINK:
     sources: [TEvent]
     targets: [TEvent]
+  GLINK:
+    sources: [TEvent]
+    targets: [TEvent]
+    properties: [id, relType, signalID, origin, rule]
+    note: Grammatical link extracted by TTK; additive over already-materialized TEvent nodes.
 
 semantic_enrichment_properties:
   NamedEntity:

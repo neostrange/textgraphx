@@ -72,6 +72,7 @@ class SRLProcessor:
         MATCH (x:TagOccurrence {tok_index_doc: idx})-[:HAS_TOKEN]-()-[:CONTAINS_SENTENCE]-(:AnnotatedText {id: $doc_id})
         MATCH (n {id: $node_id})
         MERGE (x)-[:PARTICIPATES_IN]->(n)
+        MERGE (x)-[:IN_FRAME]->(n)
         """
         params = {"indices": indices, "doc_id": doc_id, "node_id": node_id}
         logger.debug("Linking %d indices to node %s", len(indices), node_id)

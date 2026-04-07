@@ -82,7 +82,9 @@ class EvaluationMapping:
     mention_attr_keys: Dict[str, Tuple[str, ...]] = field(
         default_factory=lambda: {
             "entity": ("syntactic_type", "ent_class"),
-            "event": ("pos", "tense", "aspect", "certainty", "polarity", "time", "pred", "external_ref"),
+            # external_ref is a transport/internal identifier and is intentionally
+            # excluded from scoring keys to avoid strict-mode false mismatches.
+            "event": ("pos", "tense", "aspect", "certainty", "polarity", "time", "pred"),
             "timex": ("type", "value", "functionInDocument"),
         }
     )
@@ -274,7 +276,7 @@ def build_document_from_neo4j(
     )
     entity_rows = graph.run(
         f"""
-        MATCH (:AnnotatedText {{id: $doc_id}})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok:TagOccurrence)-[:PARTICIPATES_IN]->(m)
+        MATCH (:AnnotatedText {{id: $doc_id}})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok:TagOccurrence)-[:IN_MENTION]->(m)
         WHERE (m:EntityMention OR m:NamedEntity) {_entity_discourse_clause}
         WITH m, min(tok.tok_index_doc) AS start_tok, max(tok.tok_index_doc) AS end_tok
         RETURN DISTINCT start_tok, end_tok,
@@ -349,7 +351,7 @@ def build_document_from_neo4j(
          CALL {
              WITH $doc_id AS doc_id
              MATCH (m:EventMention)
-             OPTIONAL MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(m_tok:TagOccurrence)-[:PARTICIPATES_IN]->(m)
+                         OPTIONAL MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(m_tok:TagOccurrence)-[:IN_MENTION]->(m)
              WITH m, doc_id, count(m_tok) > 0 AS token_scoped
              WHERE (m.doc_id = doc_id OR token_scoped)
                AND m.start_tok IS NOT NULL AND m.end_tok IS NOT NULL
@@ -367,7 +369,7 @@ def build_document_from_neo4j(
                              AND NOT EXISTS {
                                      MATCH (em:EventMention)-[:REFERS_TO]->(m)
                                                                          WHERE (em.doc_id = doc_id OR EXISTS {
-                                                                                         MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:PARTICIPATES_IN]->(em)
+                                                                                         MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:IN_MENTION]->(em)
                                                                                      })
                                                                                  AND em.start_tok IS NOT NULL
                                          AND em.end_tok IS NOT NULL
@@ -638,7 +640,7 @@ def build_document_from_neo4j(
                    source_labels
             UNION
             WITH $doc_id AS doc_id
-            MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:PARTICIPATES_IN]->(f:Frame)
+              MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:IN_FRAME]->(f:Frame)
             WITH DISTINCT f, doc_id
                  MATCH (fa:FrameArgument)-[r:PARTICIPANT|HAS_FRAME_ARGUMENT]->(f)
                         WHERE fa.type IN ['ARG0', 'ARG1', 'ARG2']
@@ -656,11 +658,11 @@ def build_document_from_neo4j(
                              }
             OPTIONAL MATCH (fa)-[:REFERS_TO]->(src)
             OPTIONAL MATCH (mention:NamedEntity)-[:REFERS_TO]->(src)
-                 OPTIONAL MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(fa_tok:TagOccurrence)-[:PARTICIPATES_IN]->(fa)
-                 OPTIONAL MATCH (fa_tok)-[:PARTICIPATES_IN]->(em:EntityMention)
+                  OPTIONAL MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(fa_tok:TagOccurrence)-[:IN_FRAME]->(fa)
+                  OPTIONAL MATCH (fa_tok)-[:IN_MENTION]->(em:EntityMention)
                  WITH f, fa, r, coalesce(mention, src, em) AS endpoint, doc_id
             WHERE endpoint IS NOT NULL
-            OPTIONAL MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(src_tok:TagOccurrence)-[:PARTICIPATES_IN]->(endpoint)
+              OPTIONAL MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(src_tok:TagOccurrence)-[:IN_MENTION]->(endpoint)
                  WITH f, fa, r,
                  min(src_tok.tok_index_doc) AS src_start,
                  max(src_tok.tok_index_doc) AS src_end,
@@ -756,7 +758,6 @@ def _canonicalize_event_attrs(row: Dict[str, Any]) -> Tuple[Tuple[str, str], ...
     time = str(row.get("time") or "").strip().upper() or "NON_FUTURE"
     factuality = str(row.get("factuality") or "").strip().upper()
     pred = str(row.get("pred") or "").strip().lower()
-    external_ref = str(row.get("external_ref") or row.get("externalRef") or "").strip()
 
     # MEANTIME convention: INFINITIVE-tense events signal future/possible actions.
     # When certainty/time are not explicitly set in the graph, apply these defaults.
@@ -771,8 +772,6 @@ def _canonicalize_event_attrs(row: Dict[str, Any]) -> Tuple[Tuple[str, str], ...
         attrs_map["pos"] = pos
     if pred:
         attrs_map["pred"] = pred
-    if external_ref:
-        attrs_map["external_ref"] = external_ref
 
     # Gold noun events typically omit tense/aspect when they are semantically
     # unexpressed. Preserve those attrs only when informative.
@@ -915,7 +914,7 @@ def _nominal_projection_features(
         """
         MATCH (m)
         WHERE id(m) = $node_id
-        OPTIONAL MATCH (ht:TagOccurrence)-[:PARTICIPATES_IN]->(m)
+        OPTIONAL MATCH (ht:TagOccurrence)-[:IN_MENTION]->(m)
                 WHERE ht.tok_index_doc = coalesce(m.nominalSemanticHeadTokenIndex, m.headTokenIndex, $fallback_head_idx)
         WITH m, head(collect(ht)) AS head_tok
                 WITH m, head_tok,
@@ -923,8 +922,8 @@ def _nominal_projection_features(
         OPTIONAL MATCH (m)-[:REFERS_TO]->(e:Entity)<-[:REFERS_TO]-(other:EntityMention)
         WHERE other <> m
                 WITH m, head_tok, trigger_eventive, count(DISTINCT other) AS mention_cluster_size
-         OPTIONAL MATCH (arg_tok:TagOccurrence)-[:PARTICIPATES_IN]->(m)
-         OPTIONAL MATCH (arg_tok)-[:PARTICIPATES_IN]->(fa:FrameArgument)
+         OPTIONAL MATCH (arg_tok:TagOccurrence)-[:IN_MENTION]->(m)
+         OPTIONAL MATCH (arg_tok)-[:IN_FRAME]->(fa:FrameArgument)
                  WITH m, head_tok, trigger_eventive, mention_cluster_size,
               count(DISTINCT CASE WHEN fa.type IN ['ARG0', 'ARG1', 'ARG2'] THEN fa END) AS core_arg_hits
          OPTIONAL MATCH (m)-[:REFERS_TO]->(e2:Entity)<-[:REFERS_TO]-(ne:NamedEntity)

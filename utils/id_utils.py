@@ -27,3 +27,11 @@ def make_tagocc_id(doc_id: Union[str, int], sent_index: int, token_idx: int) -> 
 def make_nounchunk_id(doc_id: Union[str, int], start: int) -> str:
     """Return a NounChunk id: <doc>_<start>"""
     return f"{_safe_str(doc_id)}_{start}"
+
+def make_event_mention_token_id(doc_id: Union[str, int], start: int, end: int) -> str:
+    """Return a stable EventMention token_id: em_<doc>_<start>_<end>
+    
+    Used for token-based migration-safe joins, similar to NamedEntity.token_id.
+    The format uses 'em_' prefix to distinguish EventMention token IDs from other types.
+    """
+    return f"em_{_safe_str(doc_id)}_{start}_{end}"

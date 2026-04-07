@@ -193,6 +193,9 @@ class EntityProcessor:
             end = item.get('end_index')
             ne_type = item.get('type')
             item['id'] = make_ne_id(document_id, start, end, ne_type)
+            # token_id is computed independently so it stays stable even
+            # if `id` is later remapped (e.g., to a NEL canonical URI).
+            item['token_id'] = make_ne_id(document_id, start, end, ne_type)
             item['legacy_syntactic_type'] = item.get(
                 'legacy_syntactic_type',
                 self._legacy_syntactic_type(item.get('syntactic_type')),
@@ -208,11 +211,12 @@ class EntityProcessor:
             ne.start_char = item.start_char, ne.end_char = item.end_char,
             ne.head = item.head, ne.headTokenIndex = item.head_token_index,
             ne.syntacticType = item.legacy_syntactic_type, ne.syntactic_type = item.syntactic_type,
-            ne.token_id = item.id, ne.token_start = item.start_index, ne.token_end = item.end_index
+            ne.token_id = item.token_id, ne.token_start = item.start_index, ne.token_end = item.end_index
             WITH ne, item as neIndex
             MATCH (text:AnnotatedText)-[:CONTAINS_SENTENCE]->(sentence:Sentence)-[:HAS_TOKEN]->(tagOccurrence:TagOccurrence)
             WHERE text.id = $documentId AND tagOccurrence.tok_index_doc >= neIndex.start_index AND tagOccurrence.tok_index_doc <= neIndex.end_index
             MERGE (ne)<-[:PARTICIPATES_IN]-(tagOccurrence)
+            MERGE (ne)<-[:IN_MENTION]-(tagOccurrence)
         """
         logger.debug("Executing NE UNWIND query for document %s", document_id)
         self.execute_query(ne_query, {"documentId": document_id, "nes": nes})

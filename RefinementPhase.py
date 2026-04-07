@@ -37,6 +37,7 @@ from textgraphx.util.GraphDbBase import GraphDBBase
 import xml.etree.ElementTree as ET
 # py2neo removed: use bolt-driver wrapper via neo4j_client
 import logging
+import warnings
 
 from textgraphx.neo4j_client import make_graph_from_config
 from textgraphx.config import get_config
@@ -283,8 +284,8 @@ class RefinementPhase():
 
         nominal_query = """
             MATCH (em:EntityMention:NominalMention)
-            MATCH (tok:TagOccurrence)-[:PARTICIPATES_IN]->(em)
-            MATCH (tok)-[:PARTICIPATES_IN]->(fa:FrameArgument)
+            MATCH (tok:TagOccurrence)-[:IN_MENTION]->(em)
+            MATCH (tok)-[:IN_FRAME]->(fa:FrameArgument)
             WHERE fa.type IN ['ARG0', 'ARG1', 'ARG2']
             SET em:DiscourseEntity
             RETURN count(DISTINCT em) AS tagged
@@ -312,7 +313,7 @@ class RefinementPhase():
 
         query = """
             CALL {
-                MATCH (mention:EntityMention)<-[:PARTICIPATES_IN]-(subj_tok:TagOccurrence)-[:IS_DEPENDENT {type: 'nsubj'}]->(pred_tok:TagOccurrence)
+                MATCH (mention:EntityMention)<-[:IN_MENTION]-(subj_tok:TagOccurrence)-[:IS_DEPENDENT {type: 'nsubj'}]->(pred_tok:TagOccurrence)
                 WHERE toLower(coalesce(pred_tok.lemma, pred_tok.text, '')) IN ['be', 'become', 'remain', 'seem', 'appear', 'stay', 'feel']
                 OPTIONAL MATCH (state_tok:TagOccurrence)-[dep:IS_DEPENDENT]->(pred_tok)
                 WHERE dep.type IN ['acomp', 'attr', 'oprd', 'xcomp']
@@ -324,7 +325,7 @@ class RefinementPhase():
                 WHERE state_tok IS NOT NULL
                 RETURN mention, pred_tok, state_tok
                 UNION
-                MATCH (mention:NamedEntity)<-[:PARTICIPATES_IN]-(subj_tok:TagOccurrence)-[:IS_DEPENDENT {type: 'nsubj'}]->(pred_tok:TagOccurrence)
+                MATCH (mention:NamedEntity)<-[:IN_MENTION]-(subj_tok:TagOccurrence)-[:IS_DEPENDENT {type: 'nsubj'}]->(pred_tok:TagOccurrence)
                 WHERE toLower(coalesce(pred_tok.lemma, pred_tok.text, '')) IN ['be', 'become', 'remain', 'seem', 'appear', 'stay', 'feel']
                 OPTIONAL MATCH (state_tok:TagOccurrence)-[dep:IS_DEPENDENT]->(pred_tok)
                 WHERE dep.type IN ['acomp', 'attr', 'oprd', 'xcomp']
@@ -417,7 +418,7 @@ class RefinementPhase():
                 MATCH (m:NamedEntity)
                 RETURN m
             }
-            OPTIONAL MATCH (tok:TagOccurrence)-[:PARTICIPATES_IN]->(m)
+            OPTIONAL MATCH (tok:TagOccurrence)-[:IN_MENTION]->(m)
             OPTIONAL MATCH (det_tok:TagOccurrence)-[:IS_DEPENDENT {type: 'det'}]->(tok)
             OPTIONAL MATCH (neg_tok:TagOccurrence)-[:IS_DEPENDENT {type: 'neg'}]->(tok)
             WITH m,
@@ -585,7 +586,7 @@ class RefinementPhase():
         logger.debug("get_and_assign_head_info_to_entity_multitoken")
         graph = self.graph
         query = """
-                        match p= (a:TagOccurrence)-[:PARTICIPATES_IN]->(f:NamedEntity), q= (a)-[:IS_DEPENDENT]->()--(f)
+                        match p= (a:TagOccurrence)-[:IN_MENTION]->(f:NamedEntity), q= (a)-[:IS_DEPENDENT]->()--(f)
                         where not exists ((a)<-[:IS_DEPENDENT]-()--(f)) and f.headTokenIndex is null
                         WITH f, a, p
                         set f.head = a.text, f.headTokenIndex = a.tok_index_doc,
@@ -610,7 +611,7 @@ class RefinementPhase():
         logger.debug("get_and_assign_head_info_to_entity_singletoken")
         graph = self.graph
         query = """
-                        match p= (a:TagOccurrence)-[:PARTICIPATES_IN]->(c:NamedEntity)
+                        match p= (a:TagOccurrence)-[:IN_MENTION]->(c:NamedEntity)
                         where not exists ((a)<-[:IS_DEPENDENT]-()--(c)) and not exists ((a)-[:IS_DEPENDENT]->()--(c)) and c.headTokenIndex is null
                         WITH c, a, p
                         set c.head = a.text, c.headTokenIndex = a.tok_index_doc,
@@ -639,7 +640,7 @@ class RefinementPhase():
         # TODO: the head for the NAM should include the whole extent of the name. see newsreader annotation guidelines
         # for more information.
         query = """
-                        match p= (a:TagOccurrence)-[:PARTICIPATES_IN]->(f:Antecedent), q= (a)-[:IS_DEPENDENT]->()--(f)
+                        match p= (a:TagOccurrence)-[:IN_MENTION]->(f:Antecedent), q= (a)-[:IS_DEPENDENT]->()--(f)
                         where not exists ((a)<-[:IS_DEPENDENT]-()--(f))
                         WITH f, a, p
                         set f.head = a.text, f.headTokenIndex = a.tok_index_doc, 
@@ -679,7 +680,7 @@ class RefinementPhase():
 
                 # query to find the head of an Antecedent when it is a single token
                 query = """    
-                                                match p= (a:TagOccurrence)-[:PARTICIPATES_IN]->(c:Antecedent)
+                                                match p= (a:TagOccurrence)-[:IN_MENTION]->(c:Antecedent)
                                                 where not exists ((a)<-[:IS_DEPENDENT]-()--(c)) and not exists ((a)-[:IS_DEPENDENT]->()--(c))
                                                 WITH c, a, p
                                                 set c.head = a.text, c.headTokenIndex = a.tok_index_doc, 
@@ -707,7 +708,7 @@ class RefinementPhase():
         # TODO: the head for the NAM should include the whole extent of the name. see newsreader annotation guidelines 
         # for more information. 
         query = """    
-                        match p= (a:TagOccurrence)-[:PARTICIPATES_IN]->(f:CorefMention), q= (a)-[:IS_DEPENDENT]->()--(f)
+                        match p= (a:TagOccurrence)-[:IN_MENTION]->(f:CorefMention), q= (a)-[:IS_DEPENDENT]->()--(f)
                         where not exists ((a)<-[:IS_DEPENDENT]-()--(f))
                         WITH f, a, p
                         set f.head = a.text, f.headTokenIndex = a.tok_index_doc, 
@@ -736,7 +737,7 @@ class RefinementPhase():
 
         # query to find the head of a NamedEntity. (case is for entitities composed of  single token )
         query = """    
-                        match p= (a:TagOccurrence)-[:PARTICIPATES_IN]->(c:CorefMention)
+                        match p= (a:TagOccurrence)-[:IN_MENTION]->(c:CorefMention)
                         where not exists ((a)<-[:IS_DEPENDENT]-()--(c)) and not exists ((a)-[:IS_DEPENDENT]->()--(c))
                         WITH c, a, p
                         set c.head = a.text, c.headTokenIndex = a.tok_index_doc, 
@@ -887,7 +888,7 @@ class RefinementPhase():
         
                 query = """    
                                                 match p= (a:TagOccurrence where a.pos in ['NNS', 'NN', 'NNP', 'NNPS','PRP', 'PRP$'])-
-                                                [:PARTICIPATES_IN]->(f:FrameArgument), q= (a)-[:IS_DEPENDENT]->()--(f)
+                                                [:IN_FRAME]->(f:FrameArgument), q= (a)-[:IS_DEPENDENT]->()--(f)
                                                 where not exists ((a)<-[:IS_DEPENDENT]-()--(f))
                                                 WITH f, a, p
                                                 set f.head = a.text, f.headTokenIndex = a.tok_index_doc, 
@@ -920,7 +921,7 @@ class RefinementPhase():
         graph = self.graph
         
         query = """    
-                        match p= (a:TagOccurrence)-[:PARTICIPATES_IN]->(f:FrameArgument), q= (a)-[:IS_DEPENDENT]->()--(f)
+                        match p= (a:TagOccurrence)-[:IN_FRAME]->(f:FrameArgument), q= (a)-[:IS_DEPENDENT]->()--(f)
                         where not exists ((a)<-[:IS_DEPENDENT]-()--(f))
                         WITH f, a, p
                         set f.head = a.text, f.headTokenIndex = a.tok_index_doc, f.headPos = a.pos 
@@ -981,7 +982,7 @@ class RefinementPhase():
         query = """
                         match p= (s:TagOccurrence where s.pos = 'IN')<-[:IS_DEPENDENT {type: 'mark'}]
                         -(a:TagOccurrence where a.pos in ['VBD','VB','VBG','VBZ','VBN','VBP'])-
-                        [:PARTICIPATES_IN]->(f:FrameArgument where f.type = 'ARGM-TMP'), q= (a)-[:IS_DEPENDENT]->()--(f)
+                        [:IN_FRAME]->(f:FrameArgument where f.type = 'ARGM-TMP'), q= (a)-[:IS_DEPENDENT]->()--(f)
                         where not exists ((a)<-[:IS_DEPENDENT]-()--(f))
                         WITH f, a, p,s
                         set f.head = a.text, f.headTokenIndex = a.tok_index_doc, f.syntacticType ='EVENTIVE', f.signal = s.text
@@ -1023,7 +1024,7 @@ class RefinementPhase():
 
                         query = """    
                                                         match p= (f)--(v:TagOccurrence {pos: 'VBG'})<-[l:IS_DEPENDENT {type: 'pcomp'}]-
-                                                        (a:TagOccurrence where a.pos in ['IN'])-[:PARTICIPATES_IN]->(f:FrameArgument where f.type = 'ARGM-TMP')
+                                                        (a:TagOccurrence where a.pos in ['IN'])-[:IN_FRAME]->(f:FrameArgument where f.type = 'ARGM-TMP')
                                                         where not exists ((a)<-[:IS_DEPENDENT]-()--(f))
                                                         WITH f, a, p, v
                                                         set f.head = a.text, f.headTokenIndex = a.tok_index_doc, f.syntacticType ='EVENTIVE', f.signal = a.text, f.complement = v.text
@@ -1054,7 +1055,7 @@ class RefinementPhase():
 
         query = """    
             match p= (f)--(v:TagOccurrence {pos: 'VBG'})<-[l:IS_DEPENDENT {type: 'pcomp'}]-
-            (a:TagOccurrence where a.pos in ['IN'])-[:PARTICIPATES_IN]->(f:FrameArgument)
+            (a:TagOccurrence where a.pos in ['IN'])-[:IN_FRAME]->(f:FrameArgument)
             where not exists ((a)<-[:IS_DEPENDENT]-()--(f))
             WITH f, a, p, v
             set f.head = a.text, f.headTokenIndex = a.tok_index_doc, f.syntacticType ='EVENTIVE', f.signal = a.text, f.complement = v.text
@@ -1090,7 +1091,7 @@ class RefinementPhase():
         # are picked up.
         query = """
                         match p= (f)--(v:TagOccurrence)<-[l:IS_DEPENDENT {type: 'pobj'}]-
-                        (a:TagOccurrence where a.pos in ['IN', 'VBG'])-[:PARTICIPATES_IN]->(f:FrameArgument where f.type = 'ARGM-TMP')
+                        (a:TagOccurrence where a.pos in ['IN', 'VBG'])-[:IN_FRAME]->(f:FrameArgument where f.type = 'ARGM-TMP')
                         where not exists ((a)<-[:IS_DEPENDENT]-()--(f))
                         WITH f, a, p, v
                         set f.head = a.text, f.headTokenIndex = a.tok_index_doc, f.syntacticType ='EVENTIVE', f.signal = a.text, f.complement = v.text
@@ -1125,7 +1126,7 @@ class RefinementPhase():
         graph = self.graph
 
         query = """    
-                        match p= (f:FrameArgument)<-[:PARTICIPATES_IN]-(head:TagOccurrence )-[:PARTICIPATES_IN]->(ne:NamedEntity)
+                        match p= (f:FrameArgument)<-[:IN_FRAME]-(head:TagOccurrence )-[:IN_MENTION]->(ne:NamedEntity)
                         where head.tok_index_doc = f.headTokenIndex and head.tok_index_doc = ne.headTokenIndex
                         merge (f)-[:REFERS_TO]->(ne)
                         return p     
@@ -1150,7 +1151,7 @@ class RefinementPhase():
         graph = self.graph
 
         query = """    
-                        match p= (f:FrameArgument)<-[:PARTICIPATES_IN]-(complementHead:TagOccurrence )-[:PARTICIPATES_IN]->(ne:NamedEntity)
+                        match p= (f:FrameArgument)<-[:IN_FRAME]-(complementHead:TagOccurrence )-[:IN_MENTION]->(ne:NamedEntity)
                         where complementHead.tok_index_doc = f.complementIndex and complementHead.tok_index_doc = ne.headTokenIndex
                         merge (f)-[:REFERS_TO]->(ne)
                         return p     
@@ -1181,7 +1182,7 @@ class RefinementPhase():
         graph = self.graph
 
         query = """    
-                        MATCH p= (f:FrameArgument where f.type in ['ARG0','ARG1','ARG2','ARG3','ARG4'])-[:PARTICIPATES_IN]-
+                        MATCH p= (f:FrameArgument where f.type in ['ARG0','ARG1','ARG2','ARG3','ARG4'])-[:IN_FRAME]-
                         (complementHead:TagOccurrence)
                         where f.complementIndex = complementHead.tok_index_doc and not exists 
                         ((complementHead)-[]-(:NamedEntity {headTokenIndex: complementHead.tok_index_doc})) and not exists
@@ -1214,7 +1215,7 @@ class RefinementPhase():
         graph = self.graph
 
         query = """    
-                        match p= (f:FrameArgument)<-[:PARTICIPATES_IN]-(head:TagOccurrence )-[:PARTICIPATES_IN]->
+                        match p= (f:FrameArgument)<-[:IN_FRAME]-(head:TagOccurrence )-[:IN_MENTION]->
                         (crf:CorefMention)--(ant:Antecedent)-[:REFERS_TO]->(ne:NamedEntity)
                         where head.pos in ['PRP','PRP$'] and head.tok_index_doc = f.headTokenIndex and head.tok_index_doc = crf.headTokenIndex
                         merge (f)-[:REFERS_TO]->(ne)
@@ -1246,7 +1247,7 @@ class RefinementPhase():
 
         query = """
                         MATCH p= (f:FrameArgument where f.type IN ['ARG0','ARG1','ARG2','ARG3','ARG4'] and f.syntacticType <> 'PRO')
-                        -[:PARTICIPATES_IN]-(h:TagOccurrence where NOT (h.pos IN ['IN']))
+                        -[:IN_FRAME]-(h:TagOccurrence where NOT (h.pos IN ['IN']))
                         WHERE f.headTokenIndex = h.tok_index_doc
                          AND NOT EXISTS ((h)-[]-(:NamedEntity {headTokenIndex: h.tok_index_doc}))
                         OPTIONAL MATCH (d:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(h)
@@ -1289,7 +1290,7 @@ class RefinementPhase():
         graph = self.graph
 
         query = """    
-                        match p= (f:Antecedent)<-[:PARTICIPATES_IN]-(head:TagOccurrence )-[:PARTICIPATES_IN]->(ne:NamedEntity)
+                        match p= (f:Antecedent)<-[:IN_MENTION]-(head:TagOccurrence )-[:IN_MENTION]->(ne:NamedEntity)
                         where head.tok_index_doc = f.headTokenIndex and head.tok_index_doc = ne.headTokenIndex
                         merge (f)-[:REFERS_TO]->(ne)
                         return p    
@@ -1310,16 +1311,39 @@ class RefinementPhase():
         This is a lightweight normalization step that marks certain NE
         semantic types (MONEY, QUANTITY, PERCENT) with an additional label
         to simplify downstream numeric handling and event enrichment.
+
+        Transitional status: this write path is retained only for compatibility
+        while participant resolution migrates toward canonical `Entity`/`VALUE`
+        sources. New read-side logic should treat `:NUMERIC` as legacy fallback.
         """
         logger.debug("tag_numeric_entities")
+        cfg = get_config()
+        if not cfg.features.fill_numeric_labels:
+            logger.debug(
+                "tag_numeric_entities: skipped (features.fill_numeric_labels=False); "
+                "set TEXTGRAPHX_FILL_NUMERIC_LABELS=true to enable legacy :NUMERIC writes"
+            )
+            return ""
+        warnings.warn(
+            "RefinementPhase.tag_numeric_entities() is transitional. "
+            "Prefer canonical VALUE/Entity-based participant resolution over direct :NUMERIC label reads.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         graph = self.graph
 
         query = """    
                         match (ne:NamedEntity) where ne.type in ['MONEY', 'QUANTITY', 'PERCENT']
-                        set ne:NUMERIC   
+                        set ne:NUMERIC
+                        return count(ne) as tagged
         
         """
-        data= graph.run(query).data()
+        data = graph.run(query).data()
+        tagged = data[0].get("tagged", 0) if data else 0
+        logger.warning(
+            "tag_numeric_entities: applied legacy :NUMERIC label to %d NamedEntity nodes; this path remains transitional during VALUE migration",
+            tagged,
+        )
         
         return ""
 
@@ -1332,16 +1356,40 @@ class RefinementPhase():
         This includes cardinal/ordinal and other value-like types to make it
         easier to find and operate on numeric or quantified entities during
         enrichment and evaluation.
+
+        Transitional status: this convenience label exists so
+        `materialize_canonical_value_nodes()` can discover legacy value-like
+        mentions before removing the label again. New read-side logic should
+        prefer canonical `VALUE` nodes.
         """
         logger.debug("tag_value_entities")
+        cfg = get_config()
+        if not cfg.features.fill_numeric_labels:
+            logger.debug(
+                "tag_value_entities: skipped (features.fill_numeric_labels=False); "
+                "set TEXTGRAPHX_FILL_NUMERIC_LABELS=true to enable legacy :VALUE writes"
+            )
+            return ""
+        warnings.warn(
+            "RefinementPhase.tag_value_entities() is transitional. "
+            "Prefer canonical VALUE nodes over direct NamedEntity:VALUE reads.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         graph = self.graph
 
         query = """    
                         match (ne:NamedEntity) where ne.type in ['CARDINAL', 'ORDINAL', 'MONEY', 'QUANTITY', 'PERCENT']
-                        set ne:VALUE   
+                        set ne:VALUE
+                        return count(ne) as tagged
         
         """
-        data= graph.run(query).data()
+        data = graph.run(query).data()
+        tagged = data[0].get("tagged", 0) if data else 0
+        logger.warning(
+            "tag_value_entities: applied transitional :VALUE label to %d NamedEntity nodes before canonical VALUE materialization",
+            tagged,
+        )
         
         return ""
 
@@ -1447,7 +1495,7 @@ class RefinementPhase():
         graph = self.graph
 
         query = """    
-                        match p= (e1:Entity)<-[:REFERS_TO]-(ne1:NamedEntity)<-[:PARTICIPATES_IN]-(t1:TagOccurrence)-[:PARTICIPATES_IN]->(coref:CorefMention)-[:COREF]->(ant:Antecedent)-[:REFERS_TO]->(ne2:NamedEntity)-[:REFERS_TO]->(e2:Entity)
+                        match p= (e1:Entity)<-[:REFERS_TO]-(ne1:NamedEntity)<-[:IN_MENTION]-(t1:TagOccurrence)-[:IN_MENTION]->(coref:CorefMention)-[:COREF]->(ant:Antecedent)-[:REFERS_TO]->(ne2:NamedEntity)-[:REFERS_TO]->(e2:Entity)
                         where t1.text = ne1.head and t1.text = coref.head and ne1.kb_id is not null and ne2.kb_id is not null and ne1.kb_id <> ne2.kb_id
                         set ne1.kb_id = ne2.kb_id, ne1.description = ne2.description, ne1.normal_term = ne2.normal_term, ne1.url_wikidata = ne2.url_wikidata,ne1.type = ne2.type
                         detach delete e1
@@ -1477,7 +1525,7 @@ class RefinementPhase():
         graph = self.graph
 
         query = """    
-                        match p= (e1:Entity)<-[:REFERS_TO]-(ne1:NamedEntity)<-[:PARTICIPATES_IN]-(t1:TagOccurrence)-[:PARTICIPATES_IN]->(coref:CorefMention)-[:COREF]->(ant:Antecedent)-[:REFERS_TO]->(ne2:NamedEntity)-[:REFERS_TO]->(e2:Entity)
+                        match p= (e1:Entity)<-[:REFERS_TO]-(ne1:NamedEntity)<-[:IN_MENTION]-(t1:TagOccurrence)-[:IN_MENTION]->(coref:CorefMention)-[:COREF]->(ant:Antecedent)-[:REFERS_TO]->(ne2:NamedEntity)-[:REFERS_TO]->(e2:Entity)
                         where t1.text = ne1.head and t1.text = coref.head and ne1.kb_id is null and ne2.kb_id is not null
                         set ne1.kb_id = ne2.kb_id, ne1.spacyType = ne1.type, ne1.type = ne2.type, ne1.description = ne2.description, ne1.normal_term = ne2.normal_term, ne1.url_wikidata = ne2.url_wikidata
                         detach delete e1
@@ -1515,10 +1563,10 @@ class RefinementPhase():
         query = """
                     match p = (pobj:TagOccurrence where pobj.pos in ['NNS','NNP','NN', 'NNPS','PRP', 'PRP$'])<-[dep2:IS_DEPENDENT {type: 'pobj'}]
                     -(prep:TagOccurrence where prep.text= 'of')<-[dep1:IS_DEPENDENT {type: 'prep'}]-(head:TagOccurrence)-
-                    [:PARTICIPATES_IN]->(fa:FrameArgument), (pobj)--(fa)
+                    [:IN_FRAME]->(fa:FrameArgument), (pobj)--(fa)
                     where head.tok_index_doc = fa.headTokenIndex
                                             and (
-                                                exists ((head)-[:PARTICIPATES_IN]->(:NamedEntity {type: 'CARDINAL'}))
+                                                exists ((head)-[:IN_MENTION]->(:NamedEntity {type: 'CARDINAL'}))
                                                 OR head.lemma in ['all', 'some', 'many', 'most', 'few', 'several', 'none', 'half', 'part', 'portion', 'group', 'majority', 'minority', 'rest', 'number', 'lot', 'lots']
                                             )
                     OPTIONAL MATCH (d:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(head)
@@ -1576,7 +1624,7 @@ class RefinementPhase():
         query = """
                  MATCH (fa:FrameArgument)-[:REFERS_TO]->(e:Entity)
                  WHERE coalesce(e.syntacticType, e.type, '') = 'NOMINAL'
-                 OPTIONAL MATCH (tok:TagOccurrence)-[:PARTICIPATES_IN]->(fa)
+                 OPTIONAL MATCH (tok:TagOccurrence)-[:IN_FRAME]->(fa)
                  OPTIONAL MATCH (d:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok)
                  WITH fa, e, d,
                      min(tok.tok_index_doc) AS min_tok,
@@ -1646,7 +1694,7 @@ class RefinementPhase():
                  WHERE coalesce(ne.start_tok, ne.token_start, ne.index) = min_tok
                    AND coalesce(ne.end_tok, ne.token_end, ne.end_index, ne.index) = max_tok
                                  OPTIONAL MATCH (tok_fa:TagOccurrence)-[:PARTICIPATES_IN]->(nc)
-                                 OPTIONAL MATCH (tok_fa)-[:PARTICIPATES_IN]->(fa:FrameArgument)
+                                 OPTIONAL MATCH (tok_fa)-[:IN_FRAME]->(fa:FrameArgument)
                                  WITH nc, d, min_tok, max_tok, min_char, max_char, chunk_text_lc,
                                             count(ne) AS ne_count,
                                             count(DISTINCT CASE WHEN fa.type IN ['ARG0', 'ARG1', 'ARG2'] THEN fa END) AS core_arg_hits
@@ -1726,7 +1774,7 @@ class RefinementPhase():
 
         query = """
                  MATCH (em:EntityMention:NominalMention)
-                 OPTIONAL MATCH (tok:TagOccurrence)-[:PARTICIPATES_IN]->(em)
+                 OPTIONAL MATCH (tok:TagOccurrence)-[:IN_MENTION]->(em)
                  WITH em, tok,
                       CASE
                           WHEN tok IS NULL THEN 99
@@ -1787,11 +1835,11 @@ class RefinementPhase():
 
         query = """
                  MATCH (em:EntityMention:NominalMention)
-                 OPTIONAL MATCH (head_tok:TagOccurrence)-[:PARTICIPATES_IN]->(em)
+                 OPTIONAL MATCH (head_tok:TagOccurrence)-[:IN_MENTION]->(em)
                   WHERE head_tok.tok_index_doc = coalesce(em.nominalSemanticHeadTokenIndex, em.headTokenIndex, em.end_tok, em.start_tok)
                  WITH em, head(collect(head_tok)) AS head_tok
-                 OPTIONAL MATCH (arg_tok:TagOccurrence)-[:PARTICIPATES_IN]->(em)
-                 OPTIONAL MATCH (arg_tok)-[:PARTICIPATES_IN]->(fa:FrameArgument)
+                 OPTIONAL MATCH (arg_tok:TagOccurrence)-[:IN_MENTION]->(em)
+                 OPTIONAL MATCH (arg_tok)-[:IN_FRAME]->(fa:FrameArgument)
                  WITH em, head_tok,
                       count(DISTINCT CASE WHEN fa.type IN ['ARG0', 'ARG1', 'ARG2'] THEN fa END) AS core_arg_hits
                  OPTIONAL MATCH (head_tok)-[:TRIGGERS]->(evt:TEvent)
@@ -1948,25 +1996,42 @@ class RefinementPhase():
     #//Because, cases like 'millions of people' actually refering to nominal rather numeric
     #//It checks that frame argument is not yet connected to entity. If it exists it means it is a case about quantified entities. 
     def link_frameArgument_to_numeric_entities(self):
-        """Link FrameArguments to numeric NamedEntity nodes (labelled NUMERIC).
+        """Link FrameArguments to numeric NamedEntity nodes.
 
-        Numeric NamedEntities (e.g., MONEY, QUANTITY) are marked with the
-        `NUMERIC` label by earlier passes. This method connects FAs whose
-        head token matches a numeric NamedEntity and which are not already
-        linked to a generic Entity.
+        Connects FAs whose head token matches a numeric-type NamedEntity
+        (MONEY, QUANTITY, PERCENT) and which are not already linked to a
+        generic Entity or canonical VALUE node.  Canonical VALUE nodes are
+        preferred: when the NamedEntity has a REFERS_TO -> VALUE chain, the FA
+        is linked to the VALUE node instead of the NamedEntity directly.
+
+        No longer relies on the legacy :NUMERIC dynamic label.  The type-based
+        filter on ``ne.type`` is the canonical way to identify numeric mentions
+        without requiring a prior label-writing pass.
         """
         logger.debug("link_frameArgument_to_numeric_entities")
         graph = self.graph
 
-        query = """    
-                        MATCH p = (f:FrameArgument)<-[:PARTICIPATES_IN]-(t:TagOccurrence)-[:PARTICIPATES_IN]->(e:NUMERIC)
-                        where f.headTokenIndex = t.tok_index_doc and not exists ((f)-[:REFERS_TO]-(:Entity))
-                        merge (f)-[:REFERS_TO]-(e)
-                        return p
-        
+        # Prefer canonical VALUE target; fall back to raw NamedEntity when no
+        # VALUE node has been materialized yet (e.g. early-phase runs).
+        query = """
+            MATCH (f:FrameArgument)<-[:IN_FRAME]-(t:TagOccurrence)
+                -[:IN_MENTION]->(ne:NamedEntity)
+            WHERE ne.type IN ['MONEY', 'QUANTITY', 'PERCENT']
+              AND f.headTokenIndex = t.tok_index_doc
+              AND NOT exists((f)-[:REFERS_TO]->(:Entity))
+            OPTIONAL MATCH (ne)-[:REFERS_TO]->(v:VALUE)
+            WITH f, ne, v
+            FOREACH (ignored IN CASE WHEN v IS NOT NULL THEN [1] ELSE [] END |
+                MERGE (f)-[:REFERS_TO]->(v)
+            )
+            FOREACH (ignored IN CASE WHEN v IS NULL THEN [1] ELSE [] END |
+                MERGE (f)-[:REFERS_TO]->(ne)
+            )
+            RETURN count(f) AS linked
         """
-        data= graph.run(query).data()
-        
+        data = graph.run(query).data()
+        linked = data[0].get("linked", 0) if data else 0
+        logger.debug("link_frameArgument_to_numeric_entities: linked %d frame arguments", linked)
         return ""
 
 

@@ -29,8 +29,8 @@ def fuse_entities_cross_sentence(
 
     query = """
     MATCH (d:AnnotatedText)-[:CONTAINS_SENTENCE]->(s:Sentence)
-    MATCH (s)-[:HAS_TOKEN]->(to1:TagOccurrence)-[:PARTICIPATES_IN]->(ne1:NamedEntity)-[:REFERS_TO]->(e1:Entity)
-    MATCH (s)-[:HAS_TOKEN]->(to2:TagOccurrence)-[:PARTICIPATES_IN]->(ne2:NamedEntity)-[:REFERS_TO]->(e2:Entity)
+    MATCH (s)-[:HAS_TOKEN]->(to1:TagOccurrence)-[:IN_MENTION]->(ne1:NamedEntity)-[:REFERS_TO]->(e1:Entity)
+    MATCH (s)-[:HAS_TOKEN]->(to2:TagOccurrence)-[:IN_MENTION]->(ne2:NamedEntity)-[:REFERS_TO]->(e2:Entity)
     WHERE e1 <> e2
       AND id(e1) < id(e2)
       AND ($doc_id IS NULL OR d.id = $doc_id)
@@ -69,9 +69,9 @@ def fuse_entities_cross_document(
 
     query = """
     MATCH (d1:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)
-          -[:PARTICIPATES_IN]->(:NamedEntity)-[:REFERS_TO]->(e1:Entity)
+            -[:IN_MENTION]->(:NamedEntity)-[:REFERS_TO]->(e1:Entity)
     MATCH (d2:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)
-          -[:PARTICIPATES_IN]->(:NamedEntity)-[:REFERS_TO]->(e2:Entity)
+            -[:IN_MENTION]->(:NamedEntity)-[:REFERS_TO]->(e2:Entity)
     WHERE d1.id <> d2.id
       AND e1 <> e2
       AND id(e1) < id(e2)
@@ -124,9 +124,9 @@ def propagate_coreference_identity_cross_document(
 
         query = """
         MATCH (d1:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)
-                    -[:PARTICIPATES_IN]->(m1)-[:REFERS_TO]->(e1:Entity)
+                    -[:IN_MENTION]->(m1)-[:REFERS_TO]->(e1:Entity)
         MATCH (d2:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)
-                    -[:PARTICIPATES_IN]->(m2)-[:REFERS_TO]->(e2:Entity)
+                    -[:IN_MENTION]->(m2)-[:REFERS_TO]->(e2:Entity)
         WHERE d1.id <> d2.id
             AND e1 <> e2
             AND id(e1) < id(e2)

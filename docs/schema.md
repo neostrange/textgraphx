@@ -39,6 +39,11 @@ Hard-contract scope (must pass):
 - Required core fields for canonical labels (`AnnotatedText`, `TagOccurrence`, `NamedEntity`, `Entity`, `TIMEX`, `TEvent`, `EventMention`, `Frame`, `FrameArgument`).
 - Span integrity (`start_tok <= end_tok`, token/char fields consistent when both exist).
 
+Runtime enforcement note:
+
+- Phase assertions and diagnostics now track hard-contract violations for missing canonical mention/event chains and missing identity fields on span-bearing mention nodes.
+- CI should treat endpoint drift, referential-chain breaks, and missing token/doc-span identity as hard failures once dataset baselines are locked.
+
 Advisory-contract scope (warn, do not block by default):
 
 - Enrichment profile completeness (`nominalSemantic*`, confidence/source metadata).
@@ -127,6 +132,8 @@ Relationship types:
 - `HAS_NEXT`
 - `IS_DEPENDENT`
 - `PARTICIPATES_IN`
+- `IN_FRAME`
+- `IN_MENTION`
 - `HAS_FRAME_ARGUMENT`
 - `REFERS_TO`
 - `HAS_LEMMA`
@@ -135,6 +142,7 @@ Relationship types:
 - `TRIGGERS`
 - `DESCRIBES`
 - `FRAME_DESCRIBES_EVENT`
+- `KEYWORD_DESCRIBES_DOCUMENT`
 - `INSTANTIATES`
 - `CREATED_ON`
 - `TLINK`
@@ -217,7 +225,7 @@ Transition policy:
 | --- | --- | --- | --- |
 | `TIMEX` | Temporal expression | `tid`: temporal id within a document. `doc_id`: owning document id. `type`: TIMEX type such as `DATE`, `TIME`, `DURATION`. `value`: normalized temporal value. `text`: surface text when available. `quant`: quantifier from HeidelTime, default `N/A`. `origin`: extraction source, commonly `text2graph` or XML-provided origin. `start_index`: token start index in the current HeidelTime path. `end_index`: token end index in the current HeidelTime path. `begin`: legacy start offset from the older XML path. `end`: legacy end offset from the older XML path. `functionInDocument`: `CREATION_TIME` for DCT or `NONE` otherwise. | Created by `TemporalPhase.create_DCT_node()`, `TemporalPhase.materialize_timexes()`, and `TemporalPhase.materialize_timexes_fallback()`. The document creation time node is also just a `TIMEX`. |
 | `TEvent` | Temporalized event node | `eiid`: event instance id. `doc_id`: owning document id. `begin`: event begin token index or offset. `end`: event end token index or offset. `aspect`: temporal aspect. `class`: event class. `epos`: event POS from TTK output. `form`: event surface form. `pos`: event POS. `tense`: event tense. `modality`: modal surface value from TTK when present. `polarity`: event polarity from TTK when present. | Created by `TemporalPhase.materialize_tevents()`. |
-| `EventMention` | Mention-level event instantiation | `id`: stable mention id, currently derived from `TEvent.eiid`. `doc_id`: owning document id. `pred`: mention-level predicate text. `tense`, `aspect`, `pos`, `epos`, `form`, `modality`, `polarity`, `class`: copied or normalized temporal/event attributes. `start_tok`, `end_tok`, `start_char`, `end_char`, `begin`, `end`: mention span coordinates. | Created by `EventEnrichmentPhase.create_event_mentions()`. Each `EventMention` links to a canonical `TEvent` through `REFERS_TO`; `TemporalPhase` does not create these nodes. |
+| `EventMention` | Mention-level event instantiation | `id`: stable mention id, currently derived from `TEvent.eiid`. `doc_id`: owning document id. `pred`: mention-level predicate text. `tense`, `aspect`, `pos`, `epos`, `form`, `modality`, `polarity`, `class`: copied or normalized temporal/event attributes. `start_tok`, `end_tok`, `start_char`, `end_char`, `begin`, `end`: mention span coordinates. `token_id`: token-based stable id for migration-safe joins. `token_start`: token start index. `token_end`: token end index. | Created by `EventEnrichmentPhase.create_event_mentions()`. Each `EventMention` links to a canonical `TEvent` through `REFERS_TO`; `TemporalPhase` does not create these nodes. |
 
 ### 2.4 Relation, keyword, and audit nodes
 
@@ -225,7 +233,7 @@ Transition policy:
 | --- | --- | --- | --- |
 | `Evidence` | Mention-level evidence for extracted relations | `id`: derived from the internal Neo4j id of an `IS_RELATED_TO` relationship. `type`: relation type copied from `IS_RELATED_TO.type`. | Created only if `TextProcessor.build_relationships_inferred_graph()` is executed. This is a live but legacy relation-extraction path. |
 | `Relationship` | Higher-level relation abstraction between canonical entities | `id`: derived from the internal Neo4j id of an `IS_RELATED_TO` relationship. `type`: relation type copied from `IS_RELATED_TO.type`. | Created only by `TextProcessor.build_relationships_inferred_graph()`. |
-| `Keyword` | Keyword node attached to a document | `id`: keyword lemma id. `NE`: optional named-entity type attached to the keyword. `index`: keyword start offset. `endIndex`: keyword end offset. | Created by `TextProcessor.store_keywords()`. This label is not documented in the ontology files but still has an active write path. |
+| `Keyword` | Keyword node attached to a document | `id`: keyword lemma id. `NE`: optional named-entity type attached to the keyword. `index`: keyword start offset. `endIndex`: keyword end offset. | Created by `TextProcessor.store_keywords()` during TextRank-based keyword extraction. Links to documents via `-[:KEYWORD_DESCRIBES_DOCUMENT {rank}]->` edges. |
 | `PhaseRun` | Generic phase audit marker | `id`: timestamp-based run id. `phase`: canonical phase name. `timestamp`: ISO timestamp. `duration_seconds`: phase duration. `documents_processed`: processed document count. `meta_*`: arbitrary metadata stored as flattened prefixed properties. | Created by `phase_assertions.record_phase_run()` and used by temporal, event-enrichment, and TLINK phases. |
 | `RefinementRun` | Refinement-specific audit marker | `id`: timestamp-based run id. `timestamp`: ISO timestamp. `passes`: ordered list of refinement passes that ran. | Created at the end of `RefinementPhase.__main__`. |
 
@@ -242,34 +250,40 @@ Some schema elements are not separate base node types. They are additional label
 
 Important note: `NUMERIC` is not created as a separate standalone node family. It is an extra label on selected `NamedEntity` nodes.
 
-### 3.2 Additional labels on `FrameArgument`
+Transition note:
 
-`EventEnrichmentPhase.add_non_core_participants_to_event()` sets `FrameArgument.argumentType`, then `add_label_to_non_core_fa()` applies that value as an extra label using APOC.
+- Event-enrichment participant-source resolution now prefers canonical `Entity` and `VALUE` targets and only falls back to legacy `NamedEntity:NUMERIC|VALUE` matches for compatibility.
+- New query logic should treat direct `NamedEntity:NUMERIC|VALUE` consumption as transitional, not canonical.
+- Refinement paths that apply direct `:NUMERIC` and temporary `:VALUE` labels now emit deprecation warnings, and runtime diagnostics expose `numeric_value_transition_inventory` so migration progress can be tracked without changing current write behavior.
 
-Observed dynamic labels include:
+### 3.2 FrameArgument argumentType property (formerly dynamic labels)
 
-- `Comitative`
-- `Locative`
-- `Directional`
-- `Goal`
-- `Manner`
-- `Temporal`
-- `Extent`
-- `Reciprocals`
-- `SecondaryPredication`
-- `PurposeClauses`
-- `CauseClauses`
-- `Discourse`
-- `Modals`
-- `Negation`
-- `DirectSpeech`
-- `Adverbials`
-- `Adjectival`
-- `LightVerb`
-- `Construction`
-- `NonCore`
+`EventEnrichmentPhase.add_non_core_participants_to_event()` sets `FrameArgument.argumentType` to a normalized semantic category. This property is the canonical representation of non-core semantic roles.
 
-These are implementation labels added at runtime. They are not fully reflected in the ontology files.
+Canonical argumentType values (from ontology.json):
+
+- `Comitative` (ARGM-COM)
+- `Locative` (ARGM-LOC)
+- `Directional` (ARGM-DIR)
+- `Goal` (ARGM-GOL)
+- `Manner` (ARGM-MNR)
+- `Temporal` (ARGM-TMP) — *note: excluded from event enrichment per section 8 caveat*
+- `Extent` (ARGM-EXT)
+- `Reciprocals` (ARGM-REC)
+- `SecondaryPredication` (ARGM-PRD)
+- `PurposeClauses` (ARGM-PRP)
+- `CauseClauses` (ARGM-CAU)
+- `Discourse` (ARGM-DIS)
+- `Modals` (ARGM-MOD)
+- `Negation` (ARGM-NEG)
+- `DirectSpeech` (ARGM-DSP)
+- `Adverbials` (ARGM-ADV)
+- `Adjectival` (ARGM-ADJ)
+- `LightVerb` (ARGM-LVB)
+- `Construction` (ARGM-CXN)
+- `NonCore` (fallback for unknown ARGM types)
+
+**Historical note**: Prior to April 2026, these values were also duplicated as extra node labels via APOC (`add_label_to_non_core_fa()`). Since no query logic or evaluation code relied on label filtering, the dynamic label application was deprecated as redundant overhead. All semantic queries should use the `argumentType` property directly.
 
 ### 3.3 Additional labels on `EntityMention`
 
@@ -334,6 +348,11 @@ Several relationship types are overloaded across different subgraphs. The tables
 | `PARTICIPANT` | `NUMERIC -> EventMention` | `type`: copied from `FrameArgument.type`. `prep`: optional preposition. | Mention-level numeric participant edge retained for compatibility alongside `EVENT_PARTICIPANT`. |
 | `PARTICIPANT` | `FrameArgument -> TEvent` | `type`: original non-core argument type. `prep`: optional preposition. | Non-core event participant edge from the argument span itself. |
 | `EVENT_PARTICIPANT` | `Entity|NUMERIC|FrameArgument -> TEvent|EventMention` | `type`: copied from frame-argument role. `prep`: optional preposition for prepositional arguments. | Canonical participant edge family written alongside `PARTICIPANT` during the maintained transition period. |
+
+Participant provenance note:
+
+- Event-enrichment participant writes now stamp provenance fields at creation time on both `PARTICIPANT` and `EVENT_PARTICIPANT` edges (`confidence`, `evidence_source`, `rule_id`, `authority_tier`, `source_kind`, `conflict_policy`, `created_at`).
+- Core participant writes use `rule_id=participant_linking_core` with confidence `0.65`; non-core writes use `rule_id=participant_linking_non_core` with confidence `0.60`.
 | `TRIGGERS` | `TagOccurrence -> TIMEX` | none | Token or token span triggers a temporal expression node. |
 | `TRIGGERS` | `TagOccurrence -> TEvent` | none | Token triggers a temporal event node. |
 | `TRIGGERS` | `TagOccurrence -> Signal` | none | Token or token span anchors a temporal signal node. |
@@ -344,13 +363,27 @@ Several relationship types are overloaded across different subgraphs. The tables
 | `CLINK` | `TEvent -> TEvent` | `source`: currently `srl_argm_cau` | Derived causal relation from `ARGM-CAU` frame arguments during event enrichment. |
 | `SLINK` | `TEvent -> TEvent` | `source`: currently `srl_argm_dsp` | Derived subordinating relation from `ARGM-DSP` frame arguments during event enrichment. |
 
+TLINK anchor-consistency note:
+
+- TLINK hardening now annotates anchor metadata (`sourceAnchorType`, `targetAnchorType`, `anchorPair`, `anchorConsistency`, `anchorConsistencyReason`) for every TLINK.
+- In non-shadow mode, inconsistent TLINKs (self-links or endpoint-contract violations) are retained but marked suppressed by `tlink_anchor_consistency_filter`.
+- Runtime diagnostics expose this state via `tlink_anchor_consistency_inventory` so anchor inconsistencies and anchor-filter suppressions can be tracked in CI and evaluation payloads.
+
+Recommended CI gate thresholds (starting point):
+
+- `tlink_anchor_inconsistent_count`: allow no increase versus baseline (`--max-tlink-anchor-inconsistent-increase 0`).
+- `tlink_missing_anchor_metadata_count`: require full metadata coverage (`--max-tlink-missing-anchor-metadata 0`).
+- `participation_in_frame_missing_count`: allow no increase and target zero missing aliases (`--max-participation-in-frame-missing-increase 0`, `--max-participation-in-frame-missing 0`).
+- `participation_in_mention_missing_count`: allow no increase and target zero missing aliases (`--max-participation-in-mention-missing-increase 0`, `--max-participation-in-mention-missing 0`).
+- Keep overall quality tolerance explicit (`--tolerance <value>`) so quality drift and temporal-anchor regressions are both enforced.
+
 ### 4.4 Fusion and keyword relationships
 
 | Relationship | Endpoint pattern | Properties | Meaning |
 | --- | --- | --- | --- |
 | `CO_OCCURS_WITH` | `Entity -> Entity` | `confidence`: confidence score. `evidence_source`: rule family or phase. `rule_id`: specific rule identifier. `created_at`: creation timestamp. | Cross-sentence fusion edge for nearby entity co-occurrence. |
 | `SAME_AS` | `Entity -> Entity` | `confidence`: confidence score. `evidence_source`: rule family or phase. `rule_id`: specific rule identifier. `created_at`: creation timestamp. | Cross-document identity fusion for entities sharing stable KB identity. |
-| `DESCRIBES` | `Keyword -> AnnotatedText` | `rank`: keyword rank score | Legacy keyword-to-document descriptive edge. This is separate from `Frame -> TEvent` event description, but reuses the same relationship type. |
+| `KEYWORD_DESCRIBES_DOCUMENT` | `Keyword -> AnnotatedText` | `rank`: keyword rank score | Keyword-to-document metadata edge. Separated from `Frame -> TEvent` to keep DESCRIBES semantically pure (event description only). |
 
 ### 4.5 Transitional relationship policy
 
@@ -363,6 +396,26 @@ Some relationship families are intentionally dual-written during the current sch
 | `PARTICIPANT` (event participant edges) | `EVENT_PARTICIPANT` | Core and non-core participant enrichment write both edges for compatibility while newer consumers can prefer `EVENT_PARTICIPANT`. |
 
 This dual-write strategy is intentional. It should be removed only as part of an explicit migration with coordinated query updates; it is not redundant drift.
+
+### 5.5 Participation edge split migration (`IN_FRAME`, `IN_MENTION`)
+
+To reduce `PARTICIPATES_IN` overloading during transition, runtime writes now dual-write:
+
+- `TagOccurrence -> IN_FRAME -> Frame|FrameArgument`
+- `TagOccurrence -> IN_MENTION -> NamedEntity|EntityMention|CorefMention|Antecedent`
+
+Compatibility policy:
+
+- Existing readers may continue to include `PARTICIPATES_IN` during transition.
+- New or migrated readers should prefer `IN_FRAME` and `IN_MENTION` first.
+
+Backfill helper for existing databases:
+
+- `python -m textgraphx.tools.migrate_participation_edges --dry-run`
+- `python -m textgraphx.tools.migrate_participation_edges --apply`
+
+The helper creates missing `IN_FRAME`/`IN_MENTION` edges from current
+`PARTICIPATES_IN` edges in batches and reports before/after missing counts.
 
 ## 5. Identity Conventions
 
@@ -434,7 +487,9 @@ These properties drive downstream behavior and are not just descriptive metadata
 - `tok_index_doc`: the most important token alignment field in the graph.
 - `kb_id`: cross-document identity anchor for canonical entities and fusion.
 - `confidence`, `evidence_source`, `rule_id`, `created_at`: provenance fields on inferred edges, especially `CO_OCCURS_WITH` and `SAME_AS`.
+- `authority_tier`, `source_kind`, `conflict_policy`: normalized provenance-contract fields now stamped on inferred relationship families, including event participant edges.
 - `relType`: semantic value of a `TLINK`.
+- `sourceAnchorType`, `targetAnchorType`, `anchorPair`, `anchorConsistency`, `anchorConsistencyReason`: TLINK anchor-consistency metadata used for temporal diagnostics and suppression auditability.
 - `prep`: stored on `PARTICIPANT` edges when a preposition or prepositional head should be preserved.
 
 ## 8. Schema Drift and Caveats
@@ -458,16 +513,18 @@ Current `ENH-NOM-03` evaluator profile modes:
 These points are important if you are trying to reconcile the codebase, the ontology docs, and the live database.
 
 1. `NUMERIC` and `VALUE` are dynamic labels on `NamedEntity`, not separate base node families.
-2. `Keyword` nodes and `Keyword -[:DESCRIBES {rank}]-> AnnotatedText` edges exist in code but are missing from the ontology files.
-3. `DESCRIBES` is overloaded for two unrelated subgraphs: `Frame -> TEvent` and `Keyword -> AnnotatedText`.
-4. `PARTICIPANT` is also overloaded: it is used for `FrameArgument -> Frame`, `Entity/NUMERIC -> TEvent`, and `FrameArgument -> TEvent`.
-5. `CONTAINS_SENTENCE` is the canonical document-to-sentence edge, but `fusion.py` still queries `:CONTAINS`, which does not match the primary ingestion schema and looks like legacy drift.
+	Event-enrichment reads now centralize this compatibility behavior and prefer canonical `Entity`/`VALUE` resolution before falling back to legacy labels.
+	The same canonical-first compatibility rule now applies when event enrichment scores low-confidence events from participant support, so VALUE-backed participants count as structural evidence instead of being ignored.
+2. `Keyword` nodes and `Keyword -[:KEYWORD_DESCRIBES_DOCUMENT {rank}]-> AnnotatedText` edges are persisted but not fully documented in the ontology files. Keywords are extracted via TextRank summarization and linked to documents for metadata/keyword extraction purposes.
+3. **Dynamic label application deprecated**: Prior to April 2026, `EventEnrichmentPhase.add_label_to_non_core_fa()` stamped 20+ semantic category labels (Locative, Directional, etc.) on FrameArgument nodes using APOC. These labels were decorative—no query or evaluation logic filtered by them. The label application is now a no-op; use the `argumentType` property instead. This change reduces APOC overhead without functional impact.
+4. `PARTICIPANT` is overloaded: it is used for `FrameArgument -> Frame`, `Entity/NUMERIC -> TEvent`, and `FrameArgument -> TEvent`. This overloading is intentional and controlled via the dual-write policy in section 4.5.
+5. Historical drift resolved: `CONTAINS_SENTENCE` is the canonical document-to-sentence edge and `fusion.py` now uses `:CONTAINS_SENTENCE` (the stale `:CONTAINS` variant was removed and guarded by milestone contradiction tests).
 6. `PhaseRun` is a real persisted audit label but is not represented in the ontology files.
 7. `RefinementRun` is also persisted and omitted from the ontology files.
-8. `TlinksRecognizer` reads `e.modal` on `TEvent`, but the current write paths do not populate that property.
+8. Historical drift resolved: `TlinksRecognizer` no longer reads `e.modal`; temporal/event writes and downstream logic consistently use `modality`.
 9. `TIMEX` has two property shapes because the codebase contains both the newer HeidelTime path (`start_index`, `end_index`, `text`, `quant`) and an older XML path (`begin`, `end`).
 10. `Signal` is currently implemented only for temporal `SIGNAL` spans from TTK. `CSignal` is still a planned schema element, not a persisted label yet.
-11. `FrameArgument.argumentType` includes a mapping for `ARGM-TMP`, but the current non-core enrichment query excludes `ARGM-TMP` from that branch, so the `Temporal` mapping is effectively unreachable there.
+11. Historical contradiction resolved: non-core participant enrichment excludes `ARGM-TMP`, and the unreachable `WHEN 'ARGM-TMP'` mapping has been removed from that branch.
 12. Some refinement `REFERS_TO` merges use undirected patterns, so very old data may not be perfectly uniform in relationship direction even when the intended semantics are clear.
 13. The nominal semantic-head profile is intentionally additive. `head` remains the original surface or parser-root head, while `nominalSemanticHead*` stores the noun-preferred head used for lexical reasoning and nominal-event analysis.
 
@@ -478,8 +535,8 @@ If you need one simplified schema view for downstream consumers, use this canoni
 - Structural backbone: `AnnotatedText -> Sentence -> TagOccurrence`.
 - Mentions and semantic spans: `TagOccurrence -> NamedEntity|Frame|FrameArgument|Antecedent|CorefMention|NounChunk` via `PARTICIPATES_IN`.
 - Entity normalization: `NamedEntity -> Entity` via `REFERS_TO`.
-- Event normalization: `TagOccurrence -> TEvent|TIMEX` via `TRIGGERS`, then `Frame -> TEvent` via `DESCRIBES`.
-- Event participants: `Entity|NUMERIC|FrameArgument -> TEvent` via `PARTICIPANT`.
+- Event normalization: `TagOccurrence -> TEvent|TIMEX` via `TRIGGERS`, then `Frame -> TEvent` via `FRAME_DESCRIBES_EVENT|DESCRIBES`.
+- Event participants: `Entity|NUMERIC|FrameArgument -> TEvent|EventMention` via `EVENT_PARTICIPANT|PARTICIPANT`.
 - Temporal relations: `TLINK` among `TEvent` and `TIMEX`.
 - Fusion and provenance: `CO_OCCURS_WITH`, `SAME_AS`, and relation-evidence nodes where the legacy relation extraction path is enabled.
 
@@ -553,4 +610,5 @@ Before merging any schema-affecting change, verify all four checks:
 Suggested CI gate policy:
 
 - Fail if code introduces undocumented canonical labels/relationships/properties.
+- Fail if runtime diagnostics report endpoint contract, referential integrity, or identity contract violations above the configured hard thresholds.
 - Warn if advisory provenance/profile fields are missing.

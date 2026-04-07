@@ -1,10 +1,11 @@
 """EventEnrichmentPhase
 
 Attach frames to temporalized events and populate participant relationships
-between canonical `Entity`/`NUMERIC` nodes and `TEvent` nodes. This phase
-assumes frames and TIMEX/TEvent nodes are already present in the graph and
-performs idempotent MERGE updates to create `DESCRIBES` and `PARTICIPANT`
-edges.
+between canonical `Entity`/`VALUE` nodes and `TEvent` nodes, with explicit
+fallback support for legacy `NamedEntity:NUMERIC|VALUE` sources during the
+current transition period. This phase assumes frames and TIMEX/TEvent nodes
+are already present in the graph and performs idempotent MERGE updates to
+create `DESCRIBES` and `PARTICIPANT` edges.
 """
 
 import os
@@ -72,6 +73,79 @@ class EventEnrichmentPhase():
             "factuality": ("event_enrichment", 0.70),
         }
         return defaults.get(field_name, ("temporal_phase", 0.90))
+
+    @staticmethod
+    def _participant_source_subquery(frame_argument_alias="fa", source_alias="participant", include_frame_argument=False):
+        """Return a Cypher subquery resolving participant sources with canonical preference.
+
+        Resolution order is:
+        1. canonical `Entity`
+        2. canonical `VALUE`
+        3. legacy fallback NamedEntity of numeric/value semantic type (CARDINAL, ORDINAL,
+           MONEY, QUANTITY, PERCENT) — independent of whether the transitional :NUMERIC
+           or :VALUE labels have been written.
+
+        Some semantic-relation paths also allow `FrameArgument` as a direct
+        source during the maintained transition period.
+        """
+        branches = [
+            f"""
+                    WITH {frame_argument_alias}
+                    MATCH ({frame_argument_alias})-[:REFERS_TO]->({source_alias}:Entity)
+                    RETURN {source_alias}
+            """,
+            f"""
+                    WITH {frame_argument_alias}
+                    MATCH ({frame_argument_alias})-[:REFERS_TO]->({source_alias}:VALUE)
+                    RETURN {source_alias}
+            """,
+            f"""
+                    WITH {frame_argument_alias}
+                    MATCH ({frame_argument_alias})-[:REFERS_TO]->({source_alias}:NamedEntity)
+                    WHERE {source_alias}.type IN ['CARDINAL', 'ORDINAL', 'MONEY', 'QUANTITY', 'PERCENT']
+                    RETURN {source_alias}
+            """,
+        ]
+        if include_frame_argument:
+            branches.append(
+                f"""
+                    WITH {frame_argument_alias}
+                    MATCH ({frame_argument_alias})-[:REFERS_TO]->({source_alias}:FrameArgument)
+                    RETURN {source_alias}
+                """
+            )
+        return "CALL {\n" + "\n                    UNION\n".join(branches) + "\n                }"
+
+    @staticmethod
+    def _event_participant_support_subquery(event_alias="event", source_alias="participant_source"):
+        """Return a Cypher subquery collecting participant-support sources with canonical preference.
+
+        Support evidence is counted across canonical `Entity`, canonical `VALUE`,
+        and legacy fallback NamedEntity of numeric/value semantic type (CARDINAL, ORDINAL,
+        MONEY, QUANTITY, PERCENT) — independent of whether the transitional :NUMERIC
+        or :VALUE labels have been written.
+        The subquery returns list batches so outer rows remain available even when
+        an event has no participants.
+        """
+        branches = [
+            f"""
+                    WITH {event_alias}
+                    OPTIONAL MATCH ({source_alias}:Entity)-[:EVENT_PARTICIPANT|PARTICIPANT]->({event_alias})
+                    RETURN collect(DISTINCT {source_alias}) AS matched_sources
+            """,
+            f"""
+                    WITH {event_alias}
+                    OPTIONAL MATCH ({source_alias}:VALUE)-[:EVENT_PARTICIPANT|PARTICIPANT]->({event_alias})
+                    RETURN collect(DISTINCT {source_alias}) AS matched_sources
+            """,
+            f"""
+                    WITH {event_alias}
+                    OPTIONAL MATCH ({source_alias}:NamedEntity)-[:EVENT_PARTICIPANT|PARTICIPANT]->({event_alias})
+                    WHERE {source_alias}.type IN ['CARDINAL', 'ORDINAL', 'MONEY', 'QUANTITY', 'PERCENT']
+                    RETURN collect(DISTINCT {source_alias}) AS matched_sources
+            """,
+        ]
+        return "CALL {\n" + "\n                    UNION\n".join(branches) + "\n                }"
 
     def _resolve_tevent_field_conflicts(self, field_name, incoming_source="event_enrichment", incoming_confidence=0.65):
         """Resolve TEvent field conflicts using authority-aware merge policy.
@@ -297,7 +371,10 @@ class EventEnrichmentPhase():
             em.start_char = event.start_char,
             em.end_char = event.end_char,
             em.begin = event.begin,
-            em.end = event.end
+            em.end = event.end,
+            em.token_id = 'em_' + toString(event.doc_id) + '_' + toString(event.start_tok) + '_' + toString(em.end_tok),
+            em.token_start = event.start_tok,
+            em.token_end = em.end_tok
         WITH em, event
         MERGE (em)-[:REFERS_TO]->(event)
         RETURN count(*) as mentions_created
@@ -371,15 +448,17 @@ class EventEnrichmentPhase():
     def add_core_participants_to_event(self):
         logger.debug("add_core_participants_to_event")
         graph = self.graph
+        participant_source_subquery = self._participant_source_subquery("fa", "e")
 
-        # Original query: Link Entity/NUMERIC to canonical TEvent
-        query = """    
-                                        MATCH (f:Frame)<-[:PARTICIPANT]-(fa:FrameArgument)-[:REFERS_TO]->(e)
+        # Original query: Link canonical Entity/VALUE or legacy NamedEntity:NUMERIC|VALUE to canonical TEvent.
+        query = f"""    
+                                        MATCH (f:Frame)<-[:PARTICIPANT]-(fa:FrameArgument)
+                                        {participant_source_subquery}
+                                        WITH f, fa, e
                                         WHERE fa.type IN ['ARG0','ARG1','ARG2','ARG3','ARG4']
-                                            AND (e:Entity OR e:NUMERIC OR e:VALUE)
                                         OPTIONAL MATCH (f)-[:FRAME_DESCRIBES_EVENT]->(event_c:TEvent)
                                         OPTIONAL MATCH (f)-[:DESCRIBES]->(event_l:TEvent)
-                                        WITH fa, e, f, coalesce(event_c, event_l) AS event,
+                                        WITH DISTINCT fa, e, f, coalesce(event_c, event_l) AS event,
                                             CASE WHEN event_c IS NULL THEN 1 ELSE 0 END AS rel_priority
                                         WITH fa, e, f, event, rel_priority,
                                              abs(
@@ -393,24 +472,58 @@ class EventEnrichmentPhase():
                                         WITH fa, e, head(collect(event)) AS event
                                         WHERE event IS NOT NULL
                     merge (e)-[r:PARTICIPANT]->(event)
-                    set r.type = fa.type, (case when fa.syntacticType in ['IN'] then r END).prep = fa.head
+                    set r.type = fa.type,
+                        (case when fa.syntacticType in ['IN'] then r END).prep = fa.head,
+                        r.confidence = 0.65,
+                        r.evidence_source = 'event_enrichment',
+                        r.rule_id = 'participant_linking_core',
+                        r.authority_tier = 'secondary',
+                        r.source_kind = 'rule',
+                        r.conflict_policy = 'additive',
+                        r.created_at = coalesce(r.created_at, datetime().epochMillis)
                     merge (e)-[nr:EVENT_PARTICIPANT]->(event)
-                    set nr.type = fa.type, (case when fa.syntacticType in ['IN'] then nr END).prep = fa.head
+                    set nr.type = fa.type,
+                        (case when fa.syntacticType in ['IN'] then nr END).prep = fa.head,
+                        nr.confidence = 0.65,
+                        nr.evidence_source = 'event_enrichment',
+                        nr.rule_id = 'participant_linking_core',
+                        nr.authority_tier = 'secondary',
+                        nr.source_kind = 'rule',
+                        nr.conflict_policy = 'additive',
+                        nr.created_at = coalesce(nr.created_at, datetime().epochMillis)
                                         return count(*) AS linked
         
         """
         data= graph.run(query).data()
         
-        # New query: Link Entity/NUMERIC to EventMention (mention layer)
-        query_mention = """
+        # New query: Link canonical Entity/VALUE or legacy NamedEntity:NUMERIC|VALUE to EventMention (mention layer).
+        query_mention = f"""
                                         MATCH (f:Frame)-[:INSTANTIATES]->(em:EventMention)-[:REFERS_TO]->(event:TEvent)
-                                        MATCH (f)<-[:PARTICIPANT]-(fa:FrameArgument)-[:REFERS_TO]->(e)
+                                        MATCH (f)<-[:PARTICIPANT]-(fa:FrameArgument)
+                                        {participant_source_subquery}
+                                        WITH f, em, event, fa, e
                                         WHERE fa.type IN ['ARG0','ARG1','ARG2','ARG3','ARG4']
-                                            AND (e:Entity OR e:NUMERIC OR e:VALUE)
+                                        WITH DISTINCT f, em, event, fa, e
                     merge (e)-[r:PARTICIPANT]->(em)
-                    set r.type = fa.type, (case when fa.syntacticType in ['IN'] then r END).prep = fa.head
+                    set r.type = fa.type,
+                        (case when fa.syntacticType in ['IN'] then r END).prep = fa.head,
+                        r.confidence = 0.65,
+                        r.evidence_source = 'event_enrichment',
+                        r.rule_id = 'participant_linking_core',
+                        r.authority_tier = 'secondary',
+                        r.source_kind = 'rule',
+                        r.conflict_policy = 'additive',
+                        r.created_at = coalesce(r.created_at, datetime().epochMillis)
                     merge (e)-[nr:EVENT_PARTICIPANT]->(em)
-                    set nr.type = fa.type, (case when fa.syntacticType in ['IN'] then nr END).prep = fa.head
+                    set nr.type = fa.type,
+                        (case when fa.syntacticType in ['IN'] then nr END).prep = fa.head,
+                        nr.confidence = 0.65,
+                        nr.evidence_source = 'event_enrichment',
+                        nr.rule_id = 'participant_linking_core',
+                        nr.authority_tier = 'secondary',
+                        nr.source_kind = 'rule',
+                        nr.conflict_policy = 'additive',
+                        nr.created_at = coalesce(nr.created_at, datetime().epochMillis)
                                         return count(*) AS linked_mention
         """
         data_mention = graph.run(query_mention).data()
@@ -473,10 +586,24 @@ class EventEnrichmentPhase():
                         END
                     MERGE (fa)-[r:PARTICIPANT]->(event)
                     SET r.type = fa.type,
-                        (CASE WHEN fa.syntacticType IN ['IN'] THEN r END).prep = fa.head
+                        (CASE WHEN fa.syntacticType IN ['IN'] THEN r END).prep = fa.head,
+                        r.confidence = 0.60,
+                        r.evidence_source = 'event_enrichment',
+                        r.rule_id = 'participant_linking_non_core',
+                        r.authority_tier = 'secondary',
+                        r.source_kind = 'rule',
+                        r.conflict_policy = 'additive',
+                        r.created_at = coalesce(r.created_at, datetime().epochMillis)
                     MERGE (fa)-[nr:EVENT_PARTICIPANT]->(event)
                     SET nr.type = fa.type,
-                        (CASE WHEN fa.syntacticType IN ['IN'] THEN nr END).prep = fa.head
+                        (CASE WHEN fa.syntacticType IN ['IN'] THEN nr END).prep = fa.head,
+                        nr.confidence = 0.60,
+                        nr.evidence_source = 'event_enrichment',
+                        nr.rule_id = 'participant_linking_non_core',
+                        nr.authority_tier = 'secondary',
+                        nr.source_kind = 'rule',
+                        nr.conflict_policy = 'additive',
+                        nr.created_at = coalesce(nr.created_at, datetime().epochMillis)
                     RETURN count(*) AS linked
         
         """
@@ -490,19 +617,22 @@ class EventEnrichmentPhase():
  # 2nd step where we set the labels for the non-core fa arguments are assigned
 
     def add_label_to_non_core_fa(self):
-        logger.debug("add_label_to_non_core_fa")
-        graph = self.graph
-
-        query = """    
-                   
-                    MATCH (fa:FrameArgument)
-                    WHERE fa.argumentType is not NULL
-                    CALL apoc.create.addLabels(id(fa), [fa.argumentType]) YIELD node
-                    RETURN node     
+        """Deprecated: APOC dynamic label application disabled.
         
+        FrameArgument.argumentType property provides canonical semantic classification.
+        Dynamic labels (Locative, Directional, etc.) were applied via APOC but are not
+        used by any query logic or evaluation—they served only as documentation.
+        
+        This method is retained for backward compatibility but performs no operations.
+        The argumentType property remains on all non-core FrameArgument nodes.
+        
+        Removal rationale:
+        - Zero queries filter by dynamic labels 
+        - Zero business logic depends on labels
+        - Reduces unnecessary APOC calls
+        - Aligns with schema design intent (property-centric, not label-centric)
         """
-        data= graph.run(query).data()
-        
+        logger.debug("add_label_to_non_core_fa (deprecated, no-op)")
         return ""
 
 
@@ -540,6 +670,7 @@ class EventEnrichmentPhase():
         """
         logger.debug("add_semantic_relation_types")
         graph = self.graph
+        semantic_source_subquery = self._participant_source_subquery("fa", "src", include_frame_argument=True)
 
         query_modifies = """
                     MATCH (f:Frame)<-[:PARTICIPANT|HAS_FRAME_ARGUMENT]-(fa:FrameArgument)
@@ -557,15 +688,15 @@ class EventEnrichmentPhase():
         rows_modifies = graph.run(query_modifies).data()
         modifies_count = rows_modifies[0].get("linked", 0) if rows_modifies else 0
 
-        query_affects = """
-                    MATCH (f:Frame)<-[:PARTICIPANT|HAS_FRAME_ARGUMENT]-(fa:FrameArgument)-[:REFERS_TO]->(src)
+        query_affects = f"""
+                    MATCH (f:Frame)<-[:PARTICIPANT|HAS_FRAME_ARGUMENT]-(fa:FrameArgument)
+                    {semantic_source_subquery}
                     OPTIONAL MATCH (f)-[:FRAME_DESCRIBES_EVENT]->(event_c:TEvent)
                     OPTIONAL MATCH (f)-[:DESCRIBES]->(event_l:TEvent)
-                    WITH fa, src, coalesce(event_c, event_l) AS event
+                    WITH DISTINCT fa, src, coalesce(event_c, event_l) AS event
                     WHERE event IS NOT NULL
                       AND src <> event
                       AND fa.type IN ['ARGM-CAU', 'ARGM-PRP', 'ARGM-MNR']
-                      AND (src:Entity OR src:NUMERIC OR src:VALUE OR src:FrameArgument)
                     MERGE (src)-[r:AFFECTS]->(event)
                     SET r.argumentType = fa.type,
                         r.source = 'srl_semantic_relation',
@@ -655,6 +786,7 @@ class EventEnrichmentPhase():
         """
         logger.debug("enrich_event_mention_properties")
         graph = self.graph
+        participant_support_subquery = self._event_participant_support_subquery("te", "participant_source")
         
         # Initialize certainty from modality hints
         query_certainty = """
@@ -881,16 +1013,20 @@ class EventEnrichmentPhase():
         # Mark low-confidence event mentions using conservative linguistic evidence.
         # In addition to non-verbal spans, down-rank weak/light verb mentions
         # when they have little structural support.
-        query_low_confidence = """
+        query_low_confidence = f"""
         MATCH (em:EventMention)-[:REFERS_TO]->(te:TEvent)
         OPTIONAL MATCH (f:Frame)-[:INSTANTIATES]->(em)
            WITH em, te, count(DISTINCT f) AS frame_support
-           OPTIONAL MATCH (ent:Entity)-[:EVENT_PARTICIPANT|PARTICIPANT]->(te)
-           WITH em, te, frame_support, count(DISTINCT ent) AS participant_support
+           {participant_support_subquery}
+           WITH em, te, frame_support, collect(matched_sources) AS participant_source_batches
+           WITH em, te, frame_support,
+               reduce(all_sources = [], batch IN participant_source_batches | all_sources + batch) AS participant_sources
+           UNWIND CASE WHEN size(participant_sources) = 0 THEN [NULL] ELSE participant_sources END AS participant_source
+           WITH em, te, frame_support, count(DISTINCT participant_source) AS participant_support
            OPTIONAL MATCH (te)-[:TLINK]-(tl_target)
            WHERE tl_target:TEvent OR tl_target:TIMEX
            WITH em, frame_support, participant_support, count(DISTINCT tl_target) AS tlink_support,
-                split(toLower(coalesce(em.pred, '')), ' ')[0] AS pred_lc
+               split(toLower(coalesce(em.pred, '')), ' ')[0] AS pred_lc
         SET em.low_confidence = CASE
             WHEN em.pos IN ['NOUN', 'NN', 'NNS', 'NNP', 'NNPS', 'OTHER', 'JJ']
                  AND frame_support = 0
