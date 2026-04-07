@@ -1,6 +1,9 @@
 import requests
-from TextProcessor import Neo4jRepository  # Import the Neo4jRepository class
-from util.GraphDbBase import GraphDBBase  # Import the GraphDBBase class
+from textgraphx.TextProcessor import Neo4jRepository  # Import the Neo4jRepository class
+from textgraphx.util.GraphDbBase import GraphDBBase  # Import the GraphDBBase class
+import logging
+
+logger = logging.getLogger(__name__)
 
 """
 **SRLEnricher**
@@ -50,9 +53,7 @@ for enriching SRL output with meaningful
 domain-specific labels.
 """
 
-import requests
-from TextProcessor import Neo4jRepository  # Import the Neo4jRepository class
-from util.GraphDbBase import GraphDBBase  # Import the GraphDBBase class
+# ...existing imports above...
 
 class SRLEnricher(GraphDBBase):
     def __init__(self, argv, llm_api):
@@ -98,27 +99,15 @@ class SRLEnricher(GraphDBBase):
         """
         data = self.retrieve_data()  # Retrieve data from Neo4j
         prompt = "Enrich the following events and their participants:\n"
-        
-        
-        for item in data:
-                prompt = prompt + item
-                self.call_llm(prompt=prompt)
-                
-                
 
-        # for item in data:
-        #     event_properties = item['event_properties']
-        #     event_text = event_properties.get('form')
-        #     prompt += f"Event: {event_text} (ID: {item['event_id']})\n"
-            
-        #     # Assuming arguments are stored in a list
-        #     arguments = item.get('arguments', [])
-        #     for arg in arguments:
-        #         arg_properties = arg['properties']
-        #         arg_text = arg_properties.get('head', 'Unknown argument')
-        #         prompt += f"  - Argument: {arg_text} (ID: {arg['identity']})\n"
-        
-        
+        for item in data:
+            # append a serialized item and send to LLM
+            prompt += str(item) + "\n"
+            try:
+                self.call_llm(prompt=prompt)
+            except Exception:
+                # non-fatal: continue to next item
+                pass
         return prompt
 
     def call_llm(self, prompt):
@@ -133,9 +122,9 @@ class SRLEnricher(GraphDBBase):
         if response.status_code == 200:
             return response.json()  # Return the JSON response
         else:
-            print("Error: Received response with status code", response.status_code)
-            print("Response content:", response.text)  # Print the response content for debugging
-            response.raise_for_status() 
+            logger.error("Error: Received response with status code %s", response.status_code)
+            logger.debug("Response content: %s", response.text)
+            response.raise_for_status()
             
 
     def process_output(self, llm_response):
@@ -155,12 +144,13 @@ class SRLEnricher(GraphDBBase):
         return enriched_output
 
 def main():
-    llm_api = "http://localhost:11434/api/generate"  # Replace with your actual LLM API endpoint
+    from textgraphx.config import get_config
+    llm_api = get_config().services.llm_url
     enricher = SRLEnricher(argv=[], llm_api=llm_api)
     
     prompt = enricher.create_prompt_for_llm()
-    print("Generated Prompt for LLM:")
-    print(prompt)
+    logger.info("Generated Prompt for LLM:")
+    logger.info("%s", prompt)
 
 if __name__ == "__main__":
     main()

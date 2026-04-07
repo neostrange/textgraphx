@@ -1,6 +1,18 @@
 import requests
 import re
 import json
+import logging
+from textgraphx.config import get_config
+logger = logging.getLogger(__name__)
+logger.info("textgraphx.util.RestCaller module imported")
+
+
+def _service_timeout() -> int:
+    try:
+        timeout = int(get_config().services.service_timeout_sec)
+    except Exception:
+        timeout = 20
+    return max(1, timeout)
 
 def amuse_wsd_api_call2(api_endpoint, sentence):
     headers = {
@@ -11,11 +23,12 @@ def amuse_wsd_api_call2(api_endpoint, sentence):
     data_json = "[" + ",".join([f'{{"text": "{item["text"]}", "lang": "{item["lang"]}"}}' for item in data]) + "]"
 
     try:
-        response = requests.post(api_endpoint, data=data_json, headers=headers)
+        logger.debug("POST %s (AMuSE-WSD) payload size=%d", api_endpoint, len(data_json))
+        response = requests.post(api_endpoint, data=data_json, headers=headers, timeout=_service_timeout())
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
-        print(f"Error while calling AMuSE-WSD API: {e}")
+        logger.exception("Error while calling AMuSE-WSD API: %s", e)
         return None
     
 # this method has been implemented just for preprocessing input for AMUSE-WSD 
@@ -45,11 +58,12 @@ def amuse_wsd_api_call(api_endpoint, sentences):
     data = [{"text": sentence, "lang": "EN"} for sentence in updated_sentences]
 
     try:
-        response = requests.post(api_endpoint, json=data, headers=headers)
+        logger.debug("POST %s (AMuSE-WSD bulk) sentences=%d", api_endpoint, len(data))
+        response = requests.post(api_endpoint, json=data, headers=headers, timeout=_service_timeout())
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
-        print(f"Error while calling AMuSE-WSD API: {e}")
+        logger.exception("Error while calling AMuSE-WSD API: %s", e)
         return None
     
 def callHeidelTimeService(parameters):
@@ -60,18 +74,18 @@ def callHeidelTimeService(parameters):
 
     headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
 
-
-    response = requests.post("http://localhost:5000/annotate", json=data, headers=headers)
-
-    # print(response.content)
-    return response.text
+    url = get_config().services.heideltime_url
+    try:
+        response = requests.post(url, json=data, headers=headers, timeout=_service_timeout())
+        response.raise_for_status()
+        logger.debug("HeidelTime POST to %s (dct=%s)", url, dct)
+        return response.text
+    except requests.exceptions.RequestException as e:
+        logger.exception("Error while calling HeidelTime service: %s", e)
+        return ""
 
 def callAllenNlpApi(apiName, string):
-    #URL = "https://35.247.6.38/api/"+apiName+"/predict"
-    #URL = "https://demo.allennlp.org/api/"+apiName+"/predict"
-    URL = "http://localhost:8000/predict"
-    #URL = "http://10.1.50.92:8000/predict"
-    #URL = "http://localhost:8080/api/"+apiName+"/predict"
+    URL = get_config().services.srl_url
 
     PARAMS = {"Content-Type": "application/json"}
     #PARAMS = {"Content-Type": "text/plain;charset=UTF-8", "Host": "localhost:8080"}
@@ -87,13 +101,14 @@ def callAllenNlpApi(apiName, string):
         # for testing Allennlp for coreferencing
         payload = {"document":string}
     
-    r = requests.post(URL, headers=PARAMS, data=json.dumps(payload))
-
-    #r = requests.post(URL, headers=PARAMS, data=payload)
-
-    #return print(r.text)
-
-    return json.loads(r.text)
+    try:
+        r = requests.post(URL, headers=PARAMS, data=json.dumps(payload), timeout=_service_timeout())
+        r.raise_for_status()
+        logger.debug("AllenNLP response: %s", r.text)
+        return json.loads(r.text)
+    except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
+        logger.exception("Error while calling AllenNLP API: %s", e)
+        return {}
 
 #ss = """LemonDuck's activities were first spotted in China in May 2019, before it began adopting COVID_19_themed lures in email attacks in 2020 and even the recently addressed ""ProxyLogon"" Exchange Server flaws to gain access to unpatched systems.""""
 #ss = """Deutsche Bank of Germany lost almost $3.5 billion in share value, forcing the government to organize a bail_out."""

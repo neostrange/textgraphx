@@ -2,6 +2,9 @@ import logging
 import re
 import requests
 
+logger = logging.getLogger(__name__)
+
+
 class WordSenseDisambiguator:
     """
     A class that performs word sense disambiguation on a given document using the AMuSE-WSD API.
@@ -60,10 +63,10 @@ class WordSenseDisambiguator:
                         }
                         self._update_tokens_in_neo4j(sentence_id, token_index, token_attrs)
 
-            logging.info(f"Word sense disambiguation completed for document {document_id}")
+            logger.info("Word sense disambiguation completed for document %s", document_id)
 
-        except Exception as e:
-            logging.error(f"Error performing word sense disambiguation: {str(e)}")
+        except Exception:
+            logger.exception("Error performing word sense disambiguation for document %s", document_id)
 
     def _call_amuse_wsd_api(self, sentences):
         """
@@ -93,10 +96,9 @@ class WordSenseDisambiguator:
             response = requests.post(self.amuse_wsd_api_endpoint, json=data, headers=headers)
             response.raise_for_status()
             return response.json()
-        except requests.exceptions.RequestException as e:
-            print(f"Error while calling AMuSE-WSD API: {e}")
+        except requests.exceptions.RequestException:
+            logger.exception("Error while calling AMuSE-WSD API")
             return None
-        pass
 
     def _update_tokens_in_neo4j(self, sentence_id, token_index, token_attrs):
         """
@@ -126,10 +128,8 @@ class WordSenseDisambiguator:
 
         self.neo4j_executor.execute_query(query, params)
 
-        pass
 
-
-    def replace_hyphens_to_underscores(self,sentence):
+    def replace_hyphens_to_underscores(self, sentence):
         # Define a regular expression pattern to match hyphens used as infixes
         pattern = re.compile(r'(?<=\w)-(?=\w)')
 

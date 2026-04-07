@@ -1,0 +1,378 @@
+nodes:
+  AnnotatedText:
+    purpose: Document-level node
+    key_properties:
+    - id
+    - text
+    - author
+    - creationtime
+    - filename
+    - filetype
+    - title
+    - publicId
+    - uri
+    id_convention: importer-provided document id
+  Sentence:
+    purpose: Sentence container
+    key_properties:
+    - id
+    - text
+    id_convention: <doc>_<sent_index>
+  TagOccurrence:
+    purpose: Token-level node used across pipeline
+    key_properties:
+    - id
+    - index
+    - end_index
+    - text
+    - lemma
+    - pos
+    - upos
+    - tok_index_doc
+    - tok_index_sent
+    - is_stop
+    id_convention: <doc>_<sent>_<token_idx>
+  Tag:
+    purpose: Lemma grouping node
+    key_properties:
+    - id
+  NamedEntity:
+    purpose: NER mention (surface)
+    key_properties:
+    - id
+    - type
+    - value
+    - index
+    - end_index
+    - kb_id
+    - score
+    - normal_term
+    - head
+    - headTokenIndex
+    - ent_class
+    - nominalSemanticHead
+    - wnLexname
+    - wn_supersense
+    id_convention: <doc>_<start>_<end>_<type>
+  EntityMention:
+    purpose: Mention-level entity span abstraction
+    key_properties:
+    - id
+    - doc_id
+    - value
+    - head
+    - headTokenIndex
+    - start_tok
+    - end_tok
+    - start_char
+    - end_char
+  Entity:
+    purpose: Canonical/disambiguated entity
+    key_properties:
+    - id
+    - type
+    - kb_id
+    - wnLexname
+    - wn_supersense
+  Frame:
+    purpose: SRL predicate frame
+    key_properties:
+    - id
+    - headword
+    - headTokenIndex
+    - text
+    - startIndex
+    - endIndex
+    id_convention: frame_<doc>_<start>_<end>
+  FrameArgument:
+    purpose: SRL argument span
+    key_properties:
+    - id
+    - type
+    - text
+    - startIndex
+    - endIndex
+    - head
+    - headTokenIndex
+    - syntacticType
+    - complementFullText
+    id_convention: fa_<doc>_<start>_<end>_<argtype>
+  NounChunk:
+    purpose: Noun chunk span
+    key_properties:
+    - id
+    - type
+    - value
+  Antecedent:
+    purpose: Coref cluster head
+    key_properties:
+    - id
+    - text
+    - startIndex
+    - endIndex
+  CorefMention:
+    purpose: Coreference mention
+    key_properties:
+    - id
+    - text
+    - startIndex
+    - endIndex
+  NUMERIC:
+    purpose: Numeric literal node
+    key_properties:
+    - id
+    - value
+    - type
+  TIMEX:
+    purpose: Temporal expression
+    key_properties:
+    - tid
+    - doc_id
+    - type
+    - value
+    - text
+  TEvent:
+    purpose: Temporal event
+    key_properties:
+    - eiid
+    - doc_id
+    - begin
+    - end
+    - class
+    - tense
+    - factuality
+  EventMention:
+    purpose: Mention-level event instantiation linked to canonical TEvent
+    key_properties:
+    - id
+    - doc_id
+    - pred
+    - tense
+    - aspect
+    - class
+    - factuality
+    - start_tok
+    - end_tok
+    - start_char
+    - end_char
+  Evidence:
+    purpose: Provenance/evidence node for relation extraction
+    key_properties:
+    - id
+    - type
+  Relationship:
+    purpose: High-level relation node between Entities
+    key_properties:
+    - id
+    - type
+relationships:
+  CONTAINS_SENTENCE: AnnotatedText -> Sentence
+  HAS_TOKEN: Sentence -> TagOccurrence
+  HAS_NEXT: 'TagOccurrence -> TagOccurrence (properties: sentence)'
+  REFERS_TO: 'Mention node -> canonical node (EntityMention/EventMention/NamedEntity/FrameArgument -> Entity|TEvent|NamedEntity|NUMERIC)'
+  HAS_LEMMA: TagOccurrence -> Tag
+  PARTICIPATES_IN: TagOccurrence -> (NamedEntity|Frame|FrameArgument|CorefMention|Antecedent|NounChunk)
+  PARTICIPANT: 'FrameArgument -> Frame (properties: type, prep?) [transitioning]'
+  IS_DEPENDENT: 'TagOccurrence -> TagOccurrence (properties: type)'
+  COREF: CorefMention -> Antecedent
+  TRIGGERS: TagOccurrence -> TIMEX|TEvent|EventMention
+  DESCRIBES: Frame -> TEvent [transitioning]
+  FRAME_DESCRIBES_EVENT: Frame -> TEvent
+  INSTANTIATES: Frame -> EventMention
+  HAS_FRAME_ARGUMENT: FrameArgument -> Frame
+  EVENT_PARTICIPANT: 'Entity|NUMERIC|FrameArgument -> TEvent|EventMention'
+  MODIFIES: FrameArgument -> TEvent|EventMention
+  AFFECTS: 'Entity|NUMERIC|FrameArgument -> TEvent|EventMention'
+  TLINK: 'TEvent/TIMEX -> TEvent/TIMEX (properties: id, relType, signalID)'
+  CLINK: 'TEvent -> TEvent (properties: source)'
+  SLINK: 'TEvent -> TEvent (properties: source)'
+  GLINK: 'TEvent -> TEvent (properties: id, relType, signalID, origin, rule) — grammatical link from TTK'
+  IS_RELATED_TO: 'NamedEntity -> NamedEntity (properties: root, type)'
+  SOURCE: ne <- Evidence
+  DESTINATION: ne <- Evidence
+  HAS_EVIDENCE: Relationship -> Evidence
+  FROM: entity <- Relationship
+  TO: entity <- Relationship
+
+schema_tiers:
+  canonical:
+    node_labels:
+    - AnnotatedText
+    - Sentence
+    - TagOccurrence
+    - EntityMention
+    - NamedEntity
+    - Entity
+    - Frame
+    - FrameArgument
+    - EventMention
+    - Antecedent
+    - CorefMention
+    - TIMEX
+    - TEvent
+    - NUMERIC
+    relationship_types:
+    - CONTAINS_SENTENCE
+    - HAS_TOKEN
+    - HAS_NEXT
+    - IS_DEPENDENT
+    - PARTICIPATES_IN
+    - REFERS_TO
+    - HAS_LEMMA
+    - PARTICIPANT
+    - TRIGGERS
+    - DESCRIBES
+    - FRAME_DESCRIBES_EVENT
+    - INSTANTIATES
+    - HAS_FRAME_ARGUMENT
+    - EVENT_PARTICIPANT
+    - MODIFIES
+    - AFFECTS
+    - CREATED_ON
+    - TLINK
+    - CLINK
+    - SLINK
+    - GLINK
+    - COREF
+  optional:
+    node_labels:
+    - PhaseRun
+    - RefinementRun
+    relationship_types:
+    - CO_OCCURS_WITH
+    - SAME_AS
+  legacy:
+    node_labels:
+    - Keyword
+    - Evidence
+    - Relationship
+    relationship_types:
+    - IS_RELATED_TO
+    - SOURCE
+    - DESTINATION
+    - HAS_EVIDENCE
+    - FROM
+    - TO
+
+identity_policy:
+  doc_id_type: integer
+  doc_id_owner: AnnotatedText.id
+  notes: Temporal and event subgraphs should use the same doc_id type as AnnotatedText.id.
+
+span_contract:
+  token_fields:
+  - start_tok
+  - end_tok
+  char_fields:
+  - start_char
+  - end_char
+  legacy_aliases:
+    start_tok:
+    - start_tok
+    - startIndex
+    - headTokenIndex
+    end_tok:
+    - end_tok
+    - endIndex
+    start_char:
+    - start_char
+    - index
+    - begin
+    - char_begin
+    end_char:
+    - end_char
+    - end_index
+    - end
+    - char_end
+  note: legacy aliases are now disambiguated; do not reuse an alias across token and character spaces.
+
+relation_endpoint_contract:
+  REFERS_TO:
+    allowed_pairs:
+    - [EntityMention, Entity]
+    - [EventMention, TEvent]
+    - [NamedEntity, Entity]
+    - [NamedEntity, VALUE]
+    - [FrameArgument, Entity]
+    - [FrameArgument, NamedEntity]
+    - [FrameArgument, NUMERIC]
+  HAS_LEMMA:
+    allowed_pairs:
+    - [TagOccurrence, Tag]
+  EVENT_PARTICIPANT:
+    sources: [Entity, NUMERIC, FrameArgument]
+    targets: [TEvent, EventMention]
+  MODIFIES:
+    sources: [FrameArgument]
+    targets: [TEvent, EventMention]
+  AFFECTS:
+    sources: [Entity, NUMERIC, FrameArgument]
+    targets: [TEvent, EventMention]
+  CLINK:
+    sources: [TEvent]
+    targets: [TEvent]
+  SLINK:
+    sources: [TEvent]
+    targets: [TEvent]
+  GLINK:
+    sources: [TEvent]
+    targets: [TEvent]
+    properties: [id, relType, signalID, origin, rule]
+    note: Grammatical link extracted by TTK; additive over already-materialized TEvent nodes.
+
+semantic_enrichment_properties:
+  NamedEntity:
+  - nominalSemanticHead
+  - wnLexname
+  - wn_supersense
+  - ent_class
+  Entity:
+  - wnLexname
+  - wn_supersense
+  FrameArgument:
+  - wnLexname
+  - wn_supersense
+  - semanticHead
+diagnostics:
+- name: TagOccurrence
+  query: MATCH (n:TagOccurrence) RETURN count(n) AS cnt
+- name: NamedEntity
+  query: MATCH (n:NamedEntity) RETURN count(n) AS cnt
+- name: FrameArgument
+  query: MATCH (n:FrameArgument) RETURN count(n) AS cnt
+- name: FrameArgument_with_headTokenIndex
+  query: MATCH (f:FrameArgument) WHERE exists(f.headTokenIndex) RETURN count(f) AS
+    cnt
+- name: Frame
+  query: MATCH (n:Frame) RETURN count(n) AS cnt
+- name: Antecedent
+  query: MATCH (n:Antecedent) RETURN count(n) AS cnt
+- name: CorefMention
+  query: MATCH (n:CorefMention) RETURN count(n) AS cnt
+- name: IS_DEPENDENT_rels
+  query: MATCH ()-[r:IS_DEPENDENT]-() RETURN count(r) AS cnt
+- name: PARTICIPATES_IN_rels
+  query: MATCH ()-[r:PARTICIPATES_IN]-() RETURN count(r) AS cnt
+- name: IS_RELATED_TO_rels
+  query: MATCH ()-[r:IS_RELATED_TO]-() RETURN count(r) AS cnt
+- name: Legacy_Tag_REFERS_TO_rels
+  query: MATCH (:TagOccurrence)-[r:REFERS_TO]->(:Tag) RETURN count(r) AS cnt
+- name: HAS_LEMMA_rels
+  query: MATCH (:TagOccurrence)-[r:HAS_LEMMA]->(:Tag) RETURN count(r) AS cnt
+- name: EventMention_missing_factuality
+  query: MATCH (em:EventMention) WHERE em.factuality IS NULL OR trim(toString(em.factuality))
+    = '' RETURN count(em) AS cnt
+- name: EventMention_factuality_missing_attribution
+  query: MATCH (em:EventMention) WHERE em.factuality IS NOT NULL AND trim(toString(em.factuality))
+    <> '' AND (em.factualitySource IS NULL OR trim(toString(em.factualitySource))
+    = '' OR em.factualityConfidence IS NULL) RETURN count(em) AS cnt
+- name: Factuality_alignment_violations
+  query: MATCH (em:EventMention)-[:REFERS_TO]->(te:TEvent) WHERE em.factuality IS
+    NOT NULL AND trim(toString(em.factuality)) <> '' AND te.factuality IS NOT NULL
+    AND trim(toString(te.factuality)) <> '' AND toUpper(toString(em.factuality))
+    <> toUpper(toString(te.factuality)) AND coalesce(te.factualityConflictFlag,
+    false) = false RETURN count(*) AS cnt
+- name: Evidence_nodes
+  query: MATCH (n:Evidence) RETURN count(n) AS cnt
+- name: Relationship_nodes
+  query: MATCH (n:Relationship) RETURN count(n) AS cnt

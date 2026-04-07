@@ -18,10 +18,7 @@ import re
 
 logging.set_verbosity_error()
 
-from py2neo import Graph
-from py2neo import *
-
-#graph = Graph("bolt://10.1.48.224:7687", auth=("neo4j", "neo123"))
+# Neo4j access is handled via textgraphx.neo4j_client when needed
 
 #try:
 #    dd.set_extension("SRL", default=dict())
@@ -49,6 +46,8 @@ class SemanticRoleLabel:
 
     def __init__(self, ):
         self.apiName = "semantic-role-labeling"
+        from textgraphx.config import get_config
+        self._srl_url = get_config().services.srl_url
 
 
     # this method is just to accomodate long text documents. the reason is allennlp couldn't deal with such long docs
@@ -207,9 +206,8 @@ class SemanticRoleLabel:
 
     def callAllenNlpApi(self, apiName, string):
 
-        #URL = "http://localhost:8080/api/"+apiName+"/predict"
-        URL = "http://localhost:8000/predict"
-        
+        URL = self._srl_url
+
         payload = ""
         
         if apiName == 'semantic-role-labeling':
@@ -225,10 +223,9 @@ class SemanticRoleLabel:
         PARAMS = {"Content-Type": "application/json"}
 
         #payload = {"sentence":string}
-        
         r = requests.post(URL, headers=PARAMS, data=json.dumps(payload))
-
-        print(r.text)
-
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.debug("AllenNLP response: %s", r.text)
         return json.loads(r.text)
 # end of class: SemanticRoleLabel

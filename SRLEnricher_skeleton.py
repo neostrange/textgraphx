@@ -1,13 +1,14 @@
 import logging
 import requests
 import json
-from TextProcessor import Neo4jRepository  # Import the Neo4jRepository class
-from util.GraphDbBase import GraphDBBase  # Import the GraphDBBase class
+from textgraphx.TextProcessor import Neo4jRepository  # Import the Neo4jRepository class
+from textgraphx.util.GraphDbBase import GraphDBBase  # Import the GraphDBBase class
 from typing import Dict, List, Any  # Import Dict, List, and Any from typing module
 import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 class SRLEnricher(GraphDBBase):
     
     def __init__(self, argv, llm_api):
@@ -68,7 +69,7 @@ class SRLEnricher(GraphDBBase):
                     try:
                         relation_participant_text = dict(relation_participant)["id"]
                     except KeyError as e:
-                        print(f"Caught a KeyError: {e}")
+                        logger.exception("Caught a KeyError processing relation participant: %s", e)
                         relation_participant_text = dict(relation_participant)["text"]
                     
                     event_participant = {
@@ -144,9 +145,9 @@ class SRLEnricher(GraphDBBase):
 
         #for item in data:
         prompt_task = prompt + str(data)
-        print("input: ", data)
-        print("********************************************************************************************************************************************)")
-        
+        logger.debug("input: %s", data)
+        logger.debug("%s", "*" * 120)
+
         return prompt_task
     
     
@@ -157,7 +158,7 @@ class SRLEnricher(GraphDBBase):
         try:
             self.neo4j_repo.execute_query(query, {})
         except Exception as e:
-            print("Error executing Cypher query:", e)
+            logger.exception("Error executing Cypher query: %s", e)
             raise ValueError("Error executing Cypher query: {}".format(e))    
 
     def call_llm(self, prompt):
@@ -176,14 +177,14 @@ class SRLEnricher(GraphDBBase):
             response = requests.post(self.llm_api, json=payload)
             response.raise_for_status()  # Raise an error for bad responses
             response_data = response.json()  # Parse the JSON response
-            #print("Response Data:", response_data)  # Print the response data
+            logger.debug("Response Data: %s", response_data)
             if "response" in response_data:
-                print("Response Field:", response_data["response"].strip())  # Print the specific response field
+                logger.info("Response Field: %s", response_data["response"].strip())
             return response_data  # Return the JSON response
         except requests.exceptions.RequestException as e:
-            print("Error during API call:", e)
+            logger.exception("Error during API call: %s", e)
         except ValueError as e:
-            print("Error parsing JSON response:", e) 
+            logger.exception("Error parsing JSON response: %s", e)
 
     def enrich_srl_output(self):
         """
@@ -850,7 +851,9 @@ def main():
     # 1. get the dataset from the database i.e., neo4j. 
     # 2. transform each dataitem from dataset into a format that can be used by the LLM model. i.e., remove the unwanted data and keep the necessary data. return transformed data.
     data = enricher.retrieve_data()
-    print("Retrieved Data:", data)
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("Retrieved Data: %s", data)
     
     # 3. Loop through the transformed data and send each dataitem to the LLM model.
     for item in data:

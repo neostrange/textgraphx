@@ -1,11 +1,17 @@
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 class TagOccurrenceQueryExecutor:
     def __init__(self, neo4j_repository):
         self.neo4j_repository = neo4j_repository
-        pass
+        self.logger = logger
 
     def execute_tag_occurrence_query(self, sentence_tag_occurrences, sentence_id):
         # implement the execute_tag_occurrence_query method
+        self.logger.debug("execute_tag_occurrence_query: sentence_id=%s occurrences=%d", sentence_id, len(sentence_tag_occurrences))
         tag_occurrences = []
         for tag_occurrence in sentence_tag_occurrences:
             tag_occurrence_dict = dict(tag_occurrence)
@@ -28,7 +34,7 @@ class TagOccurrenceQueryExecutor:
                 MERGE (sentence)-[:HAS_TOKEN]->(tagOccurrence2)
                 MERGE (tagOccurrence1)-[r:HAS_NEXT {sentence: sentence.id}]->(tagOccurrence2))
                 FOREACH (tagItem in [tag_occurrence IN $tag_occurrences WHERE tag_occurrence.is_stop = False] | 
-                MERGE (tag:Tag {id: tagItem.lemma}) MERGE (tagOccurrence:TagOccurrence {id: tagItem.id}) MERGE (tag)<-[:REFERS_TO]-(tagOccurrence))
+                MERGE (tag:Tag {id: tagItem.lemma}) MERGE (tagOccurrence:TagOccurrence {id: tagItem.id}) MERGE (tag)<-[:HAS_LEMMA]-(tagOccurrence))
                 RETURN id(sentence) as result
             """
         else:

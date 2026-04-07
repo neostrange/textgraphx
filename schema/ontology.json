@@ -1,0 +1,462 @@
+{
+  "nodes": {
+    "AnnotatedText": {
+      "purpose": "Document-level node",
+      "key_properties": ["id", "text", "author", "creationtime", "filename", "filetype", "title", "publicId", "uri"],
+      "id_convention": "importer-provided document id"
+    },
+    "Sentence": {
+      "purpose": "Sentence container",
+      "key_properties": ["id", "text"],
+      "id_convention": "<doc>_<sent_index>"
+    },
+    "TagOccurrence": {
+      "purpose": "Token-level node used across pipeline",
+      "key_properties": ["id", "index", "end_index", "text", "lemma", "pos", "upos", "tok_index_doc", "tok_index_sent", "is_stop"],
+      "id_convention": "<doc>_<sent>_<token_idx>"
+    },
+    "Tag": { "purpose": "Lemma grouping node", "key_properties": ["id"] },
+    "NamedEntity": {
+      "purpose": "NER mention (surface)",
+      "key_properties": ["id", "type", "value", "index", "end_index", "kb_id", "score", "normal_term", "head", "headTokenIndex", "ent_class", "nominalSemanticHead", "wnLexname", "wn_supersense"],
+      "id_convention": "<doc>_<start>_<end>_<type>"
+    },
+    "EntityMention": {
+      "purpose": "Mention-level entity span abstraction",
+      "key_properties": ["id", "doc_id", "value", "head", "headTokenIndex", "start_tok", "end_tok", "start_char", "end_char"]
+    },
+    "Entity": { "purpose": "Canonical/disambiguated entity", "key_properties": ["id", "type", "kb_id", "wnLexname", "wn_supersense"] },
+    "Frame": {
+      "purpose": "SRL predicate frame",
+      "key_properties": ["id", "headword", "headTokenIndex", "text", "startIndex", "endIndex"],
+      "id_convention": "frame_<doc>_<start>_<end>"
+    },
+    "FrameArgument": {
+      "purpose": "SRL argument span",
+      "key_properties": ["id", "type", "text", "startIndex", "endIndex", "head", "headTokenIndex", "syntacticType", "complementFullText"],
+      "id_convention": "fa_<doc>_<start>_<end>_<argtype>"
+    },
+    "Signal": {
+      "purpose": "Temporal trigger span",
+      "key_properties": ["id", "doc_id", "type", "text", "start_tok", "end_tok", "start_char", "end_char"],
+      "id_convention": "signal sid from TTK, else sig_<doc>_<start>_<end>"
+    },
+    "NounChunk": { "purpose": "Noun chunk span", "key_properties": ["id", "type", "value"] },
+    "Antecedent": { "purpose": "Coref cluster head", "key_properties": ["id", "text", "startIndex", "endIndex"] },
+    "CorefMention": { "purpose": "Coreference mention", "key_properties": ["id", "text", "startIndex", "endIndex"] },
+    "NUMERIC": { "purpose": "Canonical numeric participant type, typically represented as a dynamic label on selected NamedEntity mentions", "key_properties": ["id", "value", "type"] },
+    "VALUE": { "purpose": "Canonical value expression node/label used for quantified participants", "key_properties": ["id", "type", "value"] },
+    "TIMEX": { "purpose": "Temporal expression", "key_properties": ["tid", "doc_id", "type", "value", "text"] },
+    "TEvent": { "purpose": "Temporal event", "key_properties": ["eiid", "doc_id", "begin", "end", "class", "tense", "factuality"] },
+    "EventMention": {
+      "purpose": "Mention-level event instantiation linked to canonical TEvent",
+      "key_properties": ["id", "doc_id", "pred", "tense", "aspect", "class", "factuality", "start_tok", "end_tok", "start_char", "end_char"]
+    },
+    "Evidence": { "purpose": "Provenance/evidence node for relation extraction", "key_properties": ["id", "type"] },
+    "Relationship": { "purpose": "High-level relation node between Entities", "key_properties": ["id", "type"] }
+  },
+  "relationships": {
+    "CONTAINS_SENTENCE": "AnnotatedText -> Sentence",
+    "HAS_TOKEN": "Sentence -> TagOccurrence",
+    "HAS_NEXT": "TagOccurrence -> TagOccurrence (properties: sentence)",
+    "REFERS_TO": "Mention node -> canonical node (EntityMention/EventMention/NamedEntity/FrameArgument -> Entity|TEvent|NamedEntity|NUMERIC)",
+    "HAS_LEMMA": "TagOccurrence -> Tag",
+    "PARTICIPATES_IN": "TagOccurrence -> (NamedEntity|Frame|FrameArgument|CorefMention|Antecedent|NounChunk)",
+    "PARTICIPANT": "FrameArgument -> Frame (properties: type, prep?) [transitioning — see deprecated_relationships]",
+    "IS_DEPENDENT": "TagOccurrence -> TagOccurrence (properties: type)",
+    "COREF": "CorefMention -> Antecedent",
+    "TRIGGERS": "TagOccurrence -> TIMEX|TEvent|Signal",
+    "DESCRIBES": "Frame -> TEvent [transitioning — see deprecated_relationships]",
+    "TLINK": "TEvent/TIMEX -> TEvent/TIMEX (properties: id, relType, signalID)",
+    "CREATED_ON": "AnnotatedText|PhaseRun|RefinementRun -> date/time literal (properties: date)",
+    "FRAME_DESCRIBES_EVENT": "Frame -> TEvent (canonical replacement for DESCRIBES in this context)",
+    "INSTANTIATES": "Frame -> EventMention (canonical frame-to-mention event instantiation)",
+    "HAS_FRAME_ARGUMENT": "FrameArgument -> Frame (canonical replacement for PARTICIPANT in this context)",
+    "EVENT_PARTICIPANT": "Entity|NUMERIC|FrameArgument|VALUE -> TEvent|EventMention (canonical replacement for PARTICIPANT in participant context)",
+    "MODIFIES": "FrameArgument -> TEvent|EventMention (non-core semantic modifier relation)",
+    "AFFECTS": "Entity|NUMERIC|VALUE|FrameArgument -> TEvent|EventMention (causal/influence relation)",
+    "CLINK": "TEvent -> TEvent (properties: source)",
+    "SLINK": "TEvent -> TEvent (properties: source)",
+    "GLINK": "TEvent -> TEvent (properties: id, relType, signalID, origin, rule) — grammatical link from TTK",
+    "IS_RELATED_TO": "NamedEntity -> NamedEntity (properties: root, type)",
+    "SOURCE": "ne <- Evidence",
+    "DESTINATION": "ne <- Evidence",
+    "HAS_EVIDENCE": "Relationship -> Evidence",
+    "FROM": "entity <- Relationship",
+    "TO": "entity <- Relationship"
+  },
+  "schema_tiers": {
+    "canonical": {
+      "node_labels": [
+        "AnnotatedText",
+        "Sentence",
+        "TagOccurrence",
+        "EntityMention",
+        "NamedEntity",
+        "Entity",
+        "Frame",
+        "FrameArgument",
+        "EventMention",
+        "Signal",
+        "Antecedent",
+        "CorefMention",
+        "TIMEX",
+        "TEvent",
+        "NUMERIC",
+        "VALUE"
+      ],
+      "relationship_types": [
+        "CONTAINS_SENTENCE",
+        "HAS_TOKEN",
+        "HAS_NEXT",
+        "IS_DEPENDENT",
+        "PARTICIPATES_IN",
+        "REFERS_TO",
+        "HAS_LEMMA",
+        "PARTICIPANT",
+        "TRIGGERS",
+        "DESCRIBES",
+        "CREATED_ON",
+        "TLINK",
+        "INSTANTIATES",
+        "COREF",
+        "FRAME_DESCRIBES_EVENT",
+        "HAS_FRAME_ARGUMENT",
+        "EVENT_PARTICIPANT",
+        "MODIFIES",
+        "AFFECTS",
+        "CLINK",
+        "SLINK",
+        "GLINK"
+      ]
+    },
+    "optional": {
+      "node_labels": [
+        "PhaseRun",
+        "RefinementRun"
+      ],
+      "relationship_types": [
+        "CO_OCCURS_WITH",
+        "SAME_AS"
+      ]
+    },
+    "legacy": {
+      "node_labels": [
+        "Keyword",
+        "Evidence",
+        "Relationship"
+      ],
+      "relationship_types": [
+        "IS_RELATED_TO",
+        "SOURCE",
+        "DESTINATION",
+        "HAS_EVIDENCE",
+        "FROM",
+        "TO"
+      ]
+    }
+  },
+  "source_hierarchy": {
+    "precedence": [
+      "runtime_write_paths",
+      "applied_migrations",
+      "docs_schema_contract",
+      "ontology_metadata",
+      "architecture_and_historical_docs"
+    ],
+    "runtime_write_paths": [
+      "GraphBasedNLP.py",
+      "RefinementPhase.py",
+      "TemporalPhase.py",
+      "EventEnrichmentPhase.py",
+      "TlinksRecognizer.py"
+    ],
+    "notes": "When sources disagree, treat runtime write paths plus applied migrations as authoritative. docs/schema.md is the maintained human contract and must be updated to match implemented writes."
+  },
+  "governance_mode": {
+    "mode": "balanced",
+    "hard_contract_scope": [
+      "identity_keys",
+      "referential_integrity",
+      "core_required_properties",
+      "span_integrity"
+    ],
+    "advisory_scope": [
+      "enrichment_profile_completeness",
+      "optional_provenance_coverage",
+      "legacy_alias_usage_ratio"
+    ],
+    "legacy_policy": "preserve_with_aliases"
+  },
+  "identity_policy": {
+    "doc_id_type": "integer",
+    "doc_id_owner": "AnnotatedText.id",
+    "notes": "Temporal and event subgraphs should use the same doc_id type as AnnotatedText.id."
+  },
+  "span_contract": {
+    "token_fields": [
+      "start_tok",
+      "end_tok"
+    ],
+    "char_fields": [
+      "start_char",
+      "end_char"
+    ],
+    "legacy_aliases": {
+      "start_tok": [
+        "start_tok",
+        "startIndex",
+        "headTokenIndex"
+      ],
+      "end_tok": [
+        "end_tok",
+        "endIndex"
+      ],
+      "start_char": [
+        "start_char",
+        "index",
+        "begin",
+        "char_begin"
+      ],
+      "end_char": [
+        "end_char",
+        "end_index",
+        "end",
+        "char_end"
+      ]
+    },
+    "note": "legacy aliases are now disambiguated; do not reuse an alias across token and character spaces."
+  },
+  "deprecated_relationships": {
+    "DESCRIBES": {
+      "reason": "Overloaded: used for both Frame->TEvent and Keyword->Document semantics. Split into semantically precise types.",
+      "replaced_by": ["FRAME_DESCRIBES_EVENT"],
+      "status": "transitioning"
+    },
+    "PARTICIPANT": {
+      "reason": "Overloaded: used for FrameArgument->Frame and Entity|NUMERIC|FrameArgument->TEvent semantics. Split into precise types.",
+      "replaced_by": ["HAS_FRAME_ARGUMENT", "EVENT_PARTICIPANT"],
+      "status": "transitioning"
+    }
+  },
+  "relation_endpoint_contract": {
+    "REFERS_TO": {
+      "allowed_pairs": [
+        ["EntityMention", "Entity"],
+        ["EventMention", "TEvent"],
+        ["NamedEntity", "Entity"],
+        ["NamedEntity", "VALUE"],
+        ["FrameArgument", "Entity"],
+        ["FrameArgument", "NamedEntity"],
+        ["FrameArgument", "NUMERIC"]
+      ],
+      "status": "canonical"
+    },
+    "HAS_LEMMA": {
+      "allowed_pairs": [
+        ["TagOccurrence", "Tag"]
+      ],
+      "status": "canonical"
+    },
+    "EVENT_PARTICIPANT": {
+      "sources": ["Entity", "NUMERIC", "FrameArgument", "VALUE"],
+      "targets": ["TEvent", "EventMention"],
+      "status": "canonical_transition"
+    },
+    "FRAME_DESCRIBES_EVENT": {
+      "sources": ["Frame"],
+      "targets": ["TEvent"],
+      "status": "canonical"
+    },
+    "HAS_FRAME_ARGUMENT": {
+      "sources": ["FrameArgument"],
+      "targets": ["Frame"],
+      "status": "canonical"
+    },
+    "INSTANTIATES": {
+      "sources": ["Frame"],
+      "targets": ["EventMention"],
+      "status": "canonical"
+    },
+    "MODIFIES": {
+      "sources": ["FrameArgument"],
+      "targets": ["TEvent", "EventMention"],
+      "status": "canonical"
+    },
+    "AFFECTS": {
+      "sources": ["Entity", "NUMERIC", "VALUE", "FrameArgument"],
+      "targets": ["TEvent", "EventMention"],
+      "status": "canonical"
+    },
+    "CLINK": {
+      "sources": ["TEvent"],
+      "targets": ["TEvent"],
+      "status": "canonical"
+    },
+    "SLINK": {
+      "sources": ["TEvent"],
+      "targets": ["TEvent"],
+      "status": "canonical"
+    },
+    "GLINK": {
+      "sources": ["TEvent"],
+      "targets": ["TEvent"],
+      "status": "canonical",
+      "note": "Grammatical link extracted by TTK. Additive: only links pre-existing TEvent nodes."
+    },
+    "TLINK": {
+      "sources": ["TEvent", "TIMEX"],
+      "targets": ["TEvent", "TIMEX"],
+      "status": "canonical"
+    }
+  },
+  "semantic_enrichment_properties": {
+    "NamedEntity": ["nominalSemanticHead", "wnLexname", "wn_supersense", "ent_class"],
+    "Entity": ["wnLexname", "wn_supersense"],
+    "FrameArgument": ["wnLexname", "wn_supersense", "semanticHead"]
+  },
+  "event_attribute_vocabulary": {
+    "tense": ["PAST", "PRESENT", "FUTURE", "NONE", "INFINITIVE", "PRESPART", "PASTPART"],
+    "aspect": ["NONE", "PROGRESSIVE", "PERFECTIVE", "PERFECTIVE_PROGRESSIVE"],
+    "polarity": ["POS", "NEG"],
+    "certainty": ["CERTAIN", "PROBABLE", "POSSIBLE", "UNCERTAIN"],
+    "factuality": ["ASSERTED", "REPORTED", "HYPOTHETICAL", "NEGATED", "COUNTERFACTUAL"],
+    "modality_defaults": ["NONE", "MUST", "MAY", "MIGHT", "SHOULD", "WOULD", "COULD", "CAN", "WILL", "SHALL"],
+    "normalization_policy": "uppercase_enforced"
+  },
+  "temporal_reasoning_profile": {
+    "canonical_reltypes": [
+      "BEFORE",
+      "AFTER",
+      "SIMULTANEOUS",
+      "INCLUDES",
+      "IS_INCLUDED",
+      "BEGINS",
+      "BEGUN_BY",
+      "ENDS",
+      "ENDED_BY",
+      "DURING",
+      "IDENTITY",
+      "VAGUE"
+    ],
+    "contradiction_pairs": [
+      ["BEFORE", "AFTER"],
+      ["INCLUDES", "IS_INCLUDED"],
+      ["BEGINS", "BEGUN_BY"],
+      ["ENDS", "ENDED_BY"]
+    ],
+    "closure_rules": [
+      {"lhs": ["BEFORE", "BEFORE"], "rhs": "BEFORE"},
+      {"lhs": ["AFTER", "AFTER"], "rhs": "AFTER"},
+      {"lhs": ["IDENTITY", "BEFORE"], "rhs": "BEFORE"},
+      {"lhs": ["IDENTITY", "AFTER"], "rhs": "AFTER"},
+      {"lhs": ["IDENTITY", "IDENTITY"], "rhs": "IDENTITY"}
+    ],
+    "consistency_policy": "suppress_lower_confidence_conflicts",
+    "dct_anchor_policy": "allow_case6_when_non_nominal_or_temporally_anchored"
+  },
+  "argument_type_vocabulary": {
+    "description": "Controlled vocabulary for FrameArgument.argumentType. Maps PropBank ARGM modifier codes to stable semantic role category names. This vocabulary is the canonical reference; the CASE expression in EventEnrichmentPhase.add_non_core_participants_to_event must match exactly.",
+    "fallback": "NonCore",
+    "dynamic_labels_policy": "derived_optional",
+    "mappings": {
+      "ARGM-COM": "Comitative",
+      "ARGM-LOC": "Locative",
+      "ARGM-DIR": "Directional",
+      "ARGM-GOL": "Goal",
+      "ARGM-MNR": "Manner",
+      "ARGM-EXT": "Extent",
+      "ARGM-REC": "Reciprocals",
+      "ARGM-PRD": "SecondaryPredication",
+      "ARGM-PRP": "PurposeClauses",
+      "ARGM-CAU": "CauseClauses",
+      "ARGM-DIS": "Discourse",
+      "ARGM-MOD": "Modals",
+      "ARGM-NEG": "Negation",
+      "ARGM-DSP": "DirectSpeech",
+      "ARGM-ADV": "Adverbials",
+      "ARGM-ADJ": "Adjectival",
+      "ARGM-LVB": "LightVerb",
+      "ARGM-CXN": "Construction"
+    }
+  },
+  "dynamic_label_policy": {
+    "NUMERIC": {
+      "status": "transitional",
+      "description": "NUMERIC is a transitional fallback label applied to selected NamedEntity mentions for compatibility during canonical VALUE migration. Read-side logic may still encounter it in EVENT_PARTICIPANT and related participant-resolution paths, but canonical queries should prefer VALUE or Entity-backed participants first.",
+      "query_guidance": "Prefer canonical :VALUE nodes, optionally combined with Entity-backed participants, for numeric or quantified arguments. Treat direct :NUMERIC reads as legacy fallback inventory rather than the primary query path."
+    },
+    "VALUE": {
+      "status": "canonical",
+      "description": "VALUE is a canonical node type for value expressions produced by the NER and enrichment pipeline. It participates in EVENT_PARTICIPANT relationships to represent quantified arguments. Each VALUE node has a type classification (PERCENT, MONEY, QUANTITY, CARDINAL, ORDINAL, DATE, DURATION, NUMERIC, or OTHER).",
+      "query_guidance": "Query by label :VALUE for value expressions; use v.type for filtering by value category. Check migration 0016 for TYPE governance constraints."
+    }
+  },
+  "migration_manifest": {
+    "description": "Authoritative ordered list of migration files. CI validates that on-disk files match this manifest.",
+    "files": [
+      "0001_create_constraints.cypher",
+      "0002_create_namedentity_tokenid_constraint.cypher",
+      "0003_normalize_temporal_doc_id.cypher",
+      "0004_add_timex_natural_key_constraint.cypher",
+      "0005_backfill_canonical_span_fields.cypher",
+      "0006_add_phaserun_refinementrun_constraints.cypher",
+      "0007_add_canonical_indexes.cypher",
+      "0008_backfill_canonical_event_edges.cypher",
+      "0009_introduce_entity_mention_nodes.cypher",
+      "0010_introduce_event_mention_nodes.cypher",
+      "0011_add_mention_constraints_and_indexes.cypher",
+      "0012_event_mention_property_enrichment.cypher",
+      "0013_add_event_mention_property_indexes.cypher",
+      "0014_formalize_signal_and_introduce_csignal.cypher",
+      "0015_formalize_has_participant_with_semantic_role_governance.cypher",
+      "0016_formalize_value_nodes_with_type_classification.cypher",
+      "0017_backfill_has_lemma_edges.cypher"
+    ]
+  },
+  "legacy_layer_policy": {
+    "Evidence": {
+      "status": "deprecated",
+      "notes": "Evidence nodes are created with MERGE (evidence:Evidence {id: id(r), type: r.type}) — the id(r) value is non-deterministic across Neo4j restarts, making this node layer structurally unreliable. No maintained read-side consumers exist. The layer is retained in schema_tiers.legacy for backward-compatibility with old datasets; do not extend it.",
+      "recommended_action": "do_not_extend",
+      "deprecation_path": "retain_undisturbed — no migration required; layer rots passively. Remove in a future major-version alongside its paired Relationship nodes."
+    },
+    "Relationship": {
+      "status": "deprecated",
+      "notes": "Relationship nodes are paired with Evidence nodes and share the same id(r) non-deterministic identity problem. Only writer is TextProcessor.build_relationships_inferred_graph. No maintained read-side consumers. Do not build new queries or features against this label.",
+      "recommended_action": "do_not_extend",
+      "deprecation_path": "retain_undisturbed — controlled by the same passive-retention policy as Evidence. Remove alongside Evidence in a future major-version."
+    }
+  },
+  "diagnostics": [
+  {"name": "TagOccurrence", "query": "MATCH (n:TagOccurrence) RETURN count(n) AS cnt", "min": 1},
+  {"name": "NamedEntity", "query": "MATCH (n:NamedEntity) RETURN count(n) AS cnt", "min": 1},
+  {"name": "FrameArgument", "query": "MATCH (n:FrameArgument) RETURN count(n) AS cnt"},
+  {"name": "FrameArgument_with_headTokenIndex", "query": "MATCH (f:FrameArgument) WHERE exists(f.headTokenIndex) RETURN count(f) AS cnt"},
+  {"name": "Frame", "query": "MATCH (n:Frame) RETURN count(n) AS cnt", "min": 0},
+    {"name": "Antecedent", "query": "MATCH (n:Antecedent) RETURN count(n) AS cnt"},
+    {"name": "CorefMention", "query": "MATCH (n:CorefMention) RETURN count(n) AS cnt"},
+  {"name": "IS_DEPENDENT_rels", "query": "MATCH ()-[r:IS_DEPENDENT]-() RETURN count(r) AS cnt", "min": 1},
+  {"name": "PARTICIPATES_IN_rels", "query": "MATCH ()-[r:PARTICIPATES_IN]-() RETURN count(r) AS cnt", "min": 1},
+    {"name": "IS_RELATED_TO_rels", "query": "MATCH ()-[r:IS_RELATED_TO]-() RETURN count(r) AS cnt"},
+    {"name": "Evidence_nodes", "query": "MATCH (n:Evidence) RETURN count(n) AS cnt"},
+    {"name": "Relationship_nodes", "query": "MATCH (n:Relationship) RETURN count(n) AS cnt"},
+    {"name": "Frame_missing_start_tok", "query": "MATCH (n:Frame) WHERE n.start_tok IS NULL RETURN count(n) AS cnt"},
+    {"name": "FrameArgument_missing_start_tok", "query": "MATCH (n:FrameArgument) WHERE n.start_tok IS NULL RETURN count(n) AS cnt"},
+    {"name": "NamedEntity_missing_start_tok", "query": "MATCH (n:NamedEntity) WHERE n.start_tok IS NULL RETURN count(n) AS cnt"},
+    {"name": "Antecedent_missing_start_tok", "query": "MATCH (n:Antecedent) WHERE n.start_tok IS NULL RETURN count(n) AS cnt"},
+    {"name": "CorefMention_missing_start_tok", "query": "MATCH (n:CorefMention) WHERE n.start_tok IS NULL RETURN count(n) AS cnt"},
+    {"name": "NounChunk_missing_start_tok", "query": "MATCH (n:NounChunk) WHERE n.start_tok IS NULL RETURN count(n) AS cnt"},
+    {"name": "Signal_nodes", "query": "MATCH (n:Signal) RETURN count(n) AS cnt"},
+    {"name": "CLINK_rels", "query": "MATCH ()-[r:CLINK]->() RETURN count(r) AS cnt"},
+    {"name": "SLINK_rels", "query": "MATCH ()-[r:SLINK]->() RETURN count(r) AS cnt"},
+    {"name": "Legacy_Tag_REFERS_TO_rels", "query": "MATCH (:TagOccurrence)-[r:REFERS_TO]->(:Tag) RETURN count(r) AS cnt"},
+    {"name": "HAS_LEMMA_rels", "query": "MATCH (:TagOccurrence)-[r:HAS_LEMMA]->(:Tag) RETURN count(r) AS cnt"},
+    {"name": "EventMention_missing_factuality", "query": "MATCH (em:EventMention) WHERE em.factuality IS NULL OR trim(toString(em.factuality)) = '' RETURN count(em) AS cnt"},
+    {"name": "EventMention_factuality_missing_attribution", "query": "MATCH (em:EventMention) WHERE em.factuality IS NOT NULL AND trim(toString(em.factuality)) <> '' AND (em.factualitySource IS NULL OR trim(toString(em.factualitySource)) = '' OR em.factualityConfidence IS NULL) RETURN count(em) AS cnt"},
+    {"name": "Factuality_alignment_violations", "query": "MATCH (em:EventMention)-[:REFERS_TO]->(te:TEvent) WHERE em.factuality IS NOT NULL AND trim(toString(em.factuality)) <> '' AND te.factuality IS NOT NULL AND trim(toString(te.factuality)) <> '' AND toUpper(toString(em.factuality)) <> toUpper(toString(te.factuality)) AND coalesce(te.factualityConflictFlag, false) = false RETURN count(*) AS cnt"},
+    {"name": "TIMEX_missing_start_tok", "query": "MATCH (n:TIMEX) WHERE n.start_tok IS NULL RETURN count(n) AS cnt"},
+    {"name": "Signal_missing_start_tok", "query": "MATCH (n:Signal) WHERE n.start_tok IS NULL RETURN count(n) AS cnt"},
+    {"name": "TEvent_missing_start_tok", "query": "MATCH (n:TEvent) WHERE n.start_tok IS NULL RETURN count(n) AS cnt"}
+  ]
+}

@@ -1,3 +1,9 @@
+import logging
+
+
+logger = logging.getLogger(__name__)
+
+
 class EntityDisambiguator:
     #For the purpose of mapping named entities to entity instances in our pipeline, we distinguished between two types of named entities.
 #  The first type includes entities that have been successfully disambiguated and assigned a unique KBID by the entity disambiguation module.
@@ -12,7 +18,7 @@ class EntityDisambiguator:
 
     def __init__(self, neo4j_repository):
         self.neo4j_repository = neo4j_repository
-        pass
+        self.logger = logger
 
     def disambiguate_entities(self, document_id):
         """
@@ -25,26 +31,29 @@ class EntityDisambiguator:
             WHERE document.id = $documentId
             WITH document
             MATCH (document)-[*3..3]->(ne:NamedEntity)
-            WHERE NOT ne.type IN ['NP', 'TIME', 'ORDINAL', 'NUMBER', 'MONEY', 'DATE', 'CARDINAL', 'QUANTITY', 'PERCENT'] AND ne.kb_id IS NOT NULL
+            WHERE NOT (ne.type IN ['NP', 'TIME', 'ORDINAL', 'NUMBER', 'MONEY', 'DATE', 'CARDINAL', 'QUANTITY', 'PERCENT']) AND ne.kb_id IS NOT NULL
             WITH ne
             MERGE (entity:Entity {type: ne.type, kb_id:ne.kb_id, id: split(ne.kb_id, '/')[-1]})
             MERGE (ne)-[:REFERS_TO {type: "evoke"}]->(entity)
         """
 
         extract_indirect_entities_query = """
-        MATCH (document:AnnotatedText)
+            MATCH (document:AnnotatedText)
             WHERE document.id = $documentId
             WITH document
             MATCH (document)-[*3..3]->(ne:NamedEntity)
-            WHERE NOT ne.type IN ['NP', 'TIME', 'ORDINAL', 'MONEY', 'NUMBER', 'DATE', 'CARDINAL', 'QUANTITY', 'PERCENT'] AND ne.kb_id IS NULL
+            WHERE NOT (ne.type IN ['NP', 'TIME', 'ORDINAL', 'MONEY', 'NUMBER', 'DATE', 'CARDINAL', 'QUANTITY', 'PERCENT']) AND ne.kb_id IS NULL
             WITH ne
             MERGE (entity:Entity {type: ne.type, kb_id:ne.value, id:ne.value})
             MERGE (ne)-[:REFERS_TO {type: "evoke"}]->(entity)
         """
+        self.logger.info("disambiguate_entities: starting for %s", document_id)
         self.execute_query(extract_direct_entities_query, {"documentId": document_id})
         self.execute_query(extract_indirect_entities_query, {"documentId": document_id})
+        self.logger.info("disambiguate_entities: completed for %s", document_id)
 
 
     def execute_query(self, query, params):
+        self.logger.debug("EntityDisambiguator.execute_query called with params: %s", params)
         result = self.neo4j_repository.execute_query(query, params)
         return result

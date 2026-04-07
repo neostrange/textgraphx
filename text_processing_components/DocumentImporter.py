@@ -1,5 +1,8 @@
 from abc import ABC
 from abc import ABC, abstractmethod
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class DocumentImporter(ABC):
@@ -24,10 +27,12 @@ class DocumentImporter(ABC):
         query = self.get_query()
         params = self.get_params()
         try:
+            logger.debug("Importing document id=%s", self.id)
             results = self.execute_query(query, params)
+            logger.info("Imported document id=%s rows=%s", self.id, len(results) if results else 0)
             return results
         except Exception as e:
-            print(f"Error importing document: {e}")
+            logger.exception("Error importing document id=%s: %s", self.id, e)
             return None
         
     def __str__(self):
@@ -50,6 +55,27 @@ class MeantimeXMLImporter(DocumentImporter):
     def get_params(self):
         # Return the parameters specific to MEANTIME XML documents
         return {"id": self.id, "data": self.data, "text": self.content}
+
+
+def resolve_document_id_from_naf_root(root, fallback_id):
+    """Resolve a stable AnnotatedText.id from a NAF root.
+
+    Prefer numeric public ids when present. Non-numeric public ids are not
+    used as graph ids because downstream temporal/event phases enforce integer
+    document ids in Cypher.
+    """
+    public = root.find("./nafHeader/public")
+    public_id = None if public is None else (public.attrib.get("publicId") or "").strip()
+    if public_id:
+        if public_id.isdigit():
+            return int(public_id)
+        logger.warning(
+            "Non-numeric publicId '%s' detected; using fallback integer id=%s",
+            public_id,
+            fallback_id,
+        )
+        return fallback_id
+    return fallback_id
 
 # # Usage
 # driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password"))
