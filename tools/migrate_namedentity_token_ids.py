@@ -113,7 +113,9 @@ def compute_mappings(G, nes: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
             skipped.append({"id": ne_id, "reason": "no token match"})
             continue
         tok_start, tok_end = res
-        token_id = f"{ne_id.split('_')[0]}_{tok_start}_{tok_end}_{ne_type}"
+        # token_id is intentionally type-agnostic (<doc>_<start>_<end>) so it
+        # remains stable if NamedEntity.type is corrected in later passes.
+        token_id = f"{ne_id.split('_')[0]}_{tok_start}_{tok_end}"
         mappings.append({
             "ne_id": ne_id,
             "token_id": token_id,

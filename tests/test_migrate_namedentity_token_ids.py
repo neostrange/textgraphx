@@ -54,13 +54,13 @@ class TestMigrateHelpers(unittest.TestCase):
         try:
             mappings, skipped = m.compute_mappings(fakeG, nes)
             self.assertEqual(len(mappings), 1)
-            self.assertEqual(mappings[0]["token_id"], "1_5_7_MONEY")
+            self.assertEqual(mappings[0]["token_id"], "1_5_7")
         finally:
             m.find_tok_indices_for_ne = original_finder
 
     def test_apply_mappings_calls_run(self):
         fakeG = FakeGraph()
-        mappings = [{"ne_id": "1_100_110_MONEY", "token_id": "1_5_7_MONEY", "tok_start": 5, "tok_end": 7}]
+        mappings = [{"ne_id": "1_100_110_MONEY", "token_id": "1_5_7", "tok_start": 5, "tok_end": 7}]
         applied, errors = m.apply_mappings(fakeG, mappings, batch=10)
         # our FakeGraph returns empty data for the MATCH/SET query so applied should be 0
         self.assertEqual(applied, 0)

@@ -41,6 +41,7 @@ import warnings
 
 from textgraphx.neo4j_client import make_graph_from_config
 from textgraphx.config import get_config
+from textgraphx.utils.id_utils import make_entity_mention_uid
 
 logger = logging.getLogger(__name__)
 
@@ -216,6 +217,79 @@ class RefinementPhase():
         self.username = None
         self.password = None
     logger.info("RefinementPhase initialized; using graph wrapper for query logging")
+
+    @staticmethod
+    def _coerce_doc_id(doc_id):
+        try:
+            return int(doc_id)
+        except (TypeError, ValueError):
+            return 0
+
+    def _merge_nominal_entity_mentions(self, rows, mention_source, source_key, confidence, provenance_rule_id):
+        payload = []
+        for row in rows:
+            doc_id = self._coerce_doc_id(row.get("doc_id"))
+            value = row.get("value", "")
+            head_token_index = row.get("headTokenIndex")
+            payload.append({
+                "mention_uid": make_entity_mention_uid(
+                    doc_id=doc_id,
+                    value=value,
+                    head_token_index=head_token_index,
+                    source=mention_source,
+                ),
+                "mention_id": row["mention_id"],
+                "doc_id": doc_id,
+                "value": value,
+                "head": row.get("head"),
+                "headTokenIndex": head_token_index,
+                "start_tok": row["start_tok"],
+                "end_tok": row["end_tok"],
+                "start_char": row.get("start_char"),
+                "end_char": row.get("end_char"),
+                "mention_source": mention_source,
+                "confidence": confidence,
+                "provenance_rule_id": provenance_rule_id,
+                "source_node_id": row[source_key],
+                "entity_id": row["entity_id"],
+            })
+
+        if not payload:
+            return 0
+
+        _source_labels = {"fa": "frame_argument_nominal", "nc": "noun_chunk_nominal"}  # noqa: E501
+        # Sets: em.mention_source = 'frame_argument_nominal' (fa) or em.mention_source = 'noun_chunk_nominal' (nc)
+        _batch_cypher = f"""
+                 UNWIND $rows AS row
+                 MATCH (e:Entity {{id: row.entity_id}})
+                 MERGE (em:EntityMention {{uid: row.mention_uid}})
+                 SET em:NominalMention,
+                    em.uid = row.mention_uid,
+                    em.id = row.mention_id,
+                    em.legacy_span_id = coalesce(em.legacy_span_id, row.mention_id),
+                    em.doc_id = row.doc_id,
+                    em.value = row.value,
+                    em.head = row.head,
+                    em.headTokenIndex = row.headTokenIndex,
+                    em.syntacticType = 'NOMINAL',
+                    em.syntactic_type = 'NOMINAL',
+                    em.start_tok = row.start_tok,
+                    em.end_tok = row.end_tok,
+                    em.start_char = row.start_char,
+                    em.end_char = row.end_char,
+                    em.mention_source = row.mention_source,
+                    em.confidence = coalesce(em.confidence, row.confidence),
+                    em.provenance_rule_id = row.provenance_rule_id,
+                    em.{source_key} = row.source_node_id
+                 MERGE (em)-[:REFERS_TO]->(e)
+                 WITH em, row
+                 MATCH (d:AnnotatedText {{id: row.doc_id}})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok:TagOccurrence)
+                 WHERE tok.tok_index_doc >= row.start_tok AND tok.tok_index_doc <= row.end_tok
+                 MERGE (tok)-[:PARTICIPATES_IN]->(em)
+                 RETURN count(DISTINCT em) AS mentions_materialized
+        """
+        data = self.graph.run(_batch_cypher, {"rows": payload}).data()
+        return data[0].get("mentions_materialized", 0) if data else 0
 
     def trim_trailing_punctuation_from_entity_mentions(self):
         """Remove trailing punctuation tokens from NamedEntity mention spans.
@@ -1312,9 +1386,10 @@ class RefinementPhase():
         semantic types (MONEY, QUANTITY, PERCENT) with an additional label
         to simplify downstream numeric handling and event enrichment.
 
-        Transitional status: this write path is retained only for compatibility
-        while participant resolution migrates toward canonical `Entity`/`VALUE`
-        sources. New read-side logic should treat `:NUMERIC` as legacy fallback.
+        DEPRECATED: Write-suppressed by default (features.fill_numeric_labels=False).
+        This method is retained only to support operator-triggered backfill for graphs
+        predating the default suppression. Canonical participant resolution uses
+        `Entity`/`VALUE` node targets. Removal tracked via migration 0019.
         """
         logger.debug("tag_numeric_entities")
         cfg = get_config()
@@ -1325,8 +1400,9 @@ class RefinementPhase():
             )
             return ""
         warnings.warn(
-            "RefinementPhase.tag_numeric_entities() is transitional. "
-            "Prefer canonical VALUE/Entity-based participant resolution over direct :NUMERIC label reads.",
+            "RefinementPhase.tag_numeric_entities() is deprecated. "
+            "Prefer canonical VALUE/Entity-based participant resolution. "
+            "Remaining :NUMERIC labels are removed by migration 0019.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -1357,10 +1433,10 @@ class RefinementPhase():
         easier to find and operate on numeric or quantified entities during
         enrichment and evaluation.
 
-        Transitional status: this convenience label exists so
-        `materialize_canonical_value_nodes()` can discover legacy value-like
-        mentions before removing the label again. New read-side logic should
-        prefer canonical `VALUE` nodes.
+        DEPRECATED: Write-suppressed by default (features.fill_numeric_labels=False).
+        Canonical VALUE nodes are created directly by materialize_canonical_value_nodes().
+        This method is retained only for historical operator use. Remaining NamedEntity:VALUE
+        dynamic labels are removed by migration 0019.
         """
         logger.debug("tag_value_entities")
         cfg = get_config()
@@ -1371,8 +1447,9 @@ class RefinementPhase():
             )
             return ""
         warnings.warn(
-            "RefinementPhase.tag_value_entities() is transitional. "
-            "Prefer canonical VALUE nodes over direct NamedEntity:VALUE reads.",
+            "RefinementPhase.tag_value_entities() is deprecated. "
+            "Prefer canonical VALUE nodes. Remaining :VALUE dynamic labels "
+            "on NamedEntity nodes are removed by migration 0019.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -1621,7 +1698,7 @@ class RefinementPhase():
         logger.debug("materialize_nominal_mentions_from_frame_arguments")
         graph = self.graph
 
-        query = """
+        candidate_query = """
                  MATCH (fa:FrameArgument)-[:REFERS_TO]->(e:Entity)
                  WHERE coalesce(e.syntacticType, e.type, '') = 'NOMINAL'
                  OPTIONAL MATCH (tok:TagOccurrence)-[:IN_FRAME]->(fa)
@@ -1640,32 +1717,27 @@ class RefinementPhase():
                      coalesce(fa.start_char, min_char) AS start_char,
                      coalesce(fa.end_char, max_char) AS end_char
                  WHERE start_tok IS NOT NULL AND end_tok IS NOT NULL
-                 WITH fa, e, doc_id, start_tok, end_tok, start_char, end_char,
-                     'nom_mention_fa_' + toString(doc_id) + '_' + toString(start_tok) + '_' + toString(end_tok) AS mention_id
-                 MERGE (em:EntityMention {id: mention_id})
-                 SET em:NominalMention,
-                    em.doc_id = doc_id,
-                    em.value = coalesce(fa.text, e.text, e.head, ''),
-                    em.head = coalesce(fa.head, e.head),
-                    em.headTokenIndex = coalesce(fa.headTokenIndex, e.headTokenIndex, start_tok),
-                    em.syntacticType = 'NOMINAL',
-                    em.syntactic_type = 'NOMINAL',
-                    em.start_tok = start_tok,
-                    em.end_tok = end_tok,
-                    em.start_char = start_char,
-                    em.end_char = end_char,
-                    em.mention_source = 'frame_argument_nominal',
-                    em.confidence = coalesce(em.confidence, 0.90),
-                    em.provenance_rule_id = 'refinement.materialize_nominal_mentions_from_frame_arguments',
-                    em.source_frame_argument_id = fa.id
-                 MERGE (em)-[:REFERS_TO]->(e)
-                      WITH em, doc_id, start_tok, end_tok
-                      MATCH (d:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok:TagOccurrence)
-                      WHERE tok.tok_index_doc >= start_tok AND tok.tok_index_doc <= end_tok
-                      MERGE (tok)-[:PARTICIPATES_IN]->(em)
-                 RETURN count(DISTINCT em) AS mentions_materialized
+                 RETURN DISTINCT
+                    e.id AS entity_id,
+                    fa.id AS source_frame_argument_id,
+                    doc_id,
+                    coalesce(fa.text, e.text, e.head, '') AS value,
+                    coalesce(fa.head, e.head) AS head,
+                    coalesce(fa.headTokenIndex, e.headTokenIndex, start_tok) AS headTokenIndex,
+                    start_tok,
+                    end_tok,
+                    start_char,
+                    end_char,
+                    'nom_mention_fa_' + toString(doc_id) + '_' + toString(start_tok) + '_' + toString(end_tok) AS mention_id
         """
-        graph.run(query).data()
+        rows = graph.run(candidate_query).data()
+        self._merge_nominal_entity_mentions(
+            rows=rows,
+            mention_source="fa",
+            source_key="source_frame_argument_id",
+            confidence=0.90,
+            provenance_rule_id="refinement.materialize_nominal_mentions_from_frame_arguments",
+        )
 
         return ""
 
@@ -1679,7 +1751,7 @@ class RefinementPhase():
         logger.debug("materialize_nominal_mentions_from_noun_chunks")
         graph = self.graph
 
-        query = """
+        candidate_query = """
                  MATCH (nc:NounChunk)
                  OPTIONAL MATCH (tok:TagOccurrence)-[:PARTICIPATES_IN]->(nc)
                  OPTIONAL MATCH (d:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok)
@@ -1734,30 +1806,27 @@ class RefinementPhase():
                     e.source = 'noun_chunk_nominal',
                     e.source_noun_chunk_id = nc.id,
                     e.provenance_rule_id = 'refinement.materialize_nominal_mentions_from_noun_chunks'
-                 MERGE (em:EntityMention {id: mention_id})
-                 SET em:NominalMention,
-                    em.doc_id = doc_id,
-                    em.value = coalesce(nc.value, ''),
-                    em.head = coalesce(em.head, nc.value),
-                    em.headTokenIndex = coalesce(em.headTokenIndex, start_tok),
-                    em.syntacticType = 'NOMINAL',
-                    em.syntactic_type = 'NOMINAL',
-                    em.start_tok = start_tok,
-                    em.end_tok = end_tok,
-                    em.start_char = start_char,
-                    em.end_char = end_char,
-                    em.mention_source = 'noun_chunk_nominal',
-                    em.confidence = coalesce(em.confidence, 0.75),
-                    em.provenance_rule_id = 'refinement.materialize_nominal_mentions_from_noun_chunks',
-                    em.source_noun_chunk_id = nc.id
-                 MERGE (em)-[:REFERS_TO]->(e)
-                      WITH em, doc_id, start_tok, end_tok
-                      MATCH (d:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok:TagOccurrence)
-                      WHERE tok.tok_index_doc >= start_tok AND tok.tok_index_doc <= end_tok
-                      MERGE (tok)-[:PARTICIPATES_IN]->(em)
-                 RETURN count(DISTINCT em) AS mentions_materialized
+                 RETURN DISTINCT
+                    e.id AS entity_id,
+                    nc.id AS source_noun_chunk_id,
+                    doc_id,
+                    coalesce(nc.value, '') AS value,
+                    coalesce(e.head, nc.value) AS head,
+                    start_tok AS headTokenIndex,
+                    start_tok,
+                    end_tok,
+                    start_char,
+                    end_char,
+                    mention_id
         """
-        graph.run(query).data()
+        rows = graph.run(candidate_query).data()
+        self._merge_nominal_entity_mentions(
+            rows=rows,
+            mention_source="nc",
+            source_key="source_noun_chunk_id",
+            confidence=0.75,
+            provenance_rule_id="refinement.materialize_nominal_mentions_from_noun_chunks",
+        )
 
         return ""
 

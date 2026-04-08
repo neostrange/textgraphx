@@ -25,6 +25,36 @@ except Exception:
 TokenSpan = Tuple[int, ...]
 
 
+_AUXILIARY_EVENT_LEMMAS = frozenset(
+    {
+        "be",
+        "am",
+        "is",
+        "are",
+        "was",
+        "were",
+        "been",
+        "being",
+        "do",
+        "does",
+        "did",
+        "done",
+        "have",
+        "has",
+        "had",
+        "will",
+        "would",
+        "shall",
+        "should",
+        "can",
+        "could",
+        "may",
+        "might",
+        "must",
+    }
+)
+
+
 @dataclass(frozen=True)
 class Mention:
     """Normalized mention with token-anchored span and selected attributes."""
@@ -421,6 +451,8 @@ def build_document_from_neo4j(
     for row in event_rows:
         span = _span_from_bounds(int(row["start_tok"]), int(row["end_tok"]), token_index_alignment)
         attrs = _canonicalize_event_attrs(row)
+        if not _should_project_event(attrs):
+            continue
         mention = Mention(kind="event", span=span, attrs=attrs)
         priority = int(row.get("source_priority") or 0)
         current = event_by_span.get(span)
@@ -428,6 +460,7 @@ def build_document_from_neo4j(
             event_by_span[span] = (priority, mention)
 
     doc.event_mentions.update(m for _, m in event_by_span.values())
+    projected_event_spans = frozenset(m.span for m in doc.event_mentions)
 
     timex_rows = graph.run(
         """
@@ -507,6 +540,8 @@ def build_document_from_neo4j(
             src_span = _align_relation_event_span(src_span, doc.event_mentions)
         if tgt_kind == "event":
             tgt_span = _align_relation_event_span(tgt_span, doc.event_mentions)
+        if (src_kind == "event" or tgt_kind == "event") and not projected_event_spans:
+            continue
         doc.relations.add(
             Relation(
                 kind="tlink",
@@ -548,6 +583,8 @@ def build_document_from_neo4j(
             src_span = _align_relation_event_span(src_span, doc.event_mentions)
         if tgt_kind == "event":
             tgt_span = _align_relation_event_span(tgt_span, doc.event_mentions)
+        if (src_kind == "event" or tgt_kind == "event") and not projected_event_spans:
+            continue
         doc.relations.add(
             Relation(
                 kind="glink",
@@ -591,6 +628,8 @@ def build_document_from_neo4j(
             src_span = _align_relation_event_span(src_span, doc.event_mentions)
         if tgt_kind == "event":
             tgt_span = _align_relation_event_span(tgt_span, doc.event_mentions)
+        if (src_kind == "event" or tgt_kind == "event") and not projected_event_spans:
+            continue
         rel_kind = str(row.get("rel_kind") or "").strip().lower()
         attrs = []
         reltype = str(row.get("reltype") or "").strip()
@@ -695,7 +734,6 @@ def build_document_from_neo4j(
     ).data()
     # Only keep participant relations whose event anchor is in the projected event mention set.
     # Relations anchored to low-confidence or frame-only events not in the projection are spurious.
-    projected_event_spans = frozenset(m.span for m in doc.event_mentions)
     for row in participant_rows:
         src_kind = _node_kind_from_labels(row.get("source_labels", []))
         if src_kind != "entity":
@@ -757,6 +795,7 @@ def _canonicalize_event_attrs(row: Dict[str, Any]) -> Tuple[Tuple[str, str], ...
     polarity = str(row.get("polarity") or "").strip().upper() or "POS"
     time = str(row.get("time") or "").strip().upper() or "NON_FUTURE"
     factuality = str(row.get("factuality") or "").strip().upper()
+    external_ref = str(row.get("external_ref") or "").strip()
     pred = str(row.get("pred") or "").strip().lower()
 
     # MEANTIME convention: INFINITIVE-tense events signal future/possible actions.
@@ -791,7 +830,18 @@ def _canonicalize_event_attrs(row: Dict[str, Any]) -> Tuple[Tuple[str, str], ...
     attrs_map["time"] = time
     if factuality:
         attrs_map["factuality"] = factuality
+    if external_ref:
+        attrs_map["external_ref"] = external_ref
     return tuple(sorted(attrs_map.items()))
+
+
+def _should_project_event(attrs: Tuple[Tuple[str, str], ...]) -> bool:
+    attrs_map = dict(attrs)
+    pos = attrs_map.get("pos", "")
+    pred = attrs_map.get("pred", "")
+    if pred in _AUXILIARY_EVENT_LEMMAS and pos != "NOUN":
+        return False
+    return True
 
 
 def _canonicalize_timex_attrs(row: Dict[str, Any]) -> Tuple[Tuple[str, str], ...]:
@@ -1388,11 +1438,20 @@ def score_relation_layer(
     gold_relations: Set[Relation],
     predicted_relations: Set[Relation],
     mode: str = "strict",
-    attr_keys: Tuple[str, ...] = (),
+    attr_keys: Dict[str, Tuple[str, ...]] | Tuple[str, ...] = (),
     max_examples: int = 5,
 ) -> Dict[str, Any]:
     """Compute TP/FP/FN + precision/recall/F1 for relation layer."""
     if attr_keys:
+        def _attrs_for_relation(rel: Relation) -> Tuple[Tuple[str, str], ...]:
+            if isinstance(attr_keys, dict):
+                keep = set(attr_keys.get(rel.kind, ()))
+            else:
+                keep = set(attr_keys)
+            if not keep:
+                return ()
+            return tuple(sorted((k, v) for k, v in rel.attrs if k in keep))
+
         gold_relations = {
             Relation(
                 kind=r.kind,
@@ -1400,7 +1459,7 @@ def score_relation_layer(
                 source_span=r.source_span,
                 target_kind=r.target_kind,
                 target_span=r.target_span,
-                attrs=tuple(sorted((k, v) for k, v in r.attrs if k in set(attr_keys))),
+                attrs=_attrs_for_relation(r),
             )
             for r in gold_relations
         }
@@ -1411,7 +1470,7 @@ def score_relation_layer(
                 source_span=r.source_span,
                 target_kind=r.target_kind,
                 target_span=r.target_span,
-                attrs=tuple(sorted((k, v) for k, v in r.attrs if k in set(attr_keys))),
+                attrs=_attrs_for_relation(r),
             )
             for r in predicted_relations
         }
@@ -1442,19 +1501,19 @@ def evaluate_documents(
     entity_attr = cfg.mention_attr_keys.get("entity", ())
     event_attr = cfg.mention_attr_keys.get("event", ())
     timex_attr = cfg.mention_attr_keys.get("timex", ())
-    rel_tlink_attr = cfg.relation_attr_keys.get("tlink", ())
+    relation_attr = cfg.relation_attr_keys
 
     strict = {
         "entity": score_mention_layer(gold_doc.entity_mentions, predicted_doc.entity_mentions, mode="strict", overlap_threshold=overlap_threshold, attr_keys=entity_attr, max_examples=max_examples),
         "event": score_mention_layer(gold_doc.event_mentions, predicted_doc.event_mentions, mode="strict", overlap_threshold=overlap_threshold, attr_keys=event_attr, max_examples=max_examples),
         "timex": score_mention_layer(gold_doc.timex_mentions, predicted_doc.timex_mentions, mode="strict", overlap_threshold=overlap_threshold, attr_keys=timex_attr, max_examples=max_examples),
-        "relation": score_relation_layer(gold_doc.relations, predicted_doc.relations, mode="strict", attr_keys=rel_tlink_attr, max_examples=max_examples),
+        "relation": score_relation_layer(gold_doc.relations, predicted_doc.relations, mode="strict", attr_keys=relation_attr, max_examples=max_examples),
     }
     relaxed = {
         "entity": score_mention_layer(gold_doc.entity_mentions, predicted_doc.entity_mentions, mode="relaxed", overlap_threshold=overlap_threshold, attr_keys=entity_attr, max_examples=max_examples),
         "event": score_mention_layer(gold_doc.event_mentions, predicted_doc.event_mentions, mode="relaxed", overlap_threshold=overlap_threshold, attr_keys=event_attr, max_examples=max_examples),
         "timex": score_mention_layer(gold_doc.timex_mentions, predicted_doc.timex_mentions, mode="relaxed", overlap_threshold=overlap_threshold, attr_keys=timex_attr, max_examples=max_examples),
-        "relation": score_relation_layer(gold_doc.relations, predicted_doc.relations, mode="relaxed", attr_keys=rel_tlink_attr, max_examples=max_examples),
+        "relation": score_relation_layer(gold_doc.relations, predicted_doc.relations, mode="relaxed", attr_keys=relation_attr, max_examples=max_examples),
     }
     return {
         "doc_id": gold_doc.doc_id,

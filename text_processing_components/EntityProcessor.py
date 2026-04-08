@@ -18,8 +18,9 @@ Contract and side-effects:
     `token_start`, `token_end` and commonly used NEL metadata when available.
 """
 
-from textgraphx.utils.id_utils import make_ne_id
+from textgraphx.utils.id_utils import make_ne_id, make_ne_token_id, make_ne_uid
 import logging
+import time
 
 # module logger
 logger = logging.getLogger(__name__)
@@ -192,10 +193,13 @@ class EntityProcessor:
             start = item.get('start_index')
             end = item.get('end_index')
             ne_type = item.get('type')
+            value = item.get('value', '')
+            head_token_index = item.get('head_token_index')
             item['id'] = make_ne_id(document_id, start, end, ne_type)
-            # token_id is computed independently so it stays stable even
+            item['uid'] = make_ne_uid(document_id, value, head_token_index)
+            # token_id uses a type-agnostic formula so it stays stable even
             # if `id` is later remapped (e.g., to a NEL canonical URI).
-            item['token_id'] = make_ne_id(document_id, start, end, ne_type)
+            item['token_id'] = make_ne_token_id(document_id, start, end)
             item['legacy_syntactic_type'] = item.get(
                 'legacy_syntactic_type',
                 self._legacy_syntactic_type(item.get('syntactic_type')),
@@ -203,8 +207,22 @@ class EntityProcessor:
 
         ne_query = """
             UNWIND $nes as item
-            MERGE (ne:NamedEntity {id: item.id})
-            SET ne.type = item.type, ne.value = item.value, ne.index = item.start_index, ne.end_index = item.end_index,
+            OPTIONAL MATCH (legacy:NamedEntity {id: item.id})
+            WITH item, legacy
+            CALL {
+                WITH item, legacy
+                WITH item, legacy WHERE legacy IS NOT NULL
+                SET legacy.uid = coalesce(legacy.uid, item.uid),
+                    legacy.legacy_span_id = coalesce(legacy.legacy_span_id, legacy.id)
+                RETURN legacy AS ne
+                UNION
+                WITH item, legacy
+                WITH item WHERE legacy IS NULL
+                MERGE (ne:NamedEntity {uid: item.uid})
+                RETURN ne
+            }
+            SET ne.id = item.id, ne.legacy_span_id = coalesce(ne.legacy_span_id, item.id), ne.uid = item.uid,
+            ne.type = item.type, ne.value = item.value, ne.index = item.start_index, ne.end_index = item.end_index,
             ne.kb_id = item.kb_id, ne.url_wikidata = item.url_wikidata, ne.score = item.score, ne.normal_term = item.normal_term,
             ne.description = item.description,
             ne.start_tok = item.start_index, ne.end_tok = item.end_index,
@@ -220,6 +238,80 @@ class EntityProcessor:
         """
         logger.debug("Executing NE UNWIND query for document %s", document_id)
         self.execute_query(ne_query, {"documentId": document_id, "nes": nes})
+        self._reconcile_stale_named_entities(document_id, [item["uid"] for item in nes])
+
+    def _reconcile_stale_named_entities(self, document_id, current_uids):
+        """Retire stale mention edges for NamedEntity nodes not seen in latest extraction.
+
+        This pass is intentionally low-disruption:
+        - keeps `NamedEntity.id` deterministic MERGE behavior untouched
+        - marks unseen entities as stale instead of deleting nodes
+        - removes only token mention-participation edges from stale nodes so
+          duplicate legacy spans stop participating in downstream mention reads
+        """
+        current_uids = [str(x) for x in set(current_uids or []) if x is not None]
+        run_id = f"ne_reextract_{int(time.time() * 1000)}"
+
+        # Clear stale marker for entities observed in this extraction batch.
+        if current_uids:
+            clear_query = """
+                UNWIND $current_uids AS uid
+                MATCH (ne:NamedEntity {uid: uid})
+                SET ne.stale = false,
+                    ne.stale_reason = null,
+                    ne.stale_run_id = $run_id,
+                    ne.last_seen_at = timestamp()
+            """
+            self.execute_query(clear_query, {"current_uids": current_uids, "run_id": run_id})
+
+        # Mark unseen entities as stale and retire mention edges for this document.
+        stale_query = """
+            MATCH (text:AnnotatedText {id: $documentId})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:IN_MENTION|PARTICIPATES_IN]->(ne:NamedEntity)
+            WITH DISTINCT ne
+            WHERE NOT coalesce(ne.uid, '') IN $current_uids
+            SET ne.stale = true,
+                ne.stale_reason = 'reextract_not_seen',
+                ne.stale_run_id = $run_id,
+                ne.stale_at = timestamp()
+            WITH collect(ne) AS stale_nodes
+            CALL {
+                WITH stale_nodes
+                UNWIND stale_nodes AS ne
+                OPTIONAL MATCH (:TagOccurrence)-[r:IN_MENTION|PARTICIPATES_IN]->(ne)
+                DELETE r
+                RETURN count(r) AS retired_mention_edges
+            }
+            CALL {
+                WITH stale_nodes
+                UNWIND stale_nodes AS ne
+                OPTIONAL MATCH (ne)-[rr:REFERS_TO]->(:Entity)
+                DELETE rr
+                RETURN count(rr) AS retired_refers_to_edges
+            }
+            RETURN size(stale_nodes) AS stale_nodes,
+                   retired_mention_edges,
+                   retired_refers_to_edges
+        """
+        rows = self.execute_query(
+            stale_query,
+            {
+                "documentId": document_id,
+                "current_uids": current_uids,
+                "run_id": run_id,
+            },
+        )
+        if rows:
+            stale_nodes = rows[0].get("stale_nodes", 0)
+            retired_mention_edges = rows[0].get("retired_mention_edges", 0)
+            retired_refers_to_edges = rows[0].get("retired_refers_to_edges", 0)
+            if stale_nodes or retired_mention_edges or retired_refers_to_edges:
+                logger.info(
+                    "store_entities reconciliation: marked %d stale NamedEntity nodes, retired %d mention edges, and retired %d REFERS_TO edges for document %s",
+                    stale_nodes,
+                    retired_mention_edges,
+                    retired_refers_to_edges,
+                    document_id,
+                )
 
     def execute_query(self, query, params):
         result = self.neo4j_repository.execute_query(query, params)

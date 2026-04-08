@@ -87,6 +87,7 @@ class NounChunkProcessor:
             MATCH (text:AnnotatedText)-[:CONTAINS_SENTENCE]->(sentence:Sentence)-[:HAS_TOKEN]->(tagOccurrence:TagOccurrence)
             WHERE text.id = $documentId AND tagOccurrence.tok_index_doc >= ncIndex.start_index AND tagOccurrence.tok_index_doc <= ncIndex.end_index
             MERGE (nc)<-[:PARTICIPATES_IN]-(tagOccurrence)
+            MERGE (nc)<-[:IN_MENTION]-(tagOccurrence)
         """
         logger.debug("Storing %d noun chunks for document %s", len(ncs), document_id)
         self.db_executor.execute_query(nc_query, {"documentId": document_id, "ncs": ncs})

@@ -81,6 +81,8 @@ class PhaseThresholds:
     max_event_mentions_missing_refers_to_tevent: int = 10**9
     max_frames_missing_instantiates_eventmention: int = 10**9
     max_event_mentions_missing_token_identity: int = 10**9
+    max_participation_in_frame_missing: int = 10**9
+    max_participation_in_mention_missing: int = 10**9
 
     # --- tlinks ---
     min_tlink_rels: int = 0                  # TLINK relationships
@@ -750,6 +752,32 @@ class PhaseAssertions:
                 """
             ),
             maximum=t.max_factuality_alignment_violations,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="TagOccurrence links missing IN_FRAME alias",
+            actual=self._count(
+                """
+                MATCH (tok:TagOccurrence)-[:PARTICIPATES_IN]->(target)
+                WHERE target:Frame OR target:FrameArgument
+                  AND NOT EXISTS { MATCH (tok)-[:IN_FRAME]->(target) }
+                RETURN count(*) AS c
+                """
+            ),
+            maximum=t.max_participation_in_frame_missing,
+        )
+        self._add_upper_bound_check(
+            result,
+            label="TagOccurrence links missing IN_MENTION alias",
+            actual=self._count(
+                """
+                MATCH (tok:TagOccurrence)-[:PARTICIPATES_IN]->(target)
+                WHERE target:NamedEntity OR target:NounChunk OR target:CorefMention OR target:Antecedent
+                  AND NOT EXISTS { MATCH (tok)-[:IN_MENTION]->(target) }
+                RETURN count(*) AS c
+                """
+            ),
+            maximum=t.max_participation_in_mention_missing,
         )
         if self._enforce_provenance_contracts:
             self._add_provenance_contract_check(

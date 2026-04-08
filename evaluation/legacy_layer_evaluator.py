@@ -80,7 +80,8 @@ class LegacyLayerEvaluator:
     def _count_legacy_nodes(self) -> int:
         """Count nodes with legacy labels (NamedEntity, TEvent, Frame)."""
         query = """
-        MATCH (n:NamedEntity|TEvent|Frame)
+        MATCH (n)
+        WHERE n:NamedEntity OR n:TEvent OR n:Frame
         RETURN count(n) AS c
         """
         result = self.graph.run(query).data()
@@ -89,8 +90,9 @@ class LegacyLayerEvaluator:
     def _count_active_legacy_nodes(self) -> int:
         """Count legacy nodes that are actually used (have properties/relationships)."""
         query = """
-        MATCH (n:NamedEntity|TEvent|Frame)
-        WHERE n.doc_id IS NOT NULL
+                MATCH (n)
+                WHERE (n:NamedEntity OR n:TEvent OR n:Frame)
+                    AND n.doc_id IS NOT NULL
         RETURN count(n) AS c
         """
         result = self.graph.run(query).data()
@@ -108,7 +110,9 @@ class LegacyLayerEvaluator:
     def _count_active_legacy_relationships(self) -> int:
         """Count legacy relationships that connect to populated nodes."""
         query = """
-        MATCH (a:NamedEntity|TEvent|Frame)-[r:PARTICIPANT|DESCRIBES|DESCRIBES_EVENT|EVENT_PARTICIPANT]-(b:NamedEntity|TEvent|Frame)
+                MATCH (a)-[r:PARTICIPANT|DESCRIBES|DESCRIBES_EVENT|EVENT_PARTICIPANT]-(b)
+                WHERE (a:NamedEntity OR a:TEvent OR a:Frame)
+                    AND (b:NamedEntity OR b:TEvent OR b:Frame)
         RETURN count(r) AS c
         """
         result = self.graph.run(query).data()
@@ -136,8 +140,8 @@ class LegacyLayerEvaluator:
         """Count relationships available via both old and new paths."""
         # Old: Entity->TEvent, New: Entity->EventMention->TEvent
         query = """
-        MATCH (e:Entity)-[:PARTICIPANT|:EVENT_PARTICIPANT]->(te:TEvent)
-        OPTIONAL MATCH (e)-[:PARTICIPANT|:EVENT_PARTICIPANT]->(em:EventMention)-[:REFERS_TO]->(te)
+        MATCH (e:Entity)-[:PARTICIPANT|EVENT_PARTICIPANT]->(te:TEvent)
+        OPTIONAL MATCH (e)-[:PARTICIPANT|EVENT_PARTICIPANT]->(em:EventMention)-[:REFERS_TO]->(te)
         RETURN count(CASE WHEN em IS NOT NULL THEN 1 END) AS dual_count
         """
         result = self.graph.run(query).data()
@@ -148,7 +152,7 @@ class LegacyLayerEvaluator:
         query = """
         MATCH (ne:NamedEntity)
         WHERE NOT EXISTS { MATCH (ne)-[:REFERS_TO]->(e:Entity) }
-        AND NOT EXISTS { MATCH (ne:EntityMention) }
+                    AND NOT ne:EntityMention
         RETURN count(ne) AS c
         """
         result = self.graph.run(query).data()

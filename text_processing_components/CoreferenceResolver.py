@@ -9,6 +9,7 @@ reference them consistently.
 import requests
 import json
 from textgraphx.neo4j_client import make_graph_from_config
+from textgraphx.utils.id_utils import make_coref_uid
 import logging
 
 # module logger
@@ -73,12 +74,14 @@ class CoreferenceResolver:
         Returns:
             The string id assigned to the node (used as the node's `id` property).
         """
+        node_uid = make_coref_uid(doc_id, text, start_index, node_type)
         if node_type == "CorefMention":
             existing_named_entity_id = self._find_named_entity_by_span(start_index, end_index, doc_id)
             if existing_named_entity_id is not None:
                 query = """
                 MATCH (ne:NamedEntity {id: $node_id})
                 SET ne:CorefMention,
+                    ne.uid = coalesce(ne.uid, $node_uid),
                     ne.text = coalesce(ne.text, ne.value, $text),
                     ne.start_tok = coalesce(ne.start_tok, $start),
                     ne.end_tok = coalesce(ne.end_tok, $end),
@@ -88,6 +91,7 @@ class CoreferenceResolver:
                 """
                 params = {
                     "node_id": existing_named_entity_id,
+                    "node_uid": node_uid,
                     "text": text,
                     "start": start_index,
                     "end": end_index,
@@ -106,11 +110,18 @@ class CoreferenceResolver:
         query = """
         MERGE (n:%s {id: $node_id})
         SET n.text = $text,
+            n.uid = $node_uid,
             n.start_tok = $start, n.end_tok = $end,
             n.startIndex = $start, n.endIndex = $end
         RETURN n.id
         """ % node_type
-        params = {"node_id": node_id, "text": text, "start": start_index, "end": end_index}
+        params = {
+            "node_id": node_id,
+            "node_uid": node_uid,
+            "text": text,
+            "start": start_index,
+            "end": end_index,
+        }
         self.graph.run(query, params)
         logger.debug("create_node: created/merged %s for doc=%s span=%s-%s", node_id, doc_id, start_index, end_index)
         return node_id
@@ -132,6 +143,7 @@ class CoreferenceResolver:
         MATCH (x:TagOccurrence {tok_index_doc: idx})-[:HAS_TOKEN]-()-[:CONTAINS_SENTENCE]-(:AnnotatedText {id: $doc_id})
         MATCH (n {id: $node_id})
         MERGE (x)-[:PARTICIPATES_IN]->(n)
+        MERGE (x)-[:IN_MENTION]->(n)
         """
         params = {"indices": list(index_range), "doc_id": doc_id, "node_id": node_id}
         logger.debug("connect_node_to_tag_occurrences: linking %d indices to node %s in doc %s", len(list(index_range)), node_id, doc_id)

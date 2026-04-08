@@ -102,7 +102,6 @@
         "CorefMention",
         "TIMEX",
         "TEvent",
-        "NUMERIC",
         "VALUE"
       ],
       "relationship_types": [
@@ -382,14 +381,15 @@
   },
   "dynamic_label_policy": {
     "NUMERIC": {
-      "status": "transitional",
-      "description": "NUMERIC is a transitional fallback label applied to selected NamedEntity mentions for compatibility during canonical VALUE migration. Read-side logic may still encounter it in EVENT_PARTICIPANT and related participant-resolution paths, but canonical queries should prefer VALUE or Entity-backed participants first.",
-      "query_guidance": "Prefer canonical :VALUE nodes, optionally combined with Entity-backed participants, for numeric or quantified arguments. Treat direct :NUMERIC reads as legacy fallback inventory rather than the primary query path."
+      "status": "deprecated",
+      "description": "NUMERIC is a deprecated dynamic label applied to selected NamedEntity mentions as a legacy fallback during canonical VALUE migration. Write paths are suppressed (fill_numeric_labels=False). Remaining instances are removed by migration 0019 (operator-triggered). Canonical queries must prefer :VALUE node targets and Entity-backed participants instead.",
+      "query_guidance": "Do not add new queries against :NUMERIC. For numeric or quantified arguments, query canonical :VALUE nodes or Entity-backed participants. Treat existing :NUMERIC reads as legacy fallback inventory targeted for removal.",
+      "removal_migration": "0019_remove_legacy_numeric_value_labels.cypher"
     },
     "VALUE": {
       "status": "canonical",
-      "description": "VALUE is a canonical node type for value expressions produced by the NER and enrichment pipeline. It participates in EVENT_PARTICIPANT relationships to represent quantified arguments. Each VALUE node has a type classification (PERCENT, MONEY, QUANTITY, CARDINAL, ORDINAL, DATE, DURATION, NUMERIC, or OTHER).",
-      "query_guidance": "Query by label :VALUE for value expressions; use v.type for filtering by value category. Check migration 0016 for TYPE governance constraints."
+      "description": "VALUE is a canonical node type for value expressions produced by the NER and enrichment pipeline (created by RefinementPhase.materialize_canonical_value_nodes()). It participates in EVENT_PARTICIPANT relationships to represent quantified arguments. Each VALUE node has a type classification (PERCENT, MONEY, QUANTITY, CARDINAL, ORDINAL, DATE, DURATION, NUMERIC, or OTHER). NOTE: Distinct from the deprecated VALUE dynamic label that was applied to selected NamedEntity nodes — that label is write-suppressed and targeted for removal by migration 0019.",
+      "query_guidance": "Query by label :VALUE for canonical value expression nodes; use v.type for filtering by value category. Check migration 0016 for TYPE governance constraints. Do not confuse this node type with the deprecated :VALUE dynamic label on NamedEntity nodes."
     }
   },
   "migration_manifest": {
@@ -412,6 +412,11 @@
       "0015_formalize_has_participant_with_semantic_role_governance.cypher",
       "0016_formalize_value_nodes_with_type_classification.cypher",
       "0017_backfill_has_lemma_edges.cypher"
+      ,"0018_repair_ne_token_id.cypher"
+      ,"0019_remove_legacy_numeric_value_labels.cypher"
+      ,"0020_add_uid_constraints_for_mentions.cypher"
+      ,"0021_backfill_coref_uid.cypher"
+      ,"0022_add_coref_uid_constraints.cypher"
     ]
   },
   "legacy_layer_policy": {

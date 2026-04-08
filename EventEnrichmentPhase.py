@@ -396,7 +396,7 @@ class EventEnrichmentPhase():
 
         # Path 1: token directly participates in Frame and triggers TEvent
         query_direct = """
-            MATCH (f:Frame)<-[:PARTICIPATES_IN]-(t:TagOccurrence)-[:TRIGGERS]->(event:TEvent)
+            MATCH (f:Frame)<-[:PARTICIPATES_IN|IN_FRAME]-(t:TagOccurrence)-[:TRIGGERS]->(event:TEvent)
             MERGE (f)-[:DESCRIBES]->(event)
             MERGE (f)-[:FRAME_DESCRIBES_EVENT]->(event)
             RETURN count(*) AS linked
@@ -408,7 +408,7 @@ class EventEnrichmentPhase():
         # Path 2: token participates in FrameArgument whose Frame triggers TEvent
         query_via_arg = """
             MATCH (f:Frame)<-[:PARTICIPANT]-(fa:FrameArgument)
-            MATCH (fa)<-[:PARTICIPATES_IN]-(t:TagOccurrence)-[:TRIGGERS]->(event:TEvent)
+            MATCH (fa)<-[:PARTICIPATES_IN|IN_FRAME]-(t:TagOccurrence)-[:TRIGGERS]->(event:TEvent)
             MERGE (f)-[:DESCRIBES]->(event)
             MERGE (f)-[:FRAME_DESCRIBES_EVENT]->(event)
             RETURN count(*) AS linked
@@ -646,7 +646,7 @@ class EventEnrichmentPhase():
                     OPTIONAL MATCH (f)-[:DESCRIBES]->(main_event_l:TEvent)
                     WITH fa, coalesce(main_event_c, main_event_l) AS main_event
                     WHERE main_event IS NOT NULL
-                    MATCH (fa)<-[:PARTICIPATES_IN]-(t:TagOccurrence)-[:TRIGGERS]->(sub_event:TEvent)
+                    MATCH (fa)<-[:PARTICIPATES_IN|IN_FRAME]-(t:TagOccurrence)-[:TRIGGERS]->(sub_event:TEvent)
                     WHERE main_event <> sub_event
                     MERGE (main_event)-[cl:CLINK]->(sub_event)
                     SET cl.source = 'srl_argm_cau',
@@ -741,7 +741,7 @@ class EventEnrichmentPhase():
                                             )
                                         CALL {
                                             WITH fa, main_event
-                                            MATCH (fa)<-[:PARTICIPATES_IN]-(t:TagOccurrence)-[:TRIGGERS]->(sub_event:TEvent)
+                                                MATCH (fa)<-[:PARTICIPATES_IN|IN_FRAME]-(t:TagOccurrence)-[:TRIGGERS]->(sub_event:TEvent)
                                             WHERE main_event <> sub_event
                                             WITH sub_event,
                                                  min(abs(toInteger(coalesce(t.tok_index_doc, 0)) - toInteger(coalesce(fa.headTokenIndex, 0)))) AS distance

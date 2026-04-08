@@ -106,7 +106,7 @@ class EdgeSemanticsEvaluator:
         # SAME_AS should only link nodes of the same semantic type
         query = """
         MATCH (a:EntityMention)-[:SAME_AS]->(b:EntityMention)
-        WHERE a.__type__ != b.__type__
+        WHERE a.__type__ <> b.__type__
         RETURN count(*) AS c
         """
         result = self.graph.run(query).data()

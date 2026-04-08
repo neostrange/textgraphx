@@ -93,14 +93,13 @@ class TestSchemaInvariants:
             )
 
     def test_numeric_label_in_canonical_tier(self):
-        """dynamic_label_policy marks NUMERIC as 'canonical'; it must appear in
-        schema_tiers.canonical.node_labels so queriers can treat it as a first-class label."""
+        """NUMERIC is deprecated and should not remain in canonical node labels."""
         policy_status = _payload()["dynamic_label_policy"]["NUMERIC"]["status"]
-        assert policy_status == "canonical"  # policy itself is pre-existing, should pass
+        assert policy_status in ("transitional", "deprecated")
         canonical_labels = _payload()["schema_tiers"]["canonical"]["node_labels"]
-        assert "NUMERIC" in canonical_labels, (
-            "NUMERIC has dynamic_label_policy.status='canonical' but is absent from "
-            "schema_tiers.canonical.node_labels — this is a documentation inconsistency"
+        assert "NUMERIC" not in canonical_labels, (
+            "NUMERIC is a dynamic-label fallback (deprecated) and must not appear in "
+            "schema_tiers.canonical.node_labels"
         )
 
     def test_argument_type_vocabulary_has_all_argm_codes(self):
@@ -164,8 +163,8 @@ class TestMigrationManifest:
     def test_migration_manifest_covers_all_migration_files(self):
         manifest = _payload().get("migration_manifest", {})
         files = manifest.get("files", [])
-        assert len(files) == 17, (
-            f"migration_manifest.files must list exactly 17 migration files; found {len(files)}"
+        assert len(files) == 22, (
+            f"migration_manifest.files must list exactly 22 migration files; found {len(files)}"
         )
 
     def test_migration_manifest_files_are_ordered(self):
@@ -183,8 +182,8 @@ class TestMigrationManifest:
 
     def test_migration_manifest_ends_at_latest(self):
         files = _payload().get("migration_manifest", {}).get("files", [])
-        assert files and files[-1].startswith("0017"), (
-            "migration_manifest.files must end with the 0017 HAS_LEMMA backfill migration"
+        assert files and files[-1].startswith("0022"), (
+            "migration_manifest.files must end with the 0022 coref-uid-constraints migration"
         )
 
 
@@ -201,8 +200,8 @@ class TestMigrationFiles:
 
     def test_all_migration_files_exist(self):
         files = self._files()
-        assert len(files) == 17, (
-            f"Expected 17 .cypher migration files; found {len(files)}: {[f.name for f in files]}"
+        assert len(files) == 22, (
+            f"Expected 22 .cypher migration files; found {len(files)}: {[f.name for f in files]}"
         )
 
     def test_migration_files_are_non_empty(self):
@@ -223,6 +222,7 @@ class TestMigrationFiles:
             "0002_create_namedentity_tokenid_constraint.cypher",
             "0004_add_timex_natural_key_constraint.cypher",
             "0006_add_phaserun_refinementrun_constraints.cypher",
+            "0020_add_uid_constraints_for_mentions.cypher",
         ]
         for name in constraint_files:
             content = (MIGRATIONS_DIR / name).read_text(encoding="utf-8").upper()

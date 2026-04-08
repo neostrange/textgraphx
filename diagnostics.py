@@ -125,6 +125,12 @@ DIAGNOSTIC_QUERY_REGISTRY: Dict[str, DiagnosticQuery] = {
         description="Distribution of GLINK relationships by relType.",
         expected_fields=["reltype", "glink_count"],
     ),
+    "participation_edge_migration_inventory": DiagnosticQuery(
+        name="participation_edge_migration_inventory",
+        query_pack_name="participation_edge_migration_inventory",
+        description="Counts PARTICIPATES_IN edges missing their IN_FRAME or IN_MENTION dual-write alias.",
+        expected_fields=["metric", "item_count"],
+    ),
 }
 
 
@@ -230,6 +236,11 @@ def query_glink_relation_inventory(graph: Any) -> List[Dict[str, Any]]:
     return _execute_registered_query(graph, "glink_relation_inventory")
 
 
+def query_participation_edge_migration_inventory(graph: Any) -> List[Dict[str, Any]]:
+    """Return counts of PARTICIPATES_IN edges missing IN_FRAME or IN_MENTION aliases."""
+    return _execute_registered_query(graph, "participation_edge_migration_inventory")
+
+
 def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
     """Collect runtime diagnostics in one payload.
 
@@ -254,6 +265,7 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
     factuality_attribution_violations = query_factuality_attribution_violations(graph)
     factuality_alignment_violations = query_factuality_alignment_violations(graph)
     glink_relation_inventory = query_glink_relation_inventory(graph)
+    participation_edge_inventory = query_participation_edge_migration_inventory(graph)
 
     total_endpoint_violations = sum(int(row.get("violation_count", 0) or 0) for row in endpoint_violations)
     total_referential_violations = sum(int(row.get("violation_count", 0) or 0) for row in referential_violations)
@@ -292,6 +304,10 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
         int(row.get("violation_count", 0) or 0) for row in factuality_alignment_violations
     )
     total_glinks = sum(int(row.get("glink_count", 0) or 0) for row in glink_relation_inventory)
+    participation_edge_counts = {
+        str(row.get("metric", "")): int(row.get("item_count", 0) or 0)
+        for row in participation_edge_inventory
+    }
 
     return {
         "diagnostics": get_registered_diagnostics(),
@@ -310,6 +326,7 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
         "factuality_attribution_violations": factuality_attribution_violations,
         "factuality_alignment_violations": factuality_alignment_violations,
         "glink_relation_inventory": glink_relation_inventory,
+        "participation_edge_migration_inventory": participation_edge_inventory,
         "tlink_consistency_violations": tlink_violations,
         "tlink_anchor_consistency_inventory": tlink_anchor_inventory,
         "totals": {
@@ -340,5 +357,7 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
             "tlink_anchor_endpoint_violation_count": tlink_anchor_counts.get("endpoint_violation_tlinks", 0),
             "tlink_anchor_filter_suppressed_count": tlink_anchor_counts.get("anchor_filter_suppressed_tlinks", 0),
             "tlink_missing_anchor_metadata_count": tlink_anchor_counts.get("missing_anchor_metadata_tlinks", 0),
+            "participation_in_frame_missing_count": participation_edge_counts.get("in_frame_missing", 0),
+            "participation_in_mention_missing_count": participation_edge_counts.get("in_mention_missing", 0),
         },
     }

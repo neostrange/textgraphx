@@ -224,6 +224,8 @@ class GraphBasedNLP(GraphDBBase):
             "CREATE CONSTRAINT for (t:Sentence) require t.id IS NODE KEY",
             "CREATE CONSTRAINT for (l:AnnotatedText) require l.id IS NODE KEY",
             "CREATE CONSTRAINT for (l:NamedEntity) require l.id IS NODE KEY",
+            "CREATE CONSTRAINT for (l:NamedEntity) require l.uid IS UNIQUE",
+            "CREATE CONSTRAINT for (l:EntityMention) require l.uid IS UNIQUE",
             "CREATE CONSTRAINT for (l:Entity) require (l.type, l.id) IS NODE KEY",
             "CREATE CONSTRAINT for (l:Evidence) require l.id IS NODE KEY",
             "CREATE CONSTRAINT for (l:Relationship) require l.id IS NODE KEY",
@@ -484,8 +486,11 @@ if __name__ == '__main__':
     # Record an IngestionRun marker for restart visibility (Item 7)
     try:
         from textgraphx.phase_assertions import record_phase_run
+        from textgraphx.neo4j_client import make_graph_from_config
+
+        graph = make_graph_from_config()
         record_phase_run(
-            basic_nlp.graph,
+            graph,
             phase_name="ingestion",
             duration_seconds=_phase_duration,
             documents_processed=len(text_tuples) if text_tuples else 0,
