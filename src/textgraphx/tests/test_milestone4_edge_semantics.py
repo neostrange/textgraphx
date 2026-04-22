@@ -19,7 +19,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 ONTOLOGY_JSON = ROOT / "textgraphx" / "schema" / "ontology.json"
 MIGRATIONS = ROOT / "textgraphx" / "schema" / "migrations"
 

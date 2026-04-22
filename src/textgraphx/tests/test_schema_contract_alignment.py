@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 ONTOLOGY_JSON = ROOT / "textgraphx" / "schema" / "ontology.json"
 ONTOLOGY_YAML = ROOT / "textgraphx" / "docs" / "ontology.yaml"
 SCHEMA_MD = ROOT / "textgraphx" / "docs" / "schema.md"

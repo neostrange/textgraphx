@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 TLINKS_SRC = ROOT / "textgraphx" / "TlinksRecognizer.py"
 MEANTIME_SRC = ROOT / "textgraphx" / "evaluation" / "meantime_evaluator.py"
 
