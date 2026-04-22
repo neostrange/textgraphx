@@ -1,5 +1,0 @@
-boundary_mismatch,doc_id,endpoint_mismatch,f1,fn,fp,layer,missing,mode,precision,recall,spurious,tp,type_mismatch
-0,76437,0,0.13636363636363638,14,24,entity,14,strict,0.1111111111111111,0.17647058823529413,24,3,0
-0,76437,0,0.0,17,0,event,17,strict,0.0,0.0,0,0,0
-0,76437,0,0.0,4,0,timex,4,strict,0.0,0.0,0,0,0
-0,76437,0,0.0,21,0,relation,21,strict,0.0,0.0,0,0,0
