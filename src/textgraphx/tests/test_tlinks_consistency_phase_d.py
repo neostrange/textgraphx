@@ -26,7 +26,7 @@ def test_tlinks_recognizer_runs_conflict_suppression_query():
 def test_tlinks_wrapper_source_includes_conflict_suppression_call():
     from pathlib import Path
 
-    src = Path("/home/neo/environments/textgraphx/textgraphx/phase_wrappers.py").read_text(encoding="utf-8")
+    src = (Path(__file__).parent.parent / "phase_wrappers.py").read_text(encoding="utf-8")
     assert "Suppress contradictory TLINKs" in src
     assert "recognizer.suppress_tlink_conflicts(shadow_only=tlink_shadow_mode)" in src
     assert "suppressed_tlinks" in src

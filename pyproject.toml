@@ -7,7 +7,7 @@ name = "textgraphx"
 version = "0.1.0"
 description = "Text-to-Knowledge-Graph pipeline with multi-phase NLP processing"
 authors = [{ name = "neostrange" }]
-readme = "textgraphx/README.md"
+readme = "src/textgraphx/README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
 
@@ -41,15 +41,14 @@ dev = [
 textgraphx-run = "textgraphx.run_pipeline:main"
 
 [tool.setuptools.packages.find]
-where = ["."]
+where = ["src"]
 include = ["textgraphx*"]
-exclude = ["tests*", "scripts*", "tools*"]
 
 [tool.setuptools.package-data]
 "textgraphx" = ["schema/*.json", "schema/*.yaml", "queries/*.cypher"]
 
 [tool.pytest.ini_options]
-testpaths = ["textgraphx/tests"]
+testpaths = ["src/textgraphx/tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

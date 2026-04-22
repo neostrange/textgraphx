@@ -7,7 +7,7 @@ import pytest
 
 @pytest.mark.unit
 def test_phase_wrappers_define_mode_threshold_helper():
-    src = Path("/home/neo/environments/textgraphx/textgraphx/phase_wrappers.py").read_text(encoding="utf-8")
+    src = (Path(__file__).parent.parent / "phase_wrappers.py").read_text(encoding="utf-8")
 
     assert "def _phase_thresholds_for_mode(phase_name: str):" in src
     assert "strict_modes" in src
@@ -21,7 +21,7 @@ def test_phase_wrappers_define_mode_threshold_helper():
 
 @pytest.mark.unit
 def test_temporal_and_tlinks_assertions_use_mode_thresholds():
-    src = Path("/home/neo/environments/textgraphx/textgraphx/phase_wrappers.py").read_text(encoding="utf-8")
+    src = (Path(__file__).parent.parent / "phase_wrappers.py").read_text(encoding="utf-8")
 
     assert "thresholds=_phase_thresholds_for_mode(\"temporal\")" in src
     assert "thresholds=_phase_thresholds_for_mode(\"tlinks\")" in src
@@ -29,7 +29,7 @@ def test_temporal_and_tlinks_assertions_use_mode_thresholds():
 
 @pytest.mark.unit
 def test_refinement_wrapper_reads_cross_document_fusion_toggle():
-    src = Path("/home/neo/environments/textgraphx/textgraphx/phase_wrappers.py").read_text(encoding="utf-8")
+    src = (Path(__file__).parent.parent / "phase_wrappers.py").read_text(encoding="utf-8")
 
     assert "enable_cross_document_fusion" in src
     assert "get_config().runtime.enable_cross_document_fusion" in src

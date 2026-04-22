@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 def _phase_wrappers_source() -> str:
-    return Path("/home/neo/environments/textgraphx/textgraphx/phase_wrappers.py").read_text(encoding="utf-8")
+    return (Path(__file__).parent.parent / "phase_wrappers.py").read_text(encoding="utf-8")
 
 
 def test_temporal_wrapper_stamps_before_assertions_and_enforces_contracts():

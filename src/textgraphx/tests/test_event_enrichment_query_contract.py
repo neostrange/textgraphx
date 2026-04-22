@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 def test_participant_queries_select_single_best_event_per_frame():
-    source = Path("/home/neo/environments/textgraphx/textgraphx/EventEnrichmentPhase.py").read_text(encoding="utf-8")
+    source = (Path(__file__).parent.parent / "EventEnrichmentPhase.py").read_text(encoding="utf-8")
 
     # Core participants query should resolve competing frame->event links through
     # a deterministic winner selection rather than fanout over all candidates.

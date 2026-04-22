@@ -7,7 +7,7 @@ import pytest
 
 @pytest.mark.unit
 def test_event_enrichment_contains_clause_scope_query_contract():
-    src = Path("/home/neo/environments/textgraphx/textgraphx/EventEnrichmentPhase.py").read_text(encoding="utf-8")
+    src = (Path(__file__).parent.parent / "EventEnrichmentPhase.py").read_text(encoding="utf-8")
 
     assert "query_clause_scope" in src
     assert "em.clauseType" in src
@@ -18,7 +18,7 @@ def test_event_enrichment_contains_clause_scope_query_contract():
 
 @pytest.mark.unit
 def test_clause_scope_temporal_cue_inventory_includes_core_connectives():
-    src = Path("/home/neo/environments/textgraphx/textgraphx/EventEnrichmentPhase.py").read_text(encoding="utf-8")
+    src = (Path(__file__).parent.parent / "EventEnrichmentPhase.py").read_text(encoding="utf-8")
 
     for cue in ["before", "after", "since", "until", "during", "while", "when", "if", "because", "although"]:
         assert f"'{cue}'" in src

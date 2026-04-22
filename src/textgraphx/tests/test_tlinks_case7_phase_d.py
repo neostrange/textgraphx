@@ -25,7 +25,7 @@ def test_tlinks_recognizer_case7_query_contract():
 
 @pytest.mark.unit
 def test_tlinks_wrapper_includes_case7():
-    src = Path("/home/neo/environments/textgraphx/textgraphx/phase_wrappers.py").read_text(encoding="utf-8")
+    src = (Path(__file__).parent.parent / "phase_wrappers.py").read_text(encoding="utf-8")
 
     assert "create_tlinks_case7" in src
     assert "Case 7: Clause/Scope Connective TLINKs" in src

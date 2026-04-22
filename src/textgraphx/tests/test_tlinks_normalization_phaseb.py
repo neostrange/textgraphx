@@ -28,6 +28,6 @@ def test_tlinks_recognizer_runs_normalization_query():
 def test_tlinks_wrapper_source_includes_normalization_call():
     from pathlib import Path
 
-    src = Path("/home/neo/environments/textgraphx/textgraphx/phase_wrappers.py").read_text(encoding="utf-8")
+    src = (Path(__file__).parent.parent / "phase_wrappers.py").read_text(encoding="utf-8")
     assert "Normalize TLINK relation inventory" in src
     assert "recognizer.normalize_tlink_reltypes()" in src
