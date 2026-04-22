@@ -21,25 +21,24 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.10"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
+          pip install -e .[test]
 
       - name: Run strict gate regression suite
         run: |
           python -m pytest \
-            tests/test_phase_assertions.py \
-            tests/test_diagnostics.py \
-            tests/test_orchestration.py \
-            tests/test_regression_phases.py \
-            tests/test_schema_contract_alignment.py \
-            tests/test_milestone7_schema_validation.py \
-            tests/test_tlinks_reasoning_runtime.py \
-            tests/test_check_quality_gate.py \
+            src/textgraphx/tests/test_phase_assertions.py \
+            src/textgraphx/tests/test_diagnostics.py \
+            src/textgraphx/tests/test_orchestration.py \
+            src/textgraphx/tests/test_regression_phases.py \
+            src/textgraphx/tests/test_schema_contract_alignment.py \
+            src/textgraphx/tests/test_milestone7_schema_validation.py \
+            src/textgraphx/tests/test_tlinks_reasoning_runtime.py \
+            src/textgraphx/tests/test_check_quality_gate.py \
             -q
 
   quality-gate-check:
@@ -53,16 +52,15 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.10"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
+          pip install -e .[test]
 
       - name: Run unit tests for quality gate tool
-        run: python -m pytest tests/test_check_quality_gate.py -q
+        run: python -m pytest src/textgraphx/tests/test_check_quality_gate.py -q
 
       - name: Check committed baseline exists
         id: baseline-check
@@ -84,18 +82,20 @@ jobs:
           # is exercised end-to-end. Replace this step with a real evaluate_kg_quality
           # run when a CI Neo4j service is added to this workflow.
           python - <<'EOF'
-          import json, pathlib
-            stub = {
+          import json
+          import pathlib
+
+          stub = {
               "overall_quality": 1.0,
               "runtime_diagnostics": {
-                "totals": {
-                  "tlink_anchor_inconsistent_count": 0,
-                  "tlink_missing_anchor_metadata_count": 0,
-                  "participation_in_frame_missing_count": 0,
-                  "participation_in_mention_missing_count": 0,
-                }
+                  "totals": {
+                      "tlink_anchor_inconsistent_count": 0,
+                      "tlink_missing_anchor_metadata_count": 0,
+                      "participation_in_frame_missing_count": 0,
+                      "participation_in_mention_missing_count": 0,
+                  }
               },
-            }
+          }
           out = pathlib.Path("out/evaluation")
           out.mkdir(parents=True, exist_ok=True)
           (out / "kg_quality_report.json").write_text(json.dumps(stub))

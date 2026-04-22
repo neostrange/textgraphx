@@ -40,9 +40,9 @@ echo "[4/5] Integration tests"
 "$INTEGRATION_PYTHON_BIN" -m pytest -m integration --tb=short
 
 echo "[4.5/5] Materialization gate regression"
-"$INTEGRATION_PYTHON_BIN" -m pytest tests/test_integration_pipeline_materialization.py --tb=short
+"$INTEGRATION_PYTHON_BIN" -m pytest src/textgraphx/tests/test_integration_pipeline_materialization.py --tb=short
 
 echo "[5/5] Smoke tests"
-"$PYTHON_BIN" -m pytest tests/test_smoke_e2e.py -m slow --tb=short
+"$PYTHON_BIN" -m pytest src/textgraphx/tests/test_smoke_e2e.py -m slow --tb=short
 
 echo "TDD matrix completed successfully."

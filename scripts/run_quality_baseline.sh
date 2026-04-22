@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-DATASET_DIR="textgraphx/datastore/dataset"
+DATASET_DIR="src/textgraphx/datastore/dataset"
 OUTPUT_DIR="out/evaluation/baseline"
 
 while [[ $# -gt 0 ]]; do

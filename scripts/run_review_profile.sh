@@ -24,11 +24,11 @@ echo "TEXTGRAPHX_RUNTIME_MODE=$TEXTGRAPHX_RUNTIME_MODE"
 echo "TEXTGRAPHX_STRICT_TRANSITION_GATE=$TEXTGRAPHX_STRICT_TRANSITION_GATE"
 
 "$PYTHON_BIN" -m pytest \
-  tests/test_phase_assertions.py \
-  tests/test_orchestration.py \
-  tests/test_regression_phases.py \
-  tests/test_nominal_coverage_probe.py \
-  tests/test_integration_nominal_coverage_probe.py \
+  src/textgraphx/tests/test_phase_assertions.py \
+  src/textgraphx/tests/test_orchestration.py \
+  src/textgraphx/tests/test_regression_phases.py \
+  src/textgraphx/tests/test_nominal_coverage_probe.py \
+  src/textgraphx/tests/test_integration_nominal_coverage_probe.py \
   -q
 
 echo "Review profile completed successfully."
