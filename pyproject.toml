@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "textgraphx"
+version = "0.1.0"
+description = "Text-to-Knowledge-Graph pipeline with multi-phase NLP processing"
+authors = [{ name = "neostrange" }]
+readme = "textgraphx/README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+
+dependencies = [
+    "spacy>=3.8",
+    "neo4j>=5.9",
+    "requests>=2.28",
+    "nltk>=3.8",
+    "python-json-logger>=2.0",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "apscheduler>=3.10.0",
+    "streamlit>=1.35",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-asyncio>=0.21",
+    "pytest-mock>=3.10",
+    "mock>=4.0",
+]
+dev = [
+    "textgraphx[test]",
+    "coverage[toml]",
+    "pytest-xdist",
+]
+
+[project.scripts]
+textgraphx-run = "textgraphx.run_pipeline:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["textgraphx*"]
+exclude = ["tests*", "scripts*", "tools*"]
+
+[tool.setuptools.package-data]
+"textgraphx" = ["schema/*.json", "schema/*.yaml", "queries/*.cypher"]
+
+[tool.pytest.ini_options]
+testpaths = ["textgraphx/tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short --strict-markers"
+markers = [
+    "unit: Unit tests for individual components",
+    "integration: Integration tests across components",
+    "regression: Regression tests that capture existing behaviour",
+    "scenario: Scenario tests covering end-to-end orchestration behavior",
+    "slow: Tests that take a long time to run",
+    "ui: Tests for the Streamlit UI",
+    "orchestration: Tests for the orchestration modules",
+]
+
+[tool.coverage.run]
+source = ["textgraphx"]
+omit = ["*/tests/*", "*/scripts/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
