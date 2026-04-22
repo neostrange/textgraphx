@@ -1,0 +1,273 @@
+{
+  "run_metadata": {
+    "dataset_hash": "ac3a7349956ede57",
+    "config_hash": "2b58015cf2b3462a",
+    "seed": 42,
+    "strict_gate_enabled": false,
+    "fusion_enabled": false,
+    "cleanup_mode": "auto",
+    "timestamp": "2026-04-13T04:23:43.101564+00:00Z",
+    "duration_seconds": 0.951107
+  },
+  "execution_time_seconds": 0.951107,
+  "quality_scores": {
+    "mention_layer": 0.0,
+    "edge_semantics": 0.5857066093498119,
+    "phase_assertions": 0.9993114133241522,
+    "semantic_categories": 0.4,
+    "legacy_layer": 0.8524970963995354
+  },
+  "overall_quality": 0.5675030238147,
+  "conclusiveness": {
+    "conclusive": false,
+    "reasons": [
+      "mention_layer_metrics: backward_compatibility_violations=280",
+      "phase_assertion_metrics: schema_violations=4",
+      "semantic_category_metrics: no frames categorized",
+      "legacy_layer_metrics: orphaned_legacy_nodes=127"
+    ]
+  },
+  "reports": {
+    "mention_layer_metrics": {
+      "metric_type": "mention_layer_metrics",
+      "validity_header": {
+        "run_metadata": {
+          "dataset_hash": "ac3a7349956ede57",
+          "config_hash": "2b58015cf2b3462a",
+          "seed": 42,
+          "strict_gate_enabled": false,
+          "fusion_enabled": false,
+          "cleanup_mode": "auto",
+          "timestamp": "2026-04-13T04:23:43.101564+00:00Z",
+          "duration_seconds": 0.951107
+        },
+        "determinism_checked": false,
+        "determinism_pass": null,
+        "feature_activation_evidence": {
+          "entity_mentions_activated": true,
+          "event_mentions_activated": true,
+          "entity_mention_count": 364,
+          "event_mention_count": 287
+        },
+        "inconclusive_reasons": [
+          "backward_compatibility_violations=280"
+        ],
+        "is_conclusive": false
+      },
+      "metrics": {
+        "entity_mentions_created": 364,
+        "entity_mentions_with_refers_to": 364,
+        "event_mentions_created": 287,
+        "event_mentions_with_refers_to": 287,
+        "frame_instantiates_event_mention": 525,
+        "entity_participant_links": 34,
+        "event_participant_links": 14,
+        "backward_compatibility_violations": 280,
+        "entity_mention_refers_to_rate": 1.0,
+        "event_mention_refers_to_rate": 1.0,
+        "frame_instantiation_coverage": 1.829268292682927,
+        "quality_score": 0.0
+      },
+      "evidence": {
+        "mention_types": {
+          "entity_mentions": 364,
+          "event_mentions": 287
+        },
+        "relationships": {
+          "entity_refers_to": 364,
+          "event_refers_to": 287,
+          "frame_instantiates": 525
+        }
+      }
+    },
+    "edge_semantics_metrics": {
+      "metric_type": "edge_semantics_metrics",
+      "validity_header": {
+        "run_metadata": {
+          "dataset_hash": "ac3a7349956ede57",
+          "config_hash": "2b58015cf2b3462a",
+          "seed": 42,
+          "strict_gate_enabled": false,
+          "fusion_enabled": false,
+          "cleanup_mode": "auto",
+          "timestamp": "2026-04-13T04:23:43.101564+00:00Z",
+          "duration_seconds": 0.951107
+        },
+        "determinism_checked": false,
+        "determinism_pass": null,
+        "feature_activation_evidence": {
+          "semantic_typing_activated": true,
+          "same_as_edges_created": 0,
+          "co_occurs_edges_created": 94
+        },
+        "inconclusive_reasons": [],
+        "is_conclusive": true
+      },
+      "metrics": {
+        "total_edges": 26054,
+        "typed_edges": 4466,
+        "same_as_edges": 0,
+        "co_occurs_edges": 94,
+        "participant_edges": 968,
+        "instantiates_edges": 525,
+        "refers_to_edges": 853,
+        "untyped_edges": 21588,
+        "semantic_coherence_violations": 0,
+        "typing_coverage": 0.17141321869962386,
+        "coherence_score": 1.0,
+        "quality_score": 0.5857066093498119
+      },
+      "evidence": {
+        "edge_distribution": {
+          "SAME_AS": 0,
+          "CO_OCCURS": 94,
+          "PARTICIPANT": 968,
+          "INSTANTIATES": 525,
+          "REFERS_TO": 853
+        }
+      }
+    },
+    "phase_assertion_metrics": {
+      "metric_type": "phase_assertion_metrics",
+      "validity_header": {
+        "run_metadata": {
+          "dataset_hash": "ac3a7349956ede57",
+          "config_hash": "2b58015cf2b3462a",
+          "seed": 42,
+          "strict_gate_enabled": false,
+          "fusion_enabled": false,
+          "cleanup_mode": "auto",
+          "timestamp": "2026-04-13T04:23:43.101564+00:00Z",
+          "duration_seconds": 0.951107
+        },
+        "determinism_checked": false,
+        "determinism_pass": null,
+        "feature_activation_evidence": {
+          "phase_materialization_active": true,
+          "nodes_checked": 5809
+        },
+        "inconclusive_reasons": [
+          "schema_violations=4"
+        ],
+        "is_conclusive": false
+      },
+      "metrics": {
+        "total_nodes_checked": 5809,
+        "nodes_meeting_schema": 283,
+        "schema_violations": 4,
+        "phase_invariant_violations": 0,
+        "temporal_consistency_violations": 0,
+        "semantic_consistency_violations": 0,
+        "schema_compliance_rate": 0.04871750731623343,
+        "invariant_compliance_rate": 1.0,
+        "quality_score": 0.9993114133241522
+      },
+      "evidence": {
+        "violations": {
+          "schema": 4,
+          "invariant": 0,
+          "temporal": 0,
+          "semantic": 0
+        }
+      }
+    },
+    "semantic_category_metrics": {
+      "metric_type": "semantic_category_metrics",
+      "validity_header": {
+        "run_metadata": {
+          "dataset_hash": "ac3a7349956ede57",
+          "config_hash": "2b58015cf2b3462a",
+          "seed": 42,
+          "strict_gate_enabled": false,
+          "fusion_enabled": false,
+          "cleanup_mode": "auto",
+          "timestamp": "2026-04-13T04:23:43.101564+00:00Z",
+          "duration_seconds": 0.951107
+        },
+        "determinism_checked": false,
+        "determinism_pass": null,
+        "feature_activation_evidence": {
+          "semantic_categorization_activated": false,
+          "categorized_frames": 0,
+          "category_assignments": 0
+        },
+        "inconclusive_reasons": [
+          "no frames categorized"
+        ],
+        "is_conclusive": false
+      },
+      "metrics": {
+        "total_frames": 317,
+        "frames_with_categories": 0,
+        "total_categories_assigned": 0,
+        "category_consistency_violations": 0,
+        "orphaned_categories": 0,
+        "categorization_coverage": 0.0,
+        "consistency_score": 1.0,
+        "quality_score": 0.4
+      },
+      "evidence": {
+        "categorization_status": {
+          "total_frames": 317,
+          "categorized": 0,
+          "assignments": 0,
+          "orphaned_categories": 0
+        }
+      }
+    },
+    "legacy_layer_metrics": {
+      "metric_type": "legacy_layer_metrics",
+      "validity_header": {
+        "run_metadata": {
+          "dataset_hash": "ac3a7349956ede57",
+          "config_hash": "2b58015cf2b3462a",
+          "seed": 42,
+          "strict_gate_enabled": false,
+          "fusion_enabled": false,
+          "cleanup_mode": "auto",
+          "timestamp": "2026-04-13T04:23:43.101564+00:00Z",
+          "duration_seconds": 0.951107
+        },
+        "determinism_checked": false,
+        "determinism_pass": null,
+        "feature_activation_evidence": {
+          "legacy_data_preserved": true,
+          "legacy_nodes": 287,
+          "dual_labeled_nodes": 0
+        },
+        "inconclusive_reasons": [
+          "orphaned_legacy_nodes=127"
+        ],
+        "is_conclusive": false
+      },
+      "metrics": {
+        "legacy_nodes_total": 861,
+        "legacy_nodes_active": 287,
+        "legacy_relationships_total": 2986,
+        "legacy_relationships_active": 1050,
+        "migration_dual_nodes": 0,
+        "migration_dual_rels": 28,
+        "legacy_orphans": 127,
+        "legacy_preservation_rate": 0.3333333333333333,
+        "legacy_relationship_preservation_rate": 0.35164099129269927,
+        "quality_score": 0.8524970963995354
+      },
+      "evidence": {
+        "legacy_population": {
+          "nodes_total": 861,
+          "nodes_active": 287,
+          "relationships_total": 2986,
+          "relationships_active": 1050
+        },
+        "migration_status": {
+          "dual_labeled_nodes": 0,
+          "dual_path_relationships": 28,
+          "orphaned_nodes": 127
+        }
+      }
+    }
+  },
+  "runtime_diagnostics": {
+    "error": "runtime diagnostics unavailable: {neo4j_code: Neo.ClientError.Statement.SyntaxError} {message: Unknown function 'nullif' (line 4, column 15 (offset: 168))\r\n\"WITH `coalesce`((`nullif`((`trim`((`toString`(((`em`).`entityStateType`))))), (\"\"))), (\"STATE\")) AS `entity_state_type`, `count`((`em`)) AS `mention_count`\"\r\n                                                       ^} {gql_status: 50N42} {gql_status_description: error: general processing exception - unexpected error. Unknown function 'nullif' (line 4, column 15 (offset: 168))\r\n\"WITH `coalesce`((`nullif`((`trim`((`toString`(((`em`).`entityStateType`))))), (\"\"))), (\"STATE\")) AS `entity_state_type`, `count`((`em`)) AS `mention_count`\"\r\n                                                       ^}"
+  }
+}

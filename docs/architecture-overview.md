@@ -14,7 +14,7 @@ The system is best understood as a pipeline of separate phases rather than a sin
 4. Event enrichment
 5. Temporal link recognition
 
-The shell runner [scripts/run_pipeline.sh](../scripts/run_pipeline.sh) executes those phases in that order.
+The shell runner [scripts/run_pipeline.sh](../src/textgraphx/scripts/run_pipeline.sh) executes those phases in that order.
 
 Multi-document safety note (new hardening):
 
@@ -47,20 +47,20 @@ flowchart LR
 
 Main files:
 
-- [GraphBasedNLP.py](../GraphBasedNLP.py)
-- [TextProcessor.py](../TextProcessor.py)
-- [text_processing_components/DocumentImporter.py](../text_processing_components/DocumentImporter.py)
-- [text_processing_components/SentenceCreator.py](../text_processing_components/SentenceCreator.py)
-- [text_processing_components/TagOccurrenceCreator.py](../text_processing_components/TagOccurrenceCreator.py)
-- [text_processing_components/TagOccurrenceDependencyProcessor.py](../text_processing_components/TagOccurrenceDependencyProcessor.py)
-- [text_processing_components/EntityProcessor.py](../text_processing_components/EntityProcessor.py)
-- [text_processing_components/EntityFuser.py](../text_processing_components/EntityFuser.py)
-- [text_processing_components/EntityDisambiguator.py](../text_processing_components/EntityDisambiguator.py)
-- [text_processing_components/CoreferenceResolver.py](../text_processing_components/CoreferenceResolver.py)
-- [text_processing_components/SRLProcessor.py](../text_processing_components/SRLProcessor.py)
-- [text_processing_components/NounChunkProcessor.py](../text_processing_components/NounChunkProcessor.py)
-- [text_processing_components/WordSenseDisambiguator.py](../text_processing_components/WordSenseDisambiguator.py)
-- [text_processing_components/WordnetTokenEnricher.py](../text_processing_components/WordnetTokenEnricher.py)
+- [GraphBasedNLP.py](../src/textgraphx/GraphBasedNLP.py)
+- [TextProcessor.py](../src/textgraphx/TextProcessor.py)
+- [text_processing_components/DocumentImporter.py](../src/textgraphx/text_processing_components/DocumentImporter.py)
+- [text_processing_components/SentenceCreator.py](../src/textgraphx/text_processing_components/SentenceCreator.py)
+- [text_processing_components/TagOccurrenceCreator.py](../src/textgraphx/text_processing_components/TagOccurrenceCreator.py)
+- [text_processing_components/TagOccurrenceDependencyProcessor.py](../src/textgraphx/text_processing_components/TagOccurrenceDependencyProcessor.py)
+- [text_processing_components/EntityProcessor.py](../src/textgraphx/text_processing_components/EntityProcessor.py)
+- [text_processing_components/EntityFuser.py](../src/textgraphx/text_processing_components/EntityFuser.py)
+- [text_processing_components/EntityDisambiguator.py](../src/textgraphx/text_processing_components/EntityDisambiguator.py)
+- [text_processing_components/CoreferenceResolver.py](../src/textgraphx/text_processing_components/CoreferenceResolver.py)
+- [text_processing_components/SRLProcessor.py](../src/textgraphx/text_processing_components/SRLProcessor.py)
+- [text_processing_components/NounChunkProcessor.py](../src/textgraphx/text_processing_components/NounChunkProcessor.py)
+- [text_processing_components/WordSenseDisambiguator.py](../src/textgraphx/text_processing_components/WordSenseDisambiguator.py)
+- [text_processing_components/WordnetTokenEnricher.py](../src/textgraphx/text_processing_components/WordnetTokenEnricher.py)
 
 What happens here:
 
@@ -91,7 +91,7 @@ The current design is a write-heavy pipeline with deterministic IDs and mostly d
 
 Main file:
 
-- [RefinementPhase.py](../RefinementPhase.py)
+- [RefinementPhase.py](../src/textgraphx/RefinementPhase.py)
 
 What happens here:
 
@@ -128,7 +128,7 @@ Nominal enhancement track:
 
 Main file:
 
-- [TemporalPhase.py](../TemporalPhase.py)
+- [TemporalPhase.py](../src/textgraphx/TemporalPhase.py)
 
 What happens here:
 
@@ -152,7 +152,7 @@ The temporal phase depends on external XML-producing services and APOC XML parsi
 
 Main file:
 
-- [EventEnrichmentPhase.py](../EventEnrichmentPhase.py)
+- [EventEnrichmentPhase.py](../src/textgraphx/EventEnrichmentPhase.py)
 
 What happens here:
 
@@ -180,7 +180,7 @@ This phase connects predicate structure to the temporal event layer and gives ea
 
 Main file:
 
-- [TlinksRecognizer.py](../TlinksRecognizer.py)
+- [TlinksRecognizer.py](../src/textgraphx/TlinksRecognizer.py)
 
 What happens here:
 
@@ -221,7 +221,7 @@ This phase is currently a heuristic layer on top of the temporal graph, not a le
 
 The graph is strongly document-scoped. Most IDs are built from document id plus token spans so that re-runs can use `MERGE` safely and later phases can match against stable identifiers.
 
-The canonical ontology is documented in [schema/ontology.json](../schema/ontology.json) and rendered for humans in [docs/ontology.html](ontology.html).
+The canonical ontology is documented in [schema/ontology.json](../src/textgraphx/schema/ontology.json) and rendered for humans in [docs/ontology.html](ontology.html).
 
 ### Main node types
 
@@ -264,7 +264,7 @@ The canonical ontology is documented in [schema/ontology.json](../schema/ontolog
 
 ### Identity conventions
 
-Stable ID generation is centralized in [utils/id_utils.py](../utils/id_utils.py):
+Stable ID generation is centralized in [utils/id_utils.py](../src/textgraphx/utils/id_utils.py):
 
 - Frame: `frame_<doc>_<start>_<end>`
 - FrameArgument: `fa_<doc>_<start>_<end>_<argtype>`
@@ -272,7 +272,7 @@ Stable ID generation is centralized in [utils/id_utils.py](../utils/id_utils.py)
 - TagOccurrence: `<doc>_<sent>_<token_idx>`
 - NounChunk: `<doc>_<start>`
 
-There is also a migration helper, [tools/migrate_namedentity_token_ids.py](../tools/migrate_namedentity_token_ids.py), that can derive token-index-based IDs for existing `NamedEntity` nodes without changing the original surface ID.
+There is also a migration helper, [tools/migrate_namedentity_token_ids.py](../src/textgraphx/tools/migrate_namedentity_token_ids.py), that can derive token-index-based IDs for existing `NamedEntity` nodes without changing the original surface ID.
 
 ### Constraints created at initialization
 
@@ -293,7 +293,7 @@ There is also a migration helper, [tools/migrate_namedentity_token_ids.py](../to
 
 ### Configuration
 
-The central configuration loader is [config.py](../config.py). It supports INI and TOML, plus environment variable overrides.
+The central configuration loader is [config.py](../src/textgraphx/config.py). It supports INI and TOML, plus environment variable overrides.
 
 Precedence:
 
@@ -320,13 +320,13 @@ Sentence normalization guidance:
 
 ### Neo4j access
 
-The Neo4j compatibility layer lives in [neo4j_client.py](../neo4j_client.py). It wraps the official Neo4j driver and preserves the `.run(query, parameters).data()` contract that the older code expects.
+The Neo4j compatibility layer lives in [neo4j_client.py](../src/textgraphx/neo4j_client.py). It wraps the official Neo4j driver and preserves the `.run(query, parameters).data()` contract that the older code expects.
 
-The older [GraphDBBase](../util/GraphDbBase.py) helper still exists and is used by some entry points, but the newer code paths prefer the centralized Neo4j wrapper.
+The older [GraphDBBase](../src/textgraphx/util/GraphDbBase.py) helper still exists and is used by some entry points, but the newer code paths prefer the centralized Neo4j wrapper.
 
 ### Logging
 
-Logging setup is centralized in [logging_config.py](../logging_config.py). It supports plain text logs, optional JSON output, and optional rotating file logs.
+Logging setup is centralized in [logging_config.py](../src/textgraphx/logging_config.py). It supports plain text logs, optional JSON output, and optional rotating file logs.
 
 ### External services and runtime dependencies
 
@@ -341,7 +341,7 @@ The pipeline assumes a running Neo4j instance and several external NLP services:
 
 Additional codebase-level service URLs currently appear in helper modules (`util/RestCaller.py`, `util/CallAllenNlpCoref.py`, and LLM helper skeletons), which indicates endpoint configuration is still only partially centralized.
 
-The provided script [scripts/run_pipeline.sh](../scripts/run_pipeline.sh) bootstraps a local venv if needed, installs requirements, downloads `en_core_web_sm`, and then runs the phase scripts in sequence.
+The provided script [scripts/run_pipeline.sh](../src/textgraphx/scripts/run_pipeline.sh) bootstraps a local venv if needed, installs requirements, downloads `en_core_web_sm`, and then runs the phase scripts in sequence.
 
 ### CLI behavior
 
@@ -431,7 +431,7 @@ Current implementation status:
 - Done: event mention predicate canonicalization now prefers trigger-token lemma and preserves phrasal-verb particles (`VB*` + following `RP`) at mention level, improving strict event matching while keeping canonical `TEvent` semantics stable.
 - Done: event factuality defaults were tightened (`certainty` heuristic for future/infinitive/modal contexts, noun-event tense/aspect over-specification cleanup) to better align mention attributes with MEANTIME-style annotation practice.
 - Done: conservative low-confidence event gating was added for non-verbal mentions with no frame/participant/TLINK evidence; flags are stored as `EventMention.low_confidence` and rolled up to `TEvent.low_confidence` only when all mentions are low-confidence. Evaluator projection excludes low-confidence events without deleting graph evidence.
-- Done: an incremental change ledger with rationale and measured outcomes is now maintained in `docs/EVALUATION_IMPROVEMENT_LOG.md`.
+- Done: an incremental change ledger with rationale and measured outcomes is now maintained in `docs/archive/EVALUATION_IMPROVEMENT_LOG.md`.
 - Done: a targeted cognitive-participle normalization (`fearing that ...`) and fallback event projection de-duplication removed the last strict event type-mismatch on doc 76437 and improved strict event F1.
 - Done: `ENH-NOM-01` and `ENH-NOM-02` nominal semantic-head layer (`resolve_nominal_semantic_heads`) and `wnLexname` persistence (`annotate_nominal_semantic_profiles`) are implemented in `RefinementPhase.py`; the head-repair pass prefers NOUN/PROPN/PRON tokens over modifiers/determiners and sets `nominalSemanticHead*` fields on `EntityMention` and `Entity` nodes, while `wnLexname` from `WordnetTokenEnricher` is read and stored as `nominalHeadWnLexname`.
 - Done: `ENH-NOM-03` evaluator nominal profile modes (`all`, `eventive`, `salient`, `candidate-gold`, `background`) are implemented in `meantime_evaluator.build_document_from_neo4j` and validated against `allowed_profile_modes`; all five modes are covered by comprehensive unit tests in `tests/test_enh_nom_01_02_03.py` (55 tests).
@@ -456,15 +456,15 @@ Current implementation status:
 
 If you want to improve the system incrementally, the highest-value files to revisit first are:
 
-- [GraphBasedNLP.py](../GraphBasedNLP.py)
-- [TextProcessor.py](../TextProcessor.py)
-- [RefinementPhase.py](../RefinementPhase.py)
-- [TemporalPhase.py](../TemporalPhase.py)
-- [EventEnrichmentPhase.py](../EventEnrichmentPhase.py)
-- [TlinksRecognizer.py](../TlinksRecognizer.py)
-- [schema/ontology.json](../schema/ontology.json)
-- [config.py](../config.py)
-- [neo4j_client.py](../neo4j_client.py)
-- [scripts/run_pipeline.sh](../scripts/run_pipeline.sh)
+- [GraphBasedNLP.py](../src/textgraphx/GraphBasedNLP.py)
+- [TextProcessor.py](../src/textgraphx/TextProcessor.py)
+- [RefinementPhase.py](../src/textgraphx/RefinementPhase.py)
+- [TemporalPhase.py](../src/textgraphx/TemporalPhase.py)
+- [EventEnrichmentPhase.py](../src/textgraphx/EventEnrichmentPhase.py)
+- [TlinksRecognizer.py](../src/textgraphx/TlinksRecognizer.py)
+- [schema/ontology.json](../src/textgraphx/schema/ontology.json)
+- [config.py](../src/textgraphx/config.py)
+- [neo4j_client.py](../src/textgraphx/neo4j_client.py)
+- [scripts/run_pipeline.sh](../src/textgraphx/scripts/run_pipeline.sh)
 
 Those files define most of the current behavior, known risk points, and iteration leverage for the project.

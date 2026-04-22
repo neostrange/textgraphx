@@ -255,7 +255,7 @@ Establish a stable written contract before changing behavior.
 
 1. Classify schema into canonical, optional, and legacy tiers.
 2. Extend [schema.md](./schema.md) with a short canonical-schema section and a deprecation note for legacy features.
-3. Align [ontology.yaml](./ontology.yaml) and [../schema/ontology.json](../schema/ontology.json) with the canonical tier definitions.
+3. Align [ontology.yaml](./ontology.yaml) and [../schema/ontology.json](../src/textgraphx/schema/ontology.json) with the canonical tier definitions.
 4. Add a schema ownership note in [architecture-overview.md](./architecture-overview.md) stating that migrations define the enforced schema, while `schema.md` defines the maintained semantic contract.
 
 ### Acceptance criteria
@@ -304,13 +304,13 @@ Make document-scoped identity deterministic, type-consistent, and span-compatibl
 
 ### Code areas
 
-- [TemporalPhase.py](../TemporalPhase.py)
-- [TlinksRecognizer.py](../TlinksRecognizer.py)
-- [EventEnrichmentPhase.py](../EventEnrichmentPhase.py)
-- [text_processing_components/TagOccurrenceCreator.py](../text_processing_components/TagOccurrenceCreator.py)
-- [text_processing_components/EntityProcessor.py](../text_processing_components/EntityProcessor.py)
-- [text_processing_components/SRLProcessor.py](../text_processing_components/SRLProcessor.py)
-- [RefinementPhase.py](../RefinementPhase.py)
+- [TemporalPhase.py](../src/textgraphx/TemporalPhase.py)
+- [TlinksRecognizer.py](../src/textgraphx/TlinksRecognizer.py)
+- [EventEnrichmentPhase.py](../src/textgraphx/EventEnrichmentPhase.py)
+- [text_processing_components/TagOccurrenceCreator.py](../src/textgraphx/text_processing_components/TagOccurrenceCreator.py)
+- [text_processing_components/EntityProcessor.py](../src/textgraphx/text_processing_components/EntityProcessor.py)
+- [text_processing_components/SRLProcessor.py](../src/textgraphx/text_processing_components/SRLProcessor.py)
+- [RefinementPhase.py](../src/textgraphx/RefinementPhase.py)
 - any query packs or validation utilities matching `doc_id`
 
 ### Acceptance criteria
@@ -360,9 +360,9 @@ Remove the highest-impact inconsistencies that currently cause semantic or opera
 
 ### Code areas
 
-- [fusion.py](../fusion.py)
-- [EventEnrichmentPhase.py](../EventEnrichmentPhase.py)
-- [TlinksRecognizer.py](../TlinksRecognizer.py)
+- [fusion.py](../src/textgraphx/fusion.py)
+- [EventEnrichmentPhase.py](../src/textgraphx/EventEnrichmentPhase.py)
+- [TlinksRecognizer.py](../src/textgraphx/TlinksRecognizer.py)
 - any regression and integration tests covering these paths
 
 ### Acceptance criteria
