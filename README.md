@@ -20,15 +20,15 @@ Pipeline order:
 5. TLINK recognition (temporal relation inference and consistency)
 
 Primary references:
-- `src/textgraphx/docs/architecture-overview.md`
-- `src/textgraphx/docs/schema.md`
-- `src/textgraphx/docs/COMPREHENSIVE_EVALUATION_FRAMEWORK.md`
-- `src/textgraphx/docs/PROJECT_CONTEXT.md`
+- `docs/architecture-overview.md`
+- `docs/schema.md`
+- `docs/COMPREHENSIVE_EVALUATION_FRAMEWORK.md`
+- `docs/PROJECT_CONTEXT.md`
 
 ## Repository layout
 
 - `src/textgraphx/`: importable package and runtime code
-- `src/textgraphx/docs/`: architecture, schema, evaluation, and roadmap docs
+- `docs/`: architecture, schema, evaluation, and roadmap docs
 - `src/textgraphx/tests/`: contract, regression, and integration tests
 - `src/textgraphx/tools/`: operator and diagnostics CLIs
 - `scripts/evaluation/`: curated evaluation scripts
@@ -68,8 +68,8 @@ Use tiered test execution for fast, reliable feedback:
    - then run selected integration/e2e tests in a live Neo4j environment
 
 Operational guidance and production checks:
-- `src/textgraphx/docs/PRODUCTION_VALIDATION.md`
-- `src/textgraphx/docs/RUNNING_PIPELINE.md`
+- `docs/PRODUCTION_VALIDATION.md`
+- `docs/RUNNING_PIPELINE.md`
 
 ## Version-control policy
 
@@ -89,5 +89,5 @@ See `.gitignore` for enforced rules.
 Milestones M1-M8 establish a unified, self-certifying evaluation framework and MEANTIME bridge. M9-M10 focus on regression detection and CI quality gating.
 
 Roadmap docs:
-- `src/textgraphx/docs/EVALUATION_ROADMAP_M1_TO_M10.md`
-- `src/textgraphx/docs/MILESTONE8_BRIDGE_VALIDATOR.md`
+- `docs/EVALUATION_ROADMAP_M1_TO_M10.md`
+- `docs/MILESTONE8_BRIDGE_VALIDATOR.md`

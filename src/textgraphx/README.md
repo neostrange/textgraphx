@@ -39,7 +39,7 @@ Table of contents
 - Operational notes & best practices (performance, idempotency, brittle rules)
 - Audience-specific guidance (developers, researchers, product)
 - Next steps and extensions
- - Generated docs (human-friendly): `textgraphx/docs/ontology.html`
+ - Generated docs (human-friendly): `docs/ontology.html`
 
 ## Overview & value proposition
 
@@ -261,9 +261,9 @@ Design notes
 - Phases are intentionally decoupled — you can run only tokenization, or run refinement/temporal phases against an existing graph.
 
 Documentation authority
-- `textgraphx/docs/schema.md` is the implementation-facing schema contract.
-- `textgraphx/docs/architecture-overview.md` is the current architecture narrative.
-- Root `docs/` files mix current milestone notes with historical implementation records; treat them as supporting context unless they explicitly describe the current state.
+- `docs/schema.md` is the implementation-facing schema contract.
+- `docs/architecture-overview.md` is the current architecture narrative.
+- `docs/` is now the canonical documentation location (with a compatibility link at `src/textgraphx/docs`).
 
 Repository structure notes
 - `textgraphx/orchestration/orchestrator.py` is the canonical orchestrator implementation.
@@ -452,8 +452,8 @@ If you'd like any of the above (or want me to wire CI checks), tell me which and
 
 Documentation & CI
 ------------------
-- A human-friendly HTML/YAML view of the machine-readable ontology is generated into `textgraphx/docs/ontology.html` and `textgraphx/docs/ontology.yaml`.
-- A GitHub Actions workflow `.github/workflows/schema_asserts.yml` is included which starts a disposable Neo4j service and runs `textgraphx/tools/schema_asserts.py` using the diagnostics in `schema/ontology.json`. The workflow expects the repository's Python requirements to be installable; adjust `textgraphx/requirements.txt` in CI as needed.
+- A human-friendly HTML/YAML view of the machine-readable ontology is generated into `docs/ontology.html` and `docs/ontology.yaml`.
+- A GitHub Actions workflow `.github/workflows/schema_asserts.yml` is included which starts a disposable Neo4j service and runs `textgraphx/tools/schema_asserts.py` using the diagnostics in `schema/ontology.json`. Prefer pyproject-based installs (`pip install -e .[test]`) in CI.
 
 ---
 

@@ -4,7 +4,7 @@
 **Status:** Historical audit snapshot. Item 4 has since been remediated in code; method and ownership references below describe the pre-fix audit state unless otherwise noted.
 
 **Do not use this file as the current architecture reference.**
-Use `textgraphx/docs/architecture-overview.md`, `textgraphx/docs/schema.md`, and `textgraphx/README.md` for the maintained current-state ownership model.
+Use `docs/architecture-overview.md`, `docs/schema.md`, and `textgraphx/README.md` for the maintained current-state ownership model.
 
 ---
 

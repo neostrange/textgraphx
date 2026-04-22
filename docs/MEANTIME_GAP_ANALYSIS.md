@@ -141,7 +141,7 @@ PHASE 1 closes the critical semantic gap by introducing explicit mention-level n
 - New code queries VALUE nodes for canonical value representation
 - Legacy EVENT_PARTICIPANT relationships with numeric entities preserved
 
-For detailed implementation status, see `/textgraphx/docs/PHASE1_MENTION_LAYER_IMPLEMENTATION.md`.
+For detailed implementation status, see `/docs/PHASE1_MENTION_LAYER_IMPLEMENTATION.md`.
 
 ---
 
