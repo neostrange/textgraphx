@@ -36,12 +36,12 @@ source .venv310/bin/activate
 
 # 2. Run the pipeline in production mode.
 TEXTGRAPHX_RUNTIME_MODE=production python -m textgraphx.run_pipeline \
-    --dataset-dir textgraphx/datastore/dataset \
+    --dataset-dir src/textgraphx/datastore/dataset \
     --cleanup none
 
 # 3. Capture a post-run quality snapshot.
 bash scripts/run_quality_baseline.sh \
-    --dataset-dir textgraphx/datastore/dataset \
+    --dataset-dir src/textgraphx/datastore/dataset \
     --output-dir  out/evaluation/production-$(date -u +%Y%m%d)
 ```
 
@@ -119,7 +119,7 @@ Recommended commands:
 make uid-preflight
 
 # Or run the helper directly.
-/home/neo/environments/textgraphx/.venv310/bin/python \
+python \
     -m textgraphx.tools.uid_smoke_preflight \
     --preflight-only
 

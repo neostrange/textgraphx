@@ -27,7 +27,7 @@ Two environments available:
 
 ### Option A: Direct command (easiest)
 ```bash
-/home/neo/environments/textgraphx/.venv310/bin/streamlit run textgraphx/app.py
+streamlit run textgraphx/app.py
 ```
 
 ### Option B: Update VS Code/scripts
@@ -43,7 +43,7 @@ Change any script that uses:
 ### Option C: Create launcher script
 ```bash
 #!/bin/bash
-cd /home/neo/environments/textgraphx
+cd "$(git rev-parse --show-toplevel)"
 ./.venv310/bin/streamlit run textgraphx/app.py
 ```
 
@@ -115,7 +115,7 @@ Look for patterns like:
 Once Python 3.10 is set and imports fixed:
 
 ```bash
-cd /home/neo/environments/textgraphx
+cd "$(git rev-parse --show-toplevel)"
 source .venv310/bin/activate
 
 # Test imports
@@ -153,7 +153,7 @@ database = neo4j
 ## Step 6: Run the Real Pipeline
 
 ```bash
-cd /home/neo/environments/textgraphx
+cd "$(git rev-parse --show-toplevel)"
 ./.venv310/bin/streamlit run textgraphx/app.py
 ```
 
@@ -222,7 +222,7 @@ If it raises, check:
 The real component classes may use different method names than orchestrator assumes. Check:
 
 ```bash
-cd /home/neo/environments/textgraphx
+cd "$(git rev-parse --show-toplevel)"
 ./.venv310/bin/python3 -c "
 from textgraphx.GraphBasedNLP import GraphBasedNLP
 import inspect
@@ -240,7 +240,7 @@ Update `orchestrator.py` phase methods to call the correct method names.
 ## Quick Start (Single Command)
 
 ```bash
-cd /home/neo/environments/textgraphx && \
+cd "$(git rev-parse --show-toplevel)" && \
 sed -i 's/from util\./from textgraphx.util./g; s/from text_processing_components/from textgraphx.text_processing_components/g' textgraphx/GraphBasedNLP.py && \
 ./.venv310/bin/streamlit run textgraphx/app.py
 ```

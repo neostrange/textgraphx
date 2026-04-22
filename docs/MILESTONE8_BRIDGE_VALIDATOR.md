@@ -279,7 +279,7 @@ from textgraphx.evaluation import (
 
 ```bash
 # Run M8 tests
-cd /home/neo/environments/textgraphx
+cd "$(git rev-parse --show-toplevel)"
 python -m pytest tests/test_milestone8_bridge_validator.py -v
 # Result: 31 passed ✅
 

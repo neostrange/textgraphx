@@ -22,7 +22,7 @@ This document explains the detailed logging mechanism implemented throughout the
 export TEXTGRAPHX_LOG_LEVEL=DEBUG
 
 # Run the pipeline
-cd /home/neo/environments/textgraphx
+cd "$(git rev-parse --show-toplevel)"
 source .venv310/bin/activate
 streamlit run textgraphx/app.py
 ```
@@ -225,7 +225,7 @@ progress.finish()
   ⟶ Importing GraphBasedNLP...
     ✓ Importing GraphBasedNLP (0.38s)
   
-  ⟶ Processing directory: /home/neo/environments/textgraphx/textgraphx/datastore/dataset...
+  ⟶ Processing directory: src/textgraphx/datastore/dataset...
   Found 5 documents (XML: 3, TXT: 2)
     ✓ Processing directory: ... (0.01s)
   

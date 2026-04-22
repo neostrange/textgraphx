@@ -132,7 +132,7 @@ result = graph.run('MATCH (e:Entity) RETURN e').data()
 ### Via Streamlit UI (Recommended)
 
 ```bash
-cd /home/neo/environments/textgraphx
+cd "$(git rev-parse --show-toplevel)"
 ./.venv/bin/streamlit run textgraphx/app.py
 ```
 

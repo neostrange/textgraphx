@@ -6,9 +6,8 @@ import pytest
 
 
 def _event_enrichment_source() -> str:
-    return Path("/home/neo/environments/textgraphx/textgraphx/EventEnrichmentPhase.py").read_text(
-        encoding="utf-8"
-    )
+    source_path = Path(__file__).resolve().parents[1] / "EventEnrichmentPhase.py"
+    return source_path.read_text(encoding="utf-8")
 
 
 @pytest.mark.unit

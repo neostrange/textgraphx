@@ -101,7 +101,7 @@ export PYTHONPATH=/path/to/textgraphx:$PYTHONPATH
 
 # Run with python directly
 python run_pipeline.py
-python run_pipeline.py --dataset textgraphx/datastore/dataset
+python run_pipeline.py --dataset src/textgraphx/datastore/dataset
 python run_pipeline.py --phases temporal,event_enrichment
 ```
 

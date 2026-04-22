@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Dict, List
 
@@ -178,17 +179,17 @@ def main():
     parser.add_argument("--docs", default="112579", help="Comma-separated document ids (default: 112579)")
     parser.add_argument(
         "--source-dir",
-        default="textgraphx/datastore/dataset-stocks",
+        default="src/textgraphx/datastore/dataset-stocks",
         help="Source directory containing NAF files",
     )
     parser.add_argument(
         "--stage-dir",
-        default="textgraphx/datastore/tmp-smoke-uid-tool",
+        default="src/textgraphx/datastore/tmp-smoke-uid-tool",
         help="Temporary staging directory for smoke docs",
     )
     parser.add_argument(
         "--python-bin",
-        default="/home/neo/environments/textgraphx/.venv310/bin/python",
+        default=sys.executable,
         help="Python interpreter for GraphBasedNLP smoke run",
     )
     parser.add_argument("--preflight-only", action="store_true", help="Only print preflight checks")

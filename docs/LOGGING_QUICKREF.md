@@ -9,7 +9,7 @@ export TEXTGRAPHX_LOG_LEVEL=DEBUG
 
 ### 2. Run Streamlit
 ```bash
-cd /home/neo/environments/textgraphx
+cd "$(git rev-parse --show-toplevel)"
 source .venv310/bin/activate
 streamlit run textgraphx/app.py
 ```

@@ -2,9 +2,9 @@
 
 Example:
   python -m textgraphx.tools.select_eval_dataset \
-    --annotated-dir textgraphx/datastore/annotated \
-    --original-dir textgraphx/datastore/original_dataset \
-    --target-dir textgraphx/datastore/dataset_eval_selected \
+        --annotated-dir src/textgraphx/datastore/annotated \
+        --original-dir src/textgraphx/datastore/original_dataset \
+        --target-dir src/textgraphx/datastore/dataset_eval_selected \
     --clean
 """
 
@@ -59,17 +59,17 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--annotated-dir",
-        default="textgraphx/datastore/annotated",
+        default="src/textgraphx/datastore/annotated",
         help="Directory containing annotated XML gold files.",
     )
     parser.add_argument(
         "--original-dir",
-        default="textgraphx/datastore/original_dataset",
+        default="src/textgraphx/datastore/original_dataset",
         help="Directory containing original dataset files (for example .naf).",
     )
     parser.add_argument(
         "--target-dir",
-        default="textgraphx/datastore/dataset_eval_selected",
+        default="src/textgraphx/datastore/dataset_eval_selected",
         help="Directory where selected originals are materialized.",
     )
     parser.add_argument(

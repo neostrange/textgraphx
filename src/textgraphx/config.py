@@ -1,7 +1,5 @@
 """Central configuration loader for textgraphx.
 
-run command temporary: /home/neo/environments/textgraphx/.venv/bin/python /home/neo/environments/textgraphx/textgraphx/run_pipeline.py
-
 Supports INI and optional TOML configs and environment variable overrides.
 
 Usage:

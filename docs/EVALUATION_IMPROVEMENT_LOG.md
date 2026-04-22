@@ -134,7 +134,7 @@ The objective was to compare precision/recall tradeoffs without mutating graph e
 ### Run Configuration
 
 - CLI: `python -m textgraphx.tools.evaluate_meantime`
-- Source: `--gold-dir textgraphx/datastore/annotated --pred-neo4j`
+- Source: `--gold-dir src/textgraphx/datastore/annotated --pred-neo4j`
 - Analysis mode: `strict`
 - Profile sweep: one run per `--nominal-profile-mode`
 
@@ -182,8 +182,8 @@ Interpretation:
 
 Artifacts:
 
-- Detailed per-mode reports are stored under `textgraphx/datastore/evaluation/nominal_profile_mode/`
-- Consolidated table: `textgraphx/datastore/evaluation/nominal_profile_mode/PROFILE_MODE_SUMMARY.md`
+- Detailed per-mode reports are stored under `src/textgraphx/datastore/evaluation/nominal_profile_mode/`
+- Consolidated table: `src/textgraphx/datastore/evaluation/nominal_profile_mode/PROFILE_MODE_SUMMARY.md`
 
 ## 2026-04-09 - Breadth-First Heuristic Sweep (A-to-Z) with Zero Regression
 
@@ -230,7 +230,7 @@ After the first breadth-first pass improved entity/timex/relation outcomes, we a
 
 Command family (batch strict all-layer):
 
-- `python -m textgraphx.tools.evaluate_meantime --gold-dir textgraphx/datastore/annotated --pred-neo4j --analysis-mode strict --relation-scope all --nominal-profile-mode candidate-gold ...`
+- `python -m textgraphx.tools.evaluate_meantime --gold-dir src/textgraphx/datastore/annotated --pred-neo4j --analysis-mode strict --relation-scope all --nominal-profile-mode candidate-gold ...`
 
 Compared baseline `global_sweep_post_batch.json` to updated `global_sweep_post2_batch.json`:
 

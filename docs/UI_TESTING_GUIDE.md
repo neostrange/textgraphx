@@ -36,7 +36,7 @@
 
 ### Start the Application
 ```bash
-cd /home/neo/environments/textgraphx
+cd "$(git rev-parse --show-toplevel)"
 ./.venv/bin/streamlit run textgraphx/app.py
 ```
 
@@ -142,10 +142,10 @@ This prevents Streamlit from trying to watch files (which requires ctypes), allo
 ## Troubleshooting
 
 ### Issue: "streamlit: command not found"
-**Solution**: Use full path: `./.venv/bin/streamlit run textgraphx/app.py`
+**Solution**: Use full path: `./.venv310/bin/streamlit run textgraphx/app.py`
 
 ### Issue: "ModuleNotFoundError: No module named 'textgraphx'"
-**Solution**: Run from the workspace root directory: `/home/neo/environments/textgraphx/`
+**Solution**: Run from the repository root directory (top-level folder).
 
 ### Issue: Tests fail with "No module found"
 **Solution**: Run from workspace root and ensure conftest.py is in tests/ directory

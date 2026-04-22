@@ -126,7 +126,7 @@ def main():
         print(f"\n❌ Error: Dataset directory not found")
         print(f"   Path: {dataset_path.resolve()}")
         print(f"   Hint: Use --dataset to specify a valid dataset directory")
-        print(f"   Example: python run_pipeline.py --dataset textgraphx/datastore/dataset")
+        print(f"   Example: python run_pipeline.py --dataset src/textgraphx/datastore/dataset")
         print(f"\n💡 Run 'python run_pipeline.py --check' to diagnose issues.\n")
         sys.exit(1)
     

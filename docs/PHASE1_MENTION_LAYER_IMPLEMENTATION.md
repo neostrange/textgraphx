@@ -188,7 +188,7 @@ AnnotatedText
 
 ```bash
 # Navigate to workspace directory
-cd /home/neo/environments/textgraphx
+cd "$(git rev-parse --show-toplevel)"
 
 # Run migrations using Neo4j's cypher-shell or via Python runner
 # Option 1: Using Neo4j's cypher-shell (if available)

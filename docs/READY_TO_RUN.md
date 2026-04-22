@@ -4,7 +4,7 @@
 
 ### Launch with Real Pipeline (Python 3.10)
 ```bash
-cd /home/neo/environments/textgraphx && \
+cd "$(git rev-parse --show-toplevel)" && \
 ./.venv310/bin/streamlit run textgraphx/app.py
 ```
 
@@ -67,7 +67,7 @@ MATCH (n) RETURN COUNT(n) as nodes, labels(n) as types
 
 ### Step 1: Launch UI
 ```bash
-cd /home/neo/environments/textgraphx
+cd "$(git rev-parse --show-toplevel)"
 ./.venv310/bin/streamlit run textgraphx/app.py
 ```
 
