@@ -24,6 +24,7 @@ This policy keeps repository history clean while preserving reproducibility.
 - keep `latest/` and `baseline/` only
 - do not commit historical `cycle_*` outputs
 - do not commit ad-hoc experiment dumps (`ab_*`, temporary sweeps, exploratory CSVs)
+- CI guardrails enforce path and artifact hygiene on pull requests
 
 This policy is enforced via `.gitignore` rules for `src/textgraphx/datastore/evaluation`.
 
@@ -39,3 +40,5 @@ This policy is enforced via `.gitignore` rules for `src/textgraphx/datastore/eva
 - `src/textgraphx/scripts/run_meantime_eval_cycle.sh`
 - `scripts/evaluation/README.md`
 - `.gitignore`
+- `.github/scripts/verify_structure_hygiene.sh`
+- `.github/workflows/structure-guardrails.yml`

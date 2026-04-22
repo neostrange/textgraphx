@@ -71,6 +71,7 @@ Thumbs.db
 datastore/**/copy_of_current_latest/
 datastore/evaluation/tmp_gold_xml/
 datastore/evaluation/tmp_pred_xml/
+/src/textgraphx/datastore/**/* copy.naf
 
 # ── Runtime config (contains secrets) ───────────────────────────────────────
 config.ini
