@@ -40,7 +40,7 @@ class PipelineRunRequest(BaseModel):
     """Request to run the pipeline."""
     dataset_path: str
     phases: List[str] = ["ingestion", "refinement", "temporal", "event_enrichment", "tlinks"]
-    model_name: str = "en_core_web_sm"
+    model_name: str = "en_core_web_trf"
 
 
 class ExecutionStatus(BaseModel):

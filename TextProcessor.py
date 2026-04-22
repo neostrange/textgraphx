@@ -106,30 +106,29 @@ class TextProcessor(object):
     
     
     
-    def __init__(self, nlp, driver):
+    def __init__(self, nlp, driver, components=None):
         self.nlp = nlp
         self._driver = driver
+        
         self.neo4j_repository = Neo4jRepository(self._driver)
-        self.uri = ""
-        self.username = ""
-        self.password = ""
+        
+        import textgraphx.config as config_module
         cfg = config_module.get_config()
-        # prefer explicit neo4j settings from central config (env overrides applied there)
         self.uri = cfg.neo4j.uri
         self.username = cfg.neo4j.user
         self.password = cfg.neo4j.password
-        #self.graph = Graph(self.uri, auth=(self.username, self.password))
         self.AMUSE_WSD_API_ENDPOINT = cfg.services.wsd_url
         self.coreference_service_endpoint = cfg.services.coref_url
-        components = component_factory.TextPipelineComponentFactory.build(
-            nlp=self.nlp,
-            neo4j_repository=self.neo4j_repository,
-            wsd_endpoint=self.AMUSE_WSD_API_ENDPOINT,
-            coref_endpoint=self.coreference_service_endpoint,
-        )
-
-        # Stage services are constructed by the dedicated factory so this
-        # orchestrator remains focused on process flow rather than wiring.
+        
+        if components is None:
+            from textgraphx.text_processing_components.pipeline.component_factory import TextPipelineComponentFactory
+            components = TextPipelineComponentFactory.build(
+                nlp=self.nlp,
+                neo4j_repository=self.neo4j_repository,
+                wsd_endpoint=self.AMUSE_WSD_API_ENDPOINT,
+                coref_endpoint=self.coreference_service_endpoint,
+            )
+        
         self.wsd = components.wsd
         self.wn_token_enricher = components.wn_token_enricher
         self.coref = components.coref
@@ -142,7 +141,12 @@ class TextProcessor(object):
         self.entity_processor = components.entity_processor
         self.entity_fuser = components.entity_fuser
         self.entity_disambiguator = components.entity_disambiguator
-
+        
+        # Pluggable stage placeholders for Item 6
+        self.tokenizer = None
+        self.tagger = None
+        self.parser = None
+        self.ner = None
     def do_wsd(self, textId: str) -> None:
         """Run word-sense disambiguation for the given document id.
 
@@ -179,94 +183,6 @@ class TextProcessor(object):
 
     def disambiguate_entities(self, text_id):
         self.entity_disambiguator.disambiguate_entities(text_id)
-
-
-    def store_sentence(self, sentence: object, annotated_text: str, text_id: str, sentence_id: int, storeTag: bool) -> int:
-        """
-        Store a sentence in the database.
-
-        Args:
-            sentence (object): The sentence object.
-            annotated_text (str): The annotated text.
-            text_id (str): The text ID.
-            sentence_id (int): The sentence ID.
-            storeTag (bool): Whether to store the tag or not.
-
-        Returns:
-            int: The node sentence ID.
-        """
-
-        tag_occurrence_query = """MATCH (sentence:Sentence) WHERE id(sentence) = $sentence_id
-            WITH sentence, $tag_occurrences as tags
-            FOREACH ( idx IN range(0,size(tags)-2) |
-            MERGE (tagOccurrence1:TagOccurrence {id: tags[idx].id})
-            SET tagOccurrence1 = tags[idx]
-            MERGE (sentence)-[:HAS_TOKEN]->(tagOccurrence1)
-            MERGE (tagOccurrence2:TagOccurrence {id: tags[idx + 1].id})
-            SET tagOccurrence2 = tags[idx + 1]
-            MERGE (sentence)-[:HAS_TOKEN]->(tagOccurrence2)
-            MERGE (tagOccurrence1)-[r:HAS_NEXT {sentence: sentence.id}]->(tagOccurrence2))
-            RETURN id(sentence) as result
-        """
-
-        tag_occurrence_with_tag_query = """MATCH (sentence:Sentence) WHERE id(sentence) = $sentence_id
-            WITH sentence, $tag_occurrences as tags
-            FOREACH ( idx IN range(0,size(tags)-2) |
-            MERGE (tagOccurrence1:TagOccurrence {id: tags[idx].id})
-            SET tagOccurrence1 = tags[idx]
-            MERGE (sentence)-[:HAS_TOKEN]->(tagOccurrence1)
-            MERGE (tagOccurrence2:TagOccurrence {id: tags[idx + 1].id})
-            SET tagOccurrence2 = tags[idx + 1]
-            MERGE (sentence)-[:HAS_TOKEN]->(tagOccurrence2)
-            MERGE (tagOccurrence1)-[r:HAS_NEXT {sentence: sentence.id}]->(tagOccurrence2))
-            FOREACH (tagItem in [tag_occurrence IN $tag_occurrences WHERE tag_occurrence.is_stop = False] | 
-            MERGE (tag:Tag {id: tagItem.lemma}) MERGE (tagOccurrence:TagOccurrence {id: tagItem.id}) MERGE (tag)<-[:HAS_LEMMA]-(tagOccurrence))
-            RETURN id(sentence) as result
-        """
-        
-        # Create sentence node
-        sentence_query = """
-            MATCH (ann:AnnotatedText) WHERE ann.id = $ann_id
-            MERGE (sentence:Sentence {id: $sentence_unique_id})
-            SET sentence.text = $text
-            MERGE (ann)-[:CONTAINS_SENTENCE]->(sentence)
-            RETURN id(sentence) as result
-        """
-        params = {"ann_id": annotated_text, "text": sentence.text, "sentence_unique_id": str(text_id) + "_" + str(sentence_id)}
-        results = self.execute_query(sentence_query, params)
-        node_sentence_id = results[0]
-
-        # Create tag occurrences
-        tag_occurrences = [{"id": str(text_id) + "_" + str(sentence_id) + "_" + str(token.idx),
-                            "index": token.idx,
-                            "end_index": len(token.text) + token.idx,
-                            "text": token.text,
-                            "lemma": token.lemma_,
-                            "pos": token.tag_,
-                            "upos": token.pos_,
-                            "tok_index_doc": token.i,
-                            "tok_index_sent": token.i - sentence.start,
-                            "is_stop": lexeme.is_stop or lexeme.is_punct or lexeme.is_space}
-                            for token in sentence
-                            for lexeme in [self.nlp.vocab[token.text]]
-                            if not lexeme.is_space]
-
-        # Process dependencies
-        tag_occurrence_dependencies = [{"source": str(text_id) + "_" + str(sentence_id) + "_" + str(token.head.idx),
-                                        "destination": str(text_id) + "_" + str(sentence_id) + "_" + str(token.idx),
-                                        "type": token.dep_}
-                                        for token in sentence]
-
-        params = {"sentence_id": node_sentence_id, "tag_occurrences": tag_occurrences}
-        if storeTag:
-            results = self.execute_query(tag_occurrence_with_tag_query, params)
-        else:
-            results = self.execute_query(tag_occurrence_query, params)
-
-        self.process_dependencies(tag_occurrence_dependencies)
-        return results[0]
-
-
 
 
     def process_sentences2(self, annotated_text, doc, storeTag, text_id):
@@ -469,9 +385,13 @@ class TextProcessor(object):
                         MATCH p= (text:AnnotatedText where text.id =  $documentId)-[:CONTAINS_SENTENCE]->(sentence:Sentence)-[:HAS_TOKEN]->(a:TagOccurrence)-[:PARTICIPATES_IN]-(ne:NamedEntity),q= (a)-[:IS_DEPENDENT]->()--(ne)
                         where not exists ((a)<-[:IS_DEPENDENT]-()--(ne))
                         WITH ne, a, p
-                                                set ne.head = a.text, ne.headTokenIndex = a.tok_index_doc, 
-                                                (case when a.pos in ['NNS', 'NN'] then ne END).syntacticType ='NOMINAL' ,
-                                                (case when a.pos in ['NNP', 'NNPS'] then ne END).syntacticType ='NAM' 
+                                                set ne.head = a.text, ne.headTokenIndex = a.tok_index_doc,
+                                                ne.syntacticType = CASE a.pos
+                                                    WHEN 'NNS' THEN 'NOMINAL'
+                                                    WHEN 'NN' THEN 'NOMINAL'
+                                                    WHEN 'NNP' THEN 'NAM'
+                                                    WHEN 'NNPS' THEN 'NAM'
+                                                    ELSE coalesce(ne.syntacticType, 'NAM') END
         
         """
         self.execute_query(query, {'documentId': document_id})
@@ -490,9 +410,13 @@ class TextProcessor(object):
                         MATCH p= (text:AnnotatedText where text.id =  $documentId )-[:CONTAINS_SENTENCE]->(sentence:Sentence)-[:HAS_TOKEN]->(a:TagOccurrence)-[:PARTICIPATES_IN]-(ne:NamedEntity)
                         where not exists ((a)<-[:IS_DEPENDENT]-()--(ne)) and not exists ((a)-[:IS_DEPENDENT]->()--(ne))
                         WITH ne, a, p
-                                                set ne.head = a.text, ne.headTokenIndex = a.tok_index_doc, 
-                                                (case when a.pos in ['NNS', 'NN'] then ne END).syntacticType ='NOMINAL' ,
-                                                (case when a.pos in ['NNP', 'NNPS'] then ne END).syntacticType ='NAM'   
+                                                set ne.head = a.text, ne.headTokenIndex = a.tok_index_doc,
+                                                ne.syntacticType = CASE a.pos
+                                                    WHEN 'NNS' THEN 'NOMINAL'
+                                                    WHEN 'NN' THEN 'NOMINAL'
+                                                    WHEN 'NNP' THEN 'NAM'
+                                                    WHEN 'NNPS' THEN 'NAM'
+                                                    ELSE coalesce(ne.syntacticType, 'NAM') END
         
         """
         self.execute_query(query, {'documentId': document_id})
@@ -731,15 +655,18 @@ class TextProcessor(object):
 
 
 def filter_spans(spans):
+    # Get largest spans first, then earlier starts
     get_sort_key = lambda span: (span.end - span.start, -span.start)
     sorted_spans = sorted(spans, key=get_sort_key, reverse=True)
     result = []
     seen_tokens = set()
     for span in sorted_spans:
-        # Check for end - 1 here because boundaries are inclusive
-        if span.start not in seen_tokens and span.end - 1 not in seen_tokens:
+        # Prevent insertion if ANY token in the span overlaps with seen tokens 
+        # (instead of just checking the strictly outer boundary bounds)
+        span_tokens = set(range(span.start, span.end))
+        if not span_tokens.intersection(seen_tokens):
             result.append(span)
-        seen_tokens.update(range(span.start, span.end))
+            seen_tokens.update(span_tokens)
     result = sorted(result, key=lambda span: span.start)
     return result
 

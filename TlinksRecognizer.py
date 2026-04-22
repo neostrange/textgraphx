@@ -89,8 +89,11 @@ class TlinksRecognizer:
             MERGE (e1)-[tl:TLINK]-(e2)
             WITH *
             SET tl.source = 't2g', tl.confidence = 0.85, tl.rule_id = 'case2_eventive_complement', tl.evidence_source = 'tlinks_recognizer',
-                (CASE WHEN fa.signal IN ['after'] THEN tl END).relType = 'AFTER',
-                (CASE WHEN fa.signal IN ['before'] THEN tl END).relType = 'BEFORE'
+                tl.relType = CASE
+                    WHEN fa.signal IN ['after'] THEN 'AFTER'
+                    WHEN fa.signal IN ['before'] THEN 'BEFORE'
+                    ELSE coalesce(tl.relType, 'VAGUE')
+                END
             RETURN p
         """
         return self._run_query(query)
@@ -104,68 +107,86 @@ class TlinksRecognizer:
                     merge (e1)-[tl:TLINK]-(e2)
                     with *
                     set tl.source = 't2g', tl.confidence = 0.80, tl.rule_id = 'case3_eventive_head', tl.evidence_source = 'tlinks_recognizer',
-                    (case when fa.signal in ['after'] then tl END).relType = 'AFTER',
-                    (case when fa.signal in ['before'] then tl END).relType = 'BEFORE',
-                    (case when fa.signal in ['following'] then tl END).relType = 'SIMULTANEOUS'
+                    tl.relType = CASE
+                        WHEN fa.signal in ['after'] THEN 'AFTER'
+                        WHEN fa.signal in ['before'] THEN 'BEFORE'
+                        WHEN fa.signal in ['following'] THEN 'SIMULTANEOUS'
+                        ELSE coalesce(tl.relType, 'VAGUE')
+                    END
                     RETURN p
         """
         return self._run_query(query)
 
     def create_tlinks_case4(self):
         logger.debug("create_tlinks_case4")
-        query = """ MATCH p = (t:TIMEX)<-[:TRIGGERS]-(h:TagOccurrence where h.pos in ['NN','NNP'])-[:IN_FRAME]->
-            (fa:FrameArgument {type: 'ARGM-TMP'})-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(f:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]->(e:TEvent)
-                    WHERE fa.headTokenIndex = h.tok_index_doc
-                    MERGE (e)-[tlink:TLINK]->(t)
-                    SET tlink.source = 't2g', tlink.relType = 'IS_INCLUDED',
-                        tlink.confidence = 0.88, tlink.rule_id = 'case4_timex_head_match', tlink.evidence_source = 'tlinks_recognizer'
+        query = """
+            MATCH (h:TagOccurrence where h.pos in ['NN','NNP'])-[:IN_FRAME]->
+                (fa:FrameArgument {type: 'ARGM-TMP'})-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(f:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]->(e:TEvent)
+            MATCH (h)-[:TRIGGERS]->(tm)
+            WHERE (tm:TimexMention OR tm:TIMEX OR tm:Timex3)
+            OPTIONAL MATCH (tm)-[:REFERS_TO]->(t_ref:TIMEX)
+            WITH h, fa, e, coalesce(t_ref, CASE WHEN tm:TIMEX OR tm:Timex3 THEN tm ELSE NULL END) AS t
+            WHERE fa.headTokenIndex = h.tok_index_doc AND t IS NOT NULL
+            WITH DISTINCT e, t
+            MERGE (e)-[tlink:TLINK]->(t)
+            SET tlink.source = 't2g', tlink.relType = 'IS_INCLUDED',
+                tlink.confidence = 0.88, tlink.rule_id = 'case4_timex_head_match', tlink.evidence_source = 'tlinks_recognizer'
+            RETURN count(tlink) AS touched
         """
         return self._run_query(query)
 
     def create_tlinks_case5(self):
         logger.debug("create_tlinks_case5")
-        query = """ MATCH p = (t:TIMEX)<-[:TRIGGERS]-(pobj:TagOccurrence where pobj.pos in ['NN','NNP'])-[:IN_FRAME]->(fa:FrameArgument {type: 'ARGM-TMP', syntacticType: 'IN'})-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(f:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]->(e:TEvent)
-                    WHERE fa.complementIndex = pobj.tok_index_doc
-
-                    MERGE (e)-[tlink:TLINK]->(t)
-                    SET tlink.source = 't2g',
-                    tlink.confidence = 0.72, tlink.rule_id = 'case5_timex_preposition', tlink.evidence_source = 'tlinks_recognizer',
-                    (CASE WHEN t.type = 'DURATION' and toLower(fa.head) = 'for' and e.tense in ['PAST', 'PRESENT'] THEN tlink END).relType = 'MEASURE',
-                    (CASE WHEN t.type = 'DURATION' and toLower(fa.head) IN ['in', 'during'] THEN tlink END).relType = 'IS_INCLUDED',
-                    (CASE WHEN t.type = 'DURATION' and t.quant <> 'N/A' and fa.head IN ['in'] THEN tlink END).relType = 'AFTER',
-                    (CASE WHEN t.type = 'DURATION' and toLower(fa.head) IN ['for'] and e.tense in ['PAST', 'PRESENT'] and e.aspect = 'PERFECTIVE' THEN tlink END).relType = 'BEGUN_BY',
-                    (CASE WHEN t.type = 'DATE' and toLower(fa.head) IN ['since'] THEN tlink END).relType = 'BEGUN_BY',
-                    (CASE WHEN t.type = 'DURATION' and toLower(fa.head) IN ['in'] THEN tlink END).relType = 'AFTER',
-                    (CASE WHEN t.type = 'DATE' and toLower(fa.head) IN ['by'] THEN tlink END).relType = 'ENDED_BY',
-                    (CASE WHEN t.type = 'DATE' and toLower(fa.head) IN ['until'] and e.tense in ['PAST'] THEN tlink END).relType = 'ENDED_BY',
-                    (CASE WHEN t.type = 'TIME' and toLower(fa.head) IN ['by'] THEN tlink END).relType = 'BEFORE',
-                    (CASE WHEN t.type in ['TIME', 'DATE', 'DURATION'] and toLower(fa.head) IN ['before'] THEN tlink END).relType = 'BEFORE',
-                    (CASE WHEN t.type in ['TIME', 'DATE', 'DURATION'] and toLower(fa.head) IN ['after'] THEN tlink END).relType = 'AFTER',
-                    (CASE WHEN t.type in ['TIME', 'DATE', 'DURATION'] and toLower(fa.head) IN ['on'] THEN tlink END).relType = 'IS_INCLUDED',
-                    //case added as per the observation during evaluation for 'in' e.g.,Temporal FA 'in the third quarter of this year' should be mentioned with 'IS_INCLUDED'
-                    (CASE WHEN t.type in ['TIME', 'DATE', 'DURATION'] and toLower(fa.head) IN ['in'] THEN tlink END).relType = 'IS_INCLUDED',
-                    (CASE WHEN t.type in ['TIME', 'DATE'] and toLower(fa.head) IN ['on'] THEN tlink END).relType = 'IS_INCLUDED'
-
-                    //return p
-                    //MERGE (e)-[tlink:TLINK]->(t)
-                    //SET tlink.source = 't2g', tlink.relType = 'IS_INCLUDED'
+        query = """
+            MATCH (pobj:TagOccurrence where pobj.pos in ['NN','NNP'])-[:IN_FRAME]->
+                (fa:FrameArgument {type: 'ARGM-TMP'})-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(f:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]->(e:TEvent)
+            MATCH (pobj)-[:TRIGGERS]->(tm)
+            WHERE (tm:TimexMention OR tm:TIMEX OR tm:Timex3)
+            OPTIONAL MATCH (tm)-[:REFERS_TO]->(t_ref:TIMEX)
+            WITH pobj, fa, e, coalesce(t_ref, CASE WHEN tm:TIMEX OR tm:Timex3 THEN tm ELSE NULL END) AS t,
+                 toLower(coalesce(fa.head, '')) AS prep_head
+            WHERE fa.end_tok = pobj.tok_index_doc
+              AND prep_head IN ['in', 'on', 'at', 'for', 'since', 'during', 'before', 'after', 'by', 'until']
+              AND t IS NOT NULL
+            WITH DISTINCT e, t, prep_head
+            MERGE (e)-[tlink:TLINK]->(t)
+            SET tlink.source = 't2g',
+                tlink.confidence = 0.72, tlink.rule_id = 'case5_timex_preposition', tlink.evidence_source = 'tlinks_recognizer',
+                tlink.relType = CASE
+                    WHEN t.type = 'DURATION' AND prep_head = 'for' AND e.tense IN ['PAST', 'PRESENT'] THEN 'MEASURE'
+                    WHEN t.type = 'DATE' AND prep_head = 'since' THEN 'BEGUN_BY'
+                    WHEN t.type = 'DURATION' AND prep_head = 'in' AND coalesce(t.quant, 'N/A') <> 'N/A' THEN 'AFTER'
+                    WHEN t.type = 'DURATION' AND prep_head IN ['in', 'during'] THEN 'IS_INCLUDED'
+                    WHEN t.type = 'DATE' AND prep_head = 'by' AND e.tense IN ['PAST'] THEN 'ENDED_BY'
+                    WHEN t.type = 'DATE' AND prep_head = 'by' THEN 'BEFORE'
+                    WHEN t.type = 'DATE' AND prep_head = 'until' AND e.tense IN ['PAST'] THEN 'ENDED_BY'
+                    WHEN t.type = 'TIME' AND prep_head = 'by' THEN 'BEFORE'
+                    WHEN t.type IN ['TIME', 'DATE', 'DURATION'] AND prep_head = 'before' THEN 'BEFORE'
+                    WHEN t.type IN ['TIME', 'DATE', 'DURATION'] AND prep_head = 'after' THEN 'AFTER'
+                    WHEN t.type IN ['TIME', 'DATE', 'DURATION'] AND prep_head IN ['on', 'in'] THEN 'IS_INCLUDED'
+                    ELSE coalesce(tlink.relType, 'VAGUE')
+                END
+            RETURN count(tlink) AS touched
         """
         return self._run_query(query)
 
     def create_tlinks_case6(self):
         logger.debug("create_tlinks_case6")
         query = """ MATCH p = (e:TEvent)<-[:TRIGGERS]-(t:TagOccurrence)<-[:HAS_TOKEN]-(s:Sentence)<-[:CONTAINS_SENTENCE]-(ann:AnnotatedText)-[:CREATED_ON]->(dct)
-                WHERE dct:TIMEX
+                WHERE dct:TIMEX OR dct:Timex3
                 AND NOT (e.tense IN ['PRESPART', 'PASPART', 'INFINITIVE']) AND NOT (t.pos IN ['NNP', 'NNS', 'NN']) 
                     //AND NOT (e.tense IN ['PRESENT'] and e.aspect IN ['NONE'])
                     MERGE (e)-[tlink:TLINK]-(dct)
                     SET tlink.source = 't2g',
                     tlink.confidence = 0.78, tlink.rule_id = 'case6_dct_anchor', tlink.evidence_source = 'tlinks_recognizer',
-                    (CASE WHEN e.tense in ['FUTURE'] THEN tlink END).relType = 'AFTER',
-                    (CASE WHEN e.tense in ['PRESENT'] and e.aspect = 'PROGRESSIVE' THEN tlink END).relType = 'IS_INCLUDED',
-                    (CASE WHEN e.tense in ['PAST'] THEN tlink END).relType = 'IS_INCLUDED',
-                    (CASE WHEN e.tense in ['PRESENT'] and e.aspect = 'PERFECTIVE' THEN tlink END).relType = 'BEFORE',
-                    (CASE WHEN e.tense in ['PASTPART'] and e.aspect = 'NONE' THEN tlink END).relType = 'IS_INCLUDED'
+                    tlink.relType = CASE
+                        WHEN e.tense in ['FUTURE'] THEN 'AFTER'
+                        WHEN e.tense in ['PRESENT'] and e.aspect = 'PROGRESSIVE' THEN 'IS_INCLUDED'
+                        WHEN e.tense in ['PAST'] THEN 'BEFORE'
+                        WHEN e.tense in ['PRESENT'] and e.aspect = 'PERFECTIVE' THEN 'BEFORE'
+                        WHEN e.tense in ['PASTPART'] and e.aspect = 'NONE' THEN 'IS_INCLUDED'
+                        ELSE coalesce(tlink.relType, 'VAGUE')
+                    END
 
                     RETURN p
         """
@@ -190,8 +211,11 @@ class TlinksRecognizer:
             tl.confidence = 0.83,
             tl.rule_id = 'case7_clause_scope_connective',
             tl.evidence_source = 'tlinks_recognizer',
-            (CASE WHEN toLower(fa.signal) = 'before' THEN tl END).relType = 'BEFORE',
-            (CASE WHEN toLower(fa.signal) = 'after' THEN tl END).relType = 'AFTER'
+            tl.relType = CASE
+                WHEN toLower(fa.signal) = 'before' THEN 'BEFORE'
+                WHEN toLower(fa.signal) = 'after' THEN 'AFTER'
+                ELSE coalesce(tl.relType, 'VAGUE')
+            END
         RETURN count(tl) AS created
         """
         return self._run_query(query)
@@ -381,7 +405,7 @@ class TlinksRecognizer:
         """Validate TLINK anchors and optionally suppress inconsistent links.
 
         Consistency requires:
-        - endpoints are in {TEvent, TIMEX}
+        - endpoints are in {TEvent, Timex3}
         - source and target are not the same node
 
         In non-shadow mode, inconsistent unsuppressed TLINKs are retained but
@@ -393,16 +417,16 @@ class TlinksRecognizer:
         WITH src, dst, r,
              CASE
                 WHEN src:TEvent THEN 'TEvent'
-                WHEN src:TIMEX THEN 'TIMEX'
+                     WHEN src:TIMEX OR src:Timex3 THEN 'TIMEX'
                 ELSE 'OTHER'
              END AS source_anchor_type,
              CASE
                 WHEN dst:TEvent THEN 'TEvent'
-                WHEN dst:TIMEX THEN 'TIMEX'
+                     WHEN dst:TIMEX OR dst:Timex3 THEN 'TIMEX'
                 ELSE 'OTHER'
              END AS target_anchor_type,
              CASE WHEN id(src) = id(dst) THEN true ELSE false END AS is_self_link,
-             CASE WHEN (src:TEvent OR src:TIMEX) AND (dst:TEvent OR dst:TIMEX) THEN true ELSE false END AS endpoint_contract_ok
+                 CASE WHEN (src:TEvent OR src:TIMEX OR src:Timex3) AND (dst:TEvent OR dst:TIMEX OR dst:Timex3) THEN true ELSE false END AS endpoint_contract_ok
         WITH src, dst, r, source_anchor_type, target_anchor_type, is_self_link, endpoint_contract_ok,
              (NOT endpoint_contract_ok OR is_self_link) AS inconsistent
         SET r.sourceAnchorType = source_anchor_type,
@@ -461,17 +485,17 @@ class TlinksRecognizer:
     def get_doc_text_and_dct(self, doc_id):
         """Retrieve document text and creation time from AnnotatedText node."""
         logger.debug("get_doc_text_and_dct for doc_id=%s", doc_id)
-        query = "MATCH (n:AnnotatedText) WHERE n.id = $doc_id RETURN n.text AS text, n.creationtime AS dct"
+        query = "MATCH (n:AnnotatedText) WHERE n.id = toInteger($doc_id) RETURN n.text AS text, n.creationtime AS dct"
         try:
             data = self.graph.run(query, parameters={"doc_id": doc_id}).data()
             if data:
                 return {
-                    "text": str(data[0].get("text", "")),
+                    "input": str(data[0].get("text", "")),
                     "dct": data[0].get("dct", ""),
                 }
         except Exception:
             logger.exception("Failed to get doc text and DCT for doc_id=%s", doc_id)
-        return {"text": "", "dct": ""}
+        return {"input": "", "dct": ""}
 
     def callTtkService(self, parameters):
         """Call TTK service and return XML response body."""
@@ -508,7 +532,7 @@ class TlinksRecognizer:
             if tag == "TLINK":
                 yield elem
 
-    def create_tlinks_e2e(self, doc_id):
+    def create_tlinks_e2e(self, doc_id, precision_mode: bool = False):
         """Build event-to-event links from TTK output over existing temporal nodes."""
         logger.debug("create_tlinks_e2e for doc_id=%s", doc_id)
         result_xml = self._get_ttk_xml(doc_id)
@@ -519,8 +543,16 @@ class TlinksRecognizer:
         query = """
             MATCH (e1:TEvent {eiid: $event_instance_id, doc_id: toInteger($doc_id)})
             MATCH (e2:TEvent {eiid: $related_event_instance, doc_id: toInteger($doc_id)})
+            WHERE $precision_mode = false OR toUpper($rel_type) IN [
+                'BEFORE', 'AFTER', 'INCLUDES', 'IS_INCLUDED', 'SIMULTANEOUS',
+                'IBEFORE', 'IAFTER', 'BEGINS', 'BEGUN_BY', 'ENDS', 'ENDED_BY'
+            ]
             MERGE (e1)-[tl:TLINK {id: $lid, relType: $rel_type}]->(e2)
-            SET tl.signalID = $signal_id
+            SET tl.signalID = $signal_id,
+                tl.source = coalesce(tl.source, 'ttk_xml'),
+                tl.rule_id = coalesce(tl.rule_id, 'xml_e2e_seed'),
+                tl.evidence_source = coalesce(tl.evidence_source, 'ttk_xml'),
+                tl.confidence = coalesce(tl.confidence, CASE WHEN $precision_mode THEN 0.70 ELSE 0.60 END)
         """
 
         linked = 0
@@ -540,6 +572,7 @@ class TlinksRecognizer:
                         "rel_type": tlink.attrib.get("relType", ""),
                         "signal_id": tlink.attrib.get("signalID"),
                         "doc_id": doc_id,
+                        "precision_mode": bool(precision_mode),
                     },
                 )
                 linked += 1
@@ -549,7 +582,7 @@ class TlinksRecognizer:
         logger.info("create_tlinks_e2e: linked %d event-event TLINKs for doc_id=%s", linked, doc_id)
         return f"linked {linked} E2E TLINKs"
 
-    def create_tlinks_e2t(self, doc_id):
+    def create_tlinks_e2t(self, doc_id, precision_mode: bool = False):
         """Build event-to-time links from TTK output over existing temporal nodes."""
         logger.debug("create_tlinks_e2t for doc_id=%s", doc_id)
         result_xml = self._get_ttk_xml(doc_id)
@@ -560,8 +593,21 @@ class TlinksRecognizer:
         query = """
             MATCH (e:TEvent {eiid: $event_instance_id, doc_id: toInteger($doc_id)})
             MATCH (t:TIMEX {tid: $related_to_time, doc_id: toInteger($doc_id)})
+              WHERE $precision_mode = false
+                OR toUpper($rel_type) IN [
+                    'BEFORE', 'AFTER', 'INCLUDES', 'IS_INCLUDED', 'SIMULTANEOUS',
+                    'IBEFORE', 'IAFTER', 'BEGINS', 'BEGUN_BY', 'ENDS', 'ENDED_BY', 'MEASURE'
+                ]
+               OR (
+                    toUpper($rel_type) = 'IS_INCLUDED'
+                    AND toUpper(coalesce(t.functionInDocument, '')) = 'CREATION_TIME'
+               )
             MERGE (e)-[tl:TLINK {id: $lid, relType: $rel_type}]->(t)
-            SET tl.signalID = $signal_id
+            SET tl.signalID = $signal_id,
+                tl.source = coalesce(tl.source, 'ttk_xml'),
+                tl.rule_id = coalesce(tl.rule_id, 'xml_e2t_seed'),
+                tl.evidence_source = coalesce(tl.evidence_source, 'ttk_xml'),
+                tl.confidence = coalesce(tl.confidence, CASE WHEN $precision_mode THEN 0.72 ELSE 0.62 END)
         """
 
         linked = 0
@@ -581,6 +627,7 @@ class TlinksRecognizer:
                         "rel_type": tlink.attrib.get("relType", ""),
                         "signal_id": tlink.attrib.get("signalID"),
                         "doc_id": doc_id,
+                        "precision_mode": bool(precision_mode),
                     },
                 )
                 linked += 1
@@ -590,7 +637,7 @@ class TlinksRecognizer:
         logger.info("create_tlinks_e2t: linked %d event-time TLINKs for doc_id=%s", linked, doc_id)
         return f"linked {linked} E2T TLINKs"
 
-    def create_tlinks_t2t(self, doc_id):
+    def create_tlinks_t2t(self, doc_id, precision_mode: bool = False):
         """Build time-to-time links from TTK output over existing temporal nodes."""
         logger.debug("create_tlinks_t2t for doc_id=%s", doc_id)
         result_xml = self._get_ttk_xml(doc_id)
@@ -601,8 +648,13 @@ class TlinksRecognizer:
         query = """
             MATCH (t1:TIMEX {tid: $time_id, doc_id: toInteger($doc_id)})
             MATCH (t2:TIMEX {tid: $related_to_time, doc_id: toInteger($doc_id)})
+            WHERE $precision_mode = false OR toUpper($rel_type) IN ['BEFORE', 'AFTER', 'INCLUDES', 'IS_INCLUDED', 'SIMULTANEOUS']
             MERGE (t1)-[tl:TLINK {id: $lid, relType: $rel_type}]->(t2)
-            SET tl.signalID = $signal_id
+            SET tl.signalID = $signal_id,
+                tl.source = coalesce(tl.source, 'ttk_xml'),
+                tl.rule_id = coalesce(tl.rule_id, 'xml_t2t_seed'),
+                tl.evidence_source = coalesce(tl.evidence_source, 'ttk_xml'),
+                tl.confidence = coalesce(tl.confidence, CASE WHEN $precision_mode THEN 0.68 ELSE 0.58 END)
         """
 
         linked = 0
@@ -622,6 +674,7 @@ class TlinksRecognizer:
                         "rel_type": tlink.attrib.get("relType", ""),
                         "signal_id": tlink.attrib.get("signalID"),
                         "doc_id": doc_id,
+                        "precision_mode": bool(precision_mode),
                     },
                 )
                 linked += 1

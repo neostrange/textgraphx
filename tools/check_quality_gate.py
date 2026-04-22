@@ -148,6 +148,42 @@ def main(argv=None) -> int:
             "Example: 0 requires no missing IN_MENTION aliases."
         ),
     )
+    parser.add_argument(
+        "--max-timexmention-missing-doc-id",
+        type=int,
+        default=None,
+        help=(
+            "Optional absolute cap for timexmention_missing_doc_id_count in current report. "
+            "Example: 0 requires all TimexMention nodes to carry doc_id."
+        ),
+    )
+    parser.add_argument(
+        "--max-timexmention-missing-span-coordinates",
+        type=int,
+        default=None,
+        help=(
+            "Optional absolute cap for timexmention_missing_span_coordinates_count in current report. "
+            "Example: 0 requires all TimexMention nodes to have start_tok/end_tok."
+        ),
+    )
+    parser.add_argument(
+        "--max-timexmention-broken-refers-to",
+        type=int,
+        default=None,
+        help=(
+            "Optional absolute cap for timexmention_broken_refers_to_count in current report. "
+            "Example: 0 requires all TimexMention nodes to REFERS_TO a TIMEX node."
+        ),
+    )
+    parser.add_argument(
+        "--max-dct-timexmention-count",
+        type=int,
+        default=None,
+        help=(
+            "Optional absolute cap for dct_timexmention_count in current report. "
+            "Example: 0 enforces DCT metadata exemption (no TimexMention for DCT)."
+        ),
+    )
     args = parser.parse_args(argv)
 
     baseline_path = Path(args.baseline)
@@ -216,6 +252,30 @@ def main(argv=None) -> int:
         if not mention_missing_ok:
             gate_reasons.append("participation_in_mention_missing")
 
+    if args.max_timexmention_missing_doc_id is not None:
+        curr_missing = _runtime_total(current_report, "timexmention_missing_doc_id_count", 0)
+        timex_doc_ok = curr_missing <= int(args.max_timexmention_missing_doc_id)
+        if not timex_doc_ok:
+            gate_reasons.append("timexmention_missing_doc_id")
+
+    if args.max_timexmention_missing_span_coordinates is not None:
+        curr_missing = _runtime_total(current_report, "timexmention_missing_span_coordinates_count", 0)
+        timex_span_ok = curr_missing <= int(args.max_timexmention_missing_span_coordinates)
+        if not timex_span_ok:
+            gate_reasons.append("timexmention_missing_span_coordinates")
+
+    if args.max_timexmention_broken_refers_to is not None:
+        curr_missing = _runtime_total(current_report, "timexmention_broken_refers_to_count", 0)
+        timex_chain_ok = curr_missing <= int(args.max_timexmention_broken_refers_to)
+        if not timex_chain_ok:
+            gate_reasons.append("timexmention_broken_refers_to")
+
+    if args.max_dct_timexmention_count is not None:
+        curr_count = _runtime_total(current_report, "dct_timexmention_count", 0)
+        dct_ok = curr_count <= int(args.max_dct_timexmention_count)
+        if not dct_ok:
+            gate_reasons.append("dct_timexmention_count")
+
     passed = len(gate_reasons) == 0
 
     label = "PASS" if passed else "FAIL"
@@ -273,6 +333,30 @@ def main(argv=None) -> int:
             print(
                 "[quality-gate] participation_in_mention_missing_count "
                 f"current={curr_missing} max_allowed={int(args.max_participation_in_mention_missing)}"
+            )
+        if args.max_timexmention_missing_doc_id is not None:
+            curr_missing = _runtime_total(current_report, "timexmention_missing_doc_id_count", 0)
+            print(
+                "[quality-gate] timexmention_missing_doc_id_count "
+                f"current={curr_missing} max_allowed={int(args.max_timexmention_missing_doc_id)}"
+            )
+        if args.max_timexmention_missing_span_coordinates is not None:
+            curr_missing = _runtime_total(current_report, "timexmention_missing_span_coordinates_count", 0)
+            print(
+                "[quality-gate] timexmention_missing_span_coordinates_count "
+                f"current={curr_missing} max_allowed={int(args.max_timexmention_missing_span_coordinates)}"
+            )
+        if args.max_timexmention_broken_refers_to is not None:
+            curr_missing = _runtime_total(current_report, "timexmention_broken_refers_to_count", 0)
+            print(
+                "[quality-gate] timexmention_broken_refers_to_count "
+                f"current={curr_missing} max_allowed={int(args.max_timexmention_broken_refers_to)}"
+            )
+        if args.max_dct_timexmention_count is not None:
+            curr_count = _runtime_total(current_report, "dct_timexmention_count", 0)
+            print(
+                "[quality-gate] dct_timexmention_count "
+                f"current={curr_count} max_allowed={int(args.max_dct_timexmention_count)}"
             )
         if gate_reasons:
             print(f"[quality-gate] reasons={','.join(gate_reasons)}")

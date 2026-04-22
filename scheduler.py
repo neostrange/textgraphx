@@ -46,7 +46,7 @@ class PipelineScheduler:
         dataset_path: str,
         phases: list,
         hours: int = 24,
-        model_name: str = "en_core_web_sm",
+        model_name: str = "en_core_web_trf",
     ) -> bool:
         """Schedule a pipeline run at regular intervals."""
         try:
@@ -77,7 +77,7 @@ class PipelineScheduler:
         dataset_path: str,
         phases: list,
         cron_expression: str,
-        model_name: str = "en_core_web_sm",
+        model_name: str = "en_core_web_trf",
     ) -> bool:
         """Schedule a pipeline run using cron expression.
         

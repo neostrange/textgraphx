@@ -332,7 +332,7 @@ class EventEnrichmentPhase():
         OPTIONAL MATCH (tok:TagOccurrence)-[:TRIGGERS]->(event)
         WITH event, tok
         ORDER BY tok.tok_index_doc
-        WITH event, head(collect(tok)) AS trig_tok, event.eiid + '_mention' as mention_id
+        WITH event, head(collect(tok)) AS trig_tok, toString(event.doc_id) + '_' + event.eiid + '_mention' as mention_id
         OPTIONAL MATCH (s:Sentence)-[:HAS_TOKEN]->(trig_tok)
         WITH event, mention_id, trig_tok,
              head([(s)-[:HAS_TOKEN]->(candidate:TagOccurrence)
@@ -372,9 +372,17 @@ class EventEnrichmentPhase():
             em.end_char = event.end_char,
             em.begin = event.begin,
             em.end = event.end,
-            em.token_id = 'em_' + toString(event.doc_id) + '_' + toString(event.start_tok) + '_' + toString(em.end_tok),
+            em.token_id = 'em_' + toString(event.doc_id) + '_' + toString(event.start_tok) + '_' + toString(CASE
+                WHEN trig_tok.pos STARTS WITH 'VB' AND next_tok.pos = 'RP'
+                THEN coalesce(next_tok.tok_index_doc, event.end_tok)
+                ELSE event.end_tok
+            END),
             em.token_start = event.start_tok,
-            em.token_end = em.end_tok
+            em.token_end = CASE
+                WHEN trig_tok.pos STARTS WITH 'VB' AND next_tok.pos = 'RP'
+                THEN coalesce(next_tok.tok_index_doc, event.end_tok)
+                ELSE event.end_tok
+            END
         WITH em, event
         MERGE (em)-[:REFERS_TO]->(event)
         RETURN count(*) as mentions_created
@@ -384,10 +392,157 @@ class EventEnrichmentPhase():
             result = graph.run(query, parameters={"doc_id": doc_id}).data()
             mentions_created = result[0].get("mentions_created", 0) if result else 0
             logger.info("create_event_mentions: created %d EventMention nodes for doc_id=%s", mentions_created, doc_id)
+            self.normalize_event_boundaries(doc_id)
+            self.tag_timeml_core_events(doc_id)
+            self.tag_timeml_core_events(doc_id)
+            self.collapse_light_verbs(doc_id)
+            self.collapse_light_verbs(doc_id)
             return mentions_created
         except Exception:
             logger.exception("Failed to create event mentions for doc_id=%s", doc_id)
             return 0
+
+
+    def tag_timeml_core_events(self, doc_id):
+        """Categorize events with 'is_timeml_core' to cleanly segregate true 
+        reasoning-layer events (e.g. states, reporting) from MEANTIME 
+        high-action evaluation-layer events without destroying graph structure.
+        """
+        logger.debug("tag_timeml_core_events for doc_id=%s", doc_id)
+        
+        query_events = """
+        MATCH (em:EventMention {doc_id: toInteger($doc_id)})
+        WITH em, toLower(coalesce(em.pred, '')) AS raw_pred, coalesce(em.pos, '') AS pos
+        WITH em, split(raw_pred, ' ')[0] AS lemma, pos
+        SET em.is_timeml_core = CASE
+            WHEN pos STARTS WITH 'VB' AND lemma IN ['be', 'is', 'was', 'are', 'were', 'been', 'being', 'have', 'has', 'had', 'having', 'do', 'does', 'did', 'done', 'doing', 'become', 'becomes', 'became', 'becoming', 'remain', 'remains', 'remained', 'remaining', 'seem', 'seems', 'seemed', 'seeming', 'look', 'looks', 'looked', 'looking', 'appear', 'appears', 'appeared', 'appearing', 'continue', 'continues', 'continued', 'continuing', 'indicate', 'indicates', 'indicated', 'indicating', 'accord', 'accords', 'accorded', 'according', 'follow', 'follows', 'followed', 'following', 'say', 'says', 'said', 'saying', 'tell', 'tells', 'told', 'telling', 'report', 'reports', 'reported', 'reporting', 'suggest', 'suggests', 'suggested', 'suggesting', 'state', 'states', 'stated', 'stating', 'think', 'thinks', 'thought', 'thinking', 'find', 'finds', 'found', 'finding', 'expect', 'expects', 'expected', 'expecting', 'believe', 'believes', 'believed', 'believing', 'know', 'knows', 'knew', 'known', 'knowing', 'consider', 'considers', 'considered', 'considering'] THEN false
+            WHEN pos STARTS WITH 'NN' AND lemma IN ['market', 'markets', 'index', 'indexes', 'indices', 'inflation', 'power', 'powers', 'job', 'jobs', 'number', 'numbers', 'system', 'systems', 'value', 'values', 'price', 'prices', 'percent', 'percentage', 'percentages', 'share', 'shares', 'fund', 'funds', 'point', 'points', 'level', 'levels', 'rate', 'rates', 'record', 'records', 'economy', 'economies', 'growth', 'month', 'months', 'year', 'years', 'day', 'days', 'week', 'weeks', 'exchange', 'exchanges'] THEN false
+            ELSE true
+        END
+        RETURN count(em) as tagged_mentions
+        """
+        try:
+            result = self.graph.run(query_events, {"doc_id": doc_id}).data()
+            tagged = result[0]['tagged_mentions'] if result else 0
+            logger.info("tag_timeml_core_events: tagged %d EventMentions for doc_id=%s", tagged, doc_id)
+        except Exception:
+            logger.exception("Failed to tag TimeML core events for doc_id=%s", doc_id)
+
+        query_tevents = """
+        MATCH (te:TEvent {doc_id: toInteger($doc_id)})
+        OPTIONAL MATCH (em:EventMention)-[:REFERS_TO]->(te)
+        WITH te, collect(em.is_timeml_core) as scores
+        SET te.is_timeml_core = CASE WHEN size(scores) > 0 THEN any(x IN scores WHERE x = true) ELSE te.is_timeml_core END
+        """
+        try:
+            self.graph.run(query_tevents, {"doc_id": doc_id})
+        except Exception:
+            pass
+
+    def collapse_light_verbs(self, doc_id):
+        '''Collapses LightVerb -> Nominal Event structures to reduce redundancy and fix FPs.
+        Transfers tense/aspect from the light verb to the nominal event, and marks
+        the light verb as is_timeml_core = false.
+        '''
+        logger.debug("collapse_light_verbs for doc_id=%s", doc_id)
+        
+        query = '''
+        MATCH (em_noun:EventMention {doc_id: toInteger($doc_id), is_timeml_core: true})
+        MATCH (tok_noun:TagOccurrence) WHERE tok_noun.tok_index_doc = em_noun.start_tok
+        
+        MATCH (tok_verb:TagOccurrence)-[dep:IS_DEPENDENT]->(tok_noun)
+        WHERE dep.type IN ['dobj', 'obj', 'pobj']
+          AND toLower(tok_verb.lemma) IN ['make', 'take', 'have', 'give', 'do', 'cause', 'hold', 'set', 'get', 'keep', 'put', 'leave', 'find', 'bring']
+        
+        MATCH (em_verb:EventMention {doc_id: toInteger($doc_id)})
+        WHERE em_verb.start_tok = tok_verb.tok_index_doc
+        
+        SET em_noun.tense = coalesce(em_noun.tense, em_verb.tense),
+            em_noun.aspect = coalesce(em_noun.aspect, em_verb.aspect),
+            em_verb.is_timeml_core = false
+        
+        WITH em_noun, em_verb
+        OPTIONAL MATCH (em_verb)-[:REFERS_TO]->(te_verb:TEvent)
+        SET te_verb.is_timeml_core = false
+        
+        WITH em_noun, em_verb
+        OPTIONAL MATCH (em_noun)-[:REFERS_TO]->(te_noun:TEvent)
+        SET te_noun.tense = coalesce(te_noun.tense, em_verb.tense),
+            te_noun.aspect = coalesce(te_noun.aspect, em_verb.aspect)
+            
+        RETURN count(em_noun) as collapsed
+        '''
+        try:
+            res = self.graph.run(query, {"doc_id": doc_id}).data()
+            if res:
+                logger.info("collapse_light_verbs: collapsed %d pairs for doc_id=%s", res[0]['collapsed'], doc_id)
+        except Exception:
+            logger.exception("Failed to collapse light verbs for doc_id=%s", doc_id)
+
+    def normalize_event_boundaries(self, doc_id):
+        """Expand nominal and verbal event mention boundaries to capture multi-word events.
+        
+        This aligns pipeline metrics with MEANTIME strict evaluation expectations:
+        - Verbal triggers expand rightwards to include particle dependencies (e.g. 'drag' -> 'drag down')
+        - Nominal triggers expand leftwards to include compound/amod dependencies (e.g. 'bomb' -> 'car bomb')
+        """
+        logger.debug("normalize_event_boundaries for doc_id=%s", doc_id)
+        doc_id = str(doc_id)
+        graph = self.graph
+        
+        # 1. Expand verbal trigger rightwards if it has a 'prt' (particle)
+        query_verbal = """
+        MATCH (em:EventMention {doc_id: toInteger($doc_id)})-[:REFERS_TO]->(te:TEvent)
+        MATCH (te)<-[:TRIGGERS]-(trig_tok:TagOccurrence)
+        WHERE trig_tok.pos STARTS WITH 'VB'
+        MATCH (trig_tok)-[dep:IS_DEPENDENT]->(prt:TagOccurrence)
+        WHERE dep.type IN ['prt', 'acomp'] AND prt.tok_index_doc > em.end_tok
+        WITH em, trig_tok, max(prt.tok_index_doc) as new_end, max(prt.end_index) as new_end_char, prt
+        WHERE new_end <= em.end_tok + 2
+        SET em.end_tok = new_end,
+            em.end_char = new_end_char,
+            em.end = new_end_char,
+            em.token_end = new_end,
+            em.token_id = 'em_' + toString(em.doc_id) + '_' + toString(em.start_tok) + '_' + toString(new_end),
+            em.pred = coalesce(trig_tok.lemma, em.pred) + ' ' + coalesce(prt.text, '')
+        """
+        
+        # 2. Expand nominal trigger leftwards if it has contiguous 'compound' or 'amod' modifiers
+        query_nominal = """
+        MATCH (em:EventMention {doc_id: toInteger($doc_id)})-[:REFERS_TO]->(te:TEvent)
+        MATCH (te)<-[:TRIGGERS]-(trig_tok:TagOccurrence)
+        WHERE trig_tok.pos STARTS WITH 'NN'
+        MATCH (trig_tok)-[dep:IS_DEPENDENT]->(mod:TagOccurrence)
+        WHERE dep.type IN ['compound', 'amod'] AND mod.tok_index_doc < em.start_tok
+        WITH em, min(mod.tok_index_doc) as new_start, min(mod.index) as new_start_char
+        WHERE new_start >= em.start_tok - 3
+        SET em.start_tok = new_start,
+            em.start_char = new_start_char,
+            em.begin = new_start_char,
+            em.token_start = new_start,
+            em.token_id = 'em_' + toString(em.doc_id) + '_' + toString(new_start) + '_' + toString(em.end_tok)
+        """
+        
+        # Calculate pred string accurately using the new bounds
+        query_nominal_pred = """
+        MATCH (em:EventMention {doc_id: toInteger($doc_id)})-[:REFERS_TO]->(te:TEvent)
+        MATCH (te)<-[:TRIGGERS]-(trig_tok:TagOccurrence)
+        WHERE trig_tok.pos STARTS WITH 'NN'
+        MATCH (tok:TagOccurrence {doc_id: em.doc_id})
+        WHERE tok.tok_index_doc >= em.start_tok AND tok.tok_index_doc <= em.end_tok
+        WITH em, tok ORDER BY tok.tok_index_doc
+        WITH em, collect(tok.text) as words
+        WHERE size(words) > 1
+        SET em.pred = reduce(s = head(words), w IN tail(words) | s + ' ' + w)
+        """
+        
+        try:
+            graph.run(query_verbal, parameters={"doc_id": doc_id})
+            graph.run(query_nominal, parameters={"doc_id": doc_id})
+            graph.run(query_nominal_pred, parameters={"doc_id": doc_id})
+            logger.info("normalize_event_boundaries: updated EventMention bounds for doc_id=%s", doc_id)
+        except Exception:
+            logger.exception("Failed to normalize event bounds for doc_id=%s", doc_id)
 
     def link_frameArgument_to_event(self):
         logger.debug("link_frameArgument_to_event")
@@ -473,24 +628,28 @@ class EventEnrichmentPhase():
                                         WHERE event IS NOT NULL
                     merge (e)-[r:PARTICIPANT]->(event)
                     set r.type = fa.type,
-                        (case when fa.syntacticType in ['IN'] then r END).prep = fa.head,
+                        r.prep = CASE WHEN fa.syntacticType IN ['IN'] THEN fa.head ELSE r.prep END,
                         r.confidence = 0.65,
                         r.evidence_source = 'event_enrichment',
                         r.rule_id = 'participant_linking_core',
                         r.authority_tier = 'secondary',
                         r.source_kind = 'rule',
                         r.conflict_policy = 'additive',
-                        r.created_at = coalesce(r.created_at, datetime().epochMillis)
+                        r.created_at = coalesce(r.created_at, datetime().epochMillis),
+                        r.is_core = true,
+                        r.is_core = true
                     merge (e)-[nr:EVENT_PARTICIPANT]->(event)
                     set nr.type = fa.type,
-                        (case when fa.syntacticType in ['IN'] then nr END).prep = fa.head,
+                        nr.is_core = true,
+                        nr.prep = CASE WHEN fa.syntacticType IN ['IN'] THEN fa.head ELSE nr.prep END,
                         nr.confidence = 0.65,
                         nr.evidence_source = 'event_enrichment',
                         nr.rule_id = 'participant_linking_core',
                         nr.authority_tier = 'secondary',
                         nr.source_kind = 'rule',
                         nr.conflict_policy = 'additive',
-                        nr.created_at = coalesce(nr.created_at, datetime().epochMillis)
+                        nr.created_at = coalesce(nr.created_at, datetime().epochMillis),
+                        nr.is_core = true
                                         return count(*) AS linked
         
         """
@@ -506,24 +665,26 @@ class EventEnrichmentPhase():
                                         WITH DISTINCT f, em, event, fa, e
                     merge (e)-[r:PARTICIPANT]->(em)
                     set r.type = fa.type,
-                        (case when fa.syntacticType in ['IN'] then r END).prep = fa.head,
+                        r.prep = CASE WHEN fa.syntacticType IN ['IN'] THEN fa.head ELSE r.prep END,
                         r.confidence = 0.65,
                         r.evidence_source = 'event_enrichment',
                         r.rule_id = 'participant_linking_core',
                         r.authority_tier = 'secondary',
                         r.source_kind = 'rule',
                         r.conflict_policy = 'additive',
-                        r.created_at = coalesce(r.created_at, datetime().epochMillis)
+                        r.created_at = coalesce(r.created_at, datetime().epochMillis),
+                        r.is_core = true
                     merge (e)-[nr:EVENT_PARTICIPANT]->(em)
                     set nr.type = fa.type,
-                        (case when fa.syntacticType in ['IN'] then nr END).prep = fa.head,
+                        nr.prep = CASE WHEN fa.syntacticType IN ['IN'] THEN fa.head ELSE nr.prep END,
                         nr.confidence = 0.65,
                         nr.evidence_source = 'event_enrichment',
                         nr.rule_id = 'participant_linking_core',
                         nr.authority_tier = 'secondary',
                         nr.source_kind = 'rule',
                         nr.conflict_policy = 'additive',
-                        nr.created_at = coalesce(nr.created_at, datetime().epochMillis)
+                        nr.created_at = coalesce(nr.created_at, datetime().epochMillis),
+                        nr.is_core = true
                                         return count(*) AS linked_mention
         """
         data_mention = graph.run(query_mention).data()
@@ -586,24 +747,26 @@ class EventEnrichmentPhase():
                         END
                     MERGE (fa)-[r:PARTICIPANT]->(event)
                     SET r.type = fa.type,
-                        (CASE WHEN fa.syntacticType IN ['IN'] THEN r END).prep = fa.head,
+                        r.prep = CASE WHEN fa.syntacticType IN ['IN'] THEN fa.head ELSE r.prep END,
                         r.confidence = 0.60,
                         r.evidence_source = 'event_enrichment',
                         r.rule_id = 'participant_linking_non_core',
                         r.authority_tier = 'secondary',
                         r.source_kind = 'rule',
                         r.conflict_policy = 'additive',
-                        r.created_at = coalesce(r.created_at, datetime().epochMillis)
+                        r.created_at = coalesce(r.created_at, datetime().epochMillis),
+                        r.is_core = false
                     MERGE (fa)-[nr:EVENT_PARTICIPANT]->(event)
                     SET nr.type = fa.type,
-                        (CASE WHEN fa.syntacticType IN ['IN'] THEN nr END).prep = fa.head,
+                        nr.prep = CASE WHEN fa.syntacticType IN ['IN'] THEN fa.head ELSE nr.prep END,
                         nr.confidence = 0.60,
                         nr.evidence_source = 'event_enrichment',
                         nr.rule_id = 'participant_linking_non_core',
                         nr.authority_tier = 'secondary',
                         nr.source_kind = 'rule',
                         nr.conflict_policy = 'additive',
-                        nr.created_at = coalesce(nr.created_at, datetime().epochMillis)
+                        nr.created_at = coalesce(nr.created_at, datetime().epochMillis),
+                        nr.is_core = false
                     RETURN count(*) AS linked
         
         """
@@ -682,7 +845,7 @@ class EventEnrichmentPhase():
                     MERGE (fa)-[r:MODIFIES]->(event)
                     SET r.type = fa.type,
                         r.source = 'srl_modifier',
-                        (CASE WHEN fa.syntacticType IN ['IN'] THEN r END).prep = fa.head
+                        r.prep = CASE WHEN fa.syntacticType IN ['IN'] THEN fa.head ELSE r.prep END
                     RETURN count(r) AS linked
         """
         rows_modifies = graph.run(query_modifies).data()
@@ -700,7 +863,7 @@ class EventEnrichmentPhase():
                     MERGE (src)-[r:AFFECTS]->(event)
                     SET r.argumentType = fa.type,
                         r.source = 'srl_semantic_relation',
-                        (CASE WHEN fa.syntacticType IN ['IN'] THEN r END).prep = fa.head
+                        r.prep = CASE WHEN fa.syntacticType IN ['IN'] THEN fa.head ELSE r.prep END
                     RETURN count(r) AS linked
         """
         rows_affects = graph.run(query_affects).data()

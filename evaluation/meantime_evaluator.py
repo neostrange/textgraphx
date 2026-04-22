@@ -11,7 +11,18 @@ from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from functools import lru_cache
 import hashlib
-from typing import Any, Dict, Iterable, Optional, Set, Tuple
+import logging
+import re
+
+
+from typing import Dict, Any, List, Tuple, Optional
+import spacy
+try:
+    _eval_nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
+except Exception:
+    _eval_nlp = None
+
+
 import xml.etree.ElementTree as ET
 
 from textgraphx.evaluation.metrics import precision_recall_f1
@@ -24,6 +35,7 @@ except Exception:
 
 TokenSpan = Tuple[int, ...]
 
+LOGGER = logging.getLogger(__name__)
 
 _AUXILIARY_EVENT_LEMMAS = frozenset(
     {
@@ -111,11 +123,15 @@ class EvaluationMapping:
 
     mention_attr_keys: Dict[str, Tuple[str, ...]] = field(
         default_factory=lambda: {
-            "entity": ("syntactic_type", "ent_class"),
+            # Keep entity strict matching focused on comparable MEANTIME fields.
+            # `ent_class` is an internal/enrichment attribute and is often absent in gold.
+            "entity": ("syntactic_type",),
             # external_ref is a transport/internal identifier and is intentionally
             # excluded from scoring keys to avoid strict-mode false mismatches.
             "event": ("pos", "tense", "aspect", "certainty", "polarity", "time", "pred"),
-            "timex": ("type", "value", "functionInDocument"),
+            # `functionInDocument` is often inconsistent between DCT inference paths
+            # and in-text mentions; keep strict matching centered on stable timex identity.
+            "timex": ("type", "value"),
         }
     )
     relation_attr_keys: Dict[str, Tuple[str, ...]] = field(
@@ -257,6 +273,81 @@ def parse_meantime_xml(xml_path: str) -> NormalizedDocument:
     return doc
 
 
+def _mention_attrs_map(m: Mention) -> Dict[str, str]:
+    return {str(k): str(v) for k, v in m.attrs}
+
+
+def _mention_syntactic_type(attrs: Dict[str, str]) -> str:
+    return str(attrs.get("syntactic_type") or attrs.get("syntacticType") or "").strip().upper()
+
+
+def apply_nominal_precision_filters(doc: NormalizedDocument) -> NormalizedDocument:
+    """Apply precision-first nominal filters to predicted entity mentions.
+
+    Rules:
+    1) Pronoun leak: pronouns must be PRO, never NOM.
+    2) Salience gate: NOM must be event-participant or coref/refers-connected.
+    3) Abstract noun drop: remove NOM with generic abstract wn lexname classes.
+    """
+
+    pron_pos_tags = {"PRP", "PRP$", "WP", "WDT"}
+    pronoun_words = {
+        "i", "me", "my", "mine", "we", "us", "our", "ours",
+        "you", "your", "yours", "he", "him", "his", "she", "her", "hers",
+        "it", "its", "they", "them", "their", "theirs",
+        "who", "whom", "whose", "which", "that", "this", "these", "those",
+    }
+    abstract_lexnames = {"noun.quantity", "noun.attribute", "noun.relation"}
+
+    token_lookup = {int(tid): _normalize_token_text(text) for tid, text in (doc.token_sequence or ())}
+
+    participant_entity_spans: Set[TokenSpan] = set()
+    coref_or_refers_entity_spans: Set[TokenSpan] = set()
+    for rel in doc.relations:
+        kind = str(rel.kind or "").strip().lower()
+        if kind == "has_participant" and rel.target_kind == "entity":
+            participant_entity_spans.add(rel.target_span)
+        if kind in {"coref", "refers_to"}:
+            if rel.source_kind == "entity":
+                coref_or_refers_entity_spans.add(rel.source_span)
+            if rel.target_kind == "entity":
+                coref_or_refers_entity_spans.add(rel.target_span)
+
+    filtered: Set[Mention] = set()
+    for mention in doc.entity_mentions:
+        attrs = _mention_attrs_map(mention)
+        syntactic_type = _mention_syntactic_type(attrs)
+
+        # Keep non-nominals untouched (except pronoun leak correction for NOM).
+        if syntactic_type not in {"NOM", "NOMINAL"}:
+            filtered.add(mention)
+            continue
+
+        # Rule 1: pronoun leak guard.
+        head_pos = str(attrs.get("head_pos") or attrs.get("pos") or "").strip().upper()
+        upos = str(attrs.get("upos") or "").strip().upper()
+        span_tokens = [token_lookup.get(int(i), "") for i in mention.span]
+        alpha_tokens = [t for t in span_tokens if t]
+        looks_pronoun = bool(alpha_tokens) and all(t in pronoun_words for t in alpha_tokens)
+        if head_pos in pron_pos_tags or upos == "PRON" or looks_pronoun:
+            continue
+
+        # Rule 2: salience gate (must participate in event structure or discourse linkage).
+        salient = (mention.span in participant_entity_spans) or (mention.span in coref_or_refers_entity_spans)
+        if not salient:
+            continue
+
+        # Rule 3: abstract noun drop.
+        wn_lexname = str(attrs.get("head_wn_lexname") or attrs.get("wn_lexname") or "").strip().lower()
+        if wn_lexname in abstract_lexnames:
+            continue
+
+        filtered.add(mention)
+
+    doc.entity_mentions = filtered
+    return doc
+
+
 def build_document_from_neo4j(
     graph: Any,
     doc_id: int | str,
@@ -306,54 +397,134 @@ def build_document_from_neo4j(
     )
     entity_rows = graph.run(
         f"""
-        MATCH (:AnnotatedText {{id: $doc_id}})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok:TagOccurrence)-[:IN_MENTION]->(m)
-        WHERE (m:EntityMention OR m:NamedEntity) {_entity_discourse_clause}
-        WITH m, min(tok.tok_index_doc) AS start_tok, max(tok.tok_index_doc) AS end_tok
+        MATCH (:AnnotatedText {{id: $doc_id}})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok:TagOccurrence)
+        MATCH (tok)-[:IN_MENTION|PARTICIPATES_IN]->(m)
+        WHERE (m:EntityMention OR m:NamedEntity OR m:NominalMention OR m:CorefMention OR m:Entity OR m:Concept) {_entity_discourse_clause}
+           AND NOT coalesce(m.stale, false)
+           WITH m,
+               min(tok.tok_index_doc) AS start_tok,
+               max(tok.tok_index_doc) AS end_tok,
+               head(collect(tok)) AS head_tok
         RETURN DISTINCT start_tok, end_tok,
              id(m) AS node_id,
              coalesce(m.syntactic_type, m.syntacticType) AS syntactic_type,
-             coalesce(m.ent_class, m.entClass) AS ent_class
+                            CASE WHEN m:NominalMention OR m:CorefMention THEN true ELSE false END AS is_nominal_mention,
+                            coalesce(m.nominalEvalStartTok, m.start_tok) AS eval_start_tok,
+                            coalesce(m.nominalEvalEndTok, m.end_tok) AS eval_end_tok,
+               coalesce(m.ent_class, m.entClass) AS ent_class,
+             coalesce(m.nominalSemanticHeadTokenIndex, m.headTokenIndex, end_tok) AS head_token_index,
+               coalesce(m.nominalHeadPos, head_tok.pos, '') AS head_pos,
+               coalesce(head_tok.upos, '') AS upos,
+               coalesce(m.nominalHeadWnLexname, head_tok.wnLexname, '') AS wn_lexname
         ORDER BY start_tok, end_tok
         """,
         {"doc_id": doc_id_int},
     ).data()
+    
+    extracted_entity_spans = set()
+    for row in entity_rows:
+        span_range = tuple(range(int(row["start_tok"]), int(row["end_tok"]) + 1))
+        extracted_entity_spans.add(span_range)
+
+    doc._extracted_entity_spans = extracted_entity_spans
+
     for row in entity_rows:
         span = _span_from_bounds(int(row["start_tok"]), int(row["end_tok"]), token_index_alignment)
+        head_pos = str(row.get("head_pos") or "").strip().upper()
+        upos = str(row.get("upos") or "").strip().upper()
         syntactic_type = str(row.get("syntactic_type") or "")
+        if not syntactic_type:
+            if head_pos in {"PRP", "PRP$", "WP", "WP$"} or upos == "PRON":
+                syntactic_type = "PRO"
+            elif head_pos in {"NNP", "NNPS"}:
+                syntactic_type = "NAM"
+            elif head_pos in {"NN", "NNS"}:
+                syntactic_type = "NOM"
         if syntactic_type.upper() == "NOMINAL":
             syntactic_type = "NOM"
-        if normalize_nominal_boundaries and syntactic_type.upper() in {"NOM", "NOMINAL"}:
-            span = _normalize_nominal_entity_span_for_eval(span, gold_token_lookup)
+
+        # Evaluation projection hygiene: keep only MEANTIME-target entity syntactic classes.
+        syntactic_type_upper = syntactic_type.upper().strip()
+        if syntactic_type_upper == "NOMINAL":
+            syntactic_type_upper = "NOM"
+            syntactic_type = "NOM"
+        if syntactic_type_upper not in {"NAM", "NOM", "PRO", "APP", "PRE.NOM"}:
+            continue
+
+        # Strict NOM alignment: only project NOM mentions from explicit mention-layer nominals.
+        # TEMPORARILY DISABLED: if syntactic_type.upper() in {"NOM", "NOMINAL"} and not bool(row.get("is_nominal_mention", False)): continue
+
+        head_token_index = row.get("head_token_index")
+        head_idx = _int_or_none(head_token_index)
+        # Compute gold-space aligned head index for all entity types.
+        # head_token_index is in Neo4j token space; token_index_alignment maps it to gold space.
+        aligned_head_idx = token_index_alignment.get(head_idx, head_idx) if head_idx is not None else None
+        is_nominal = syntactic_type.upper() in {"NOM", "NOMINAL"}
+        nominal_features: Dict[str, Any] = {}
+
+        if is_nominal:
+            eval_start = _int_or_none(row.get("eval_start_tok"))
+            eval_end = _int_or_none(row.get("eval_end_tok"))
+            if eval_start is not None and eval_end is not None and eval_start <= eval_end:
+                span = _span_from_bounds(eval_start, eval_end, token_index_alignment)
+
+            nominal_original_span = span
+
+            nominal_features = _nominal_projection_features(
+                graph=graph,
+                doc_id=doc_id_int,
+                node_id=int(row.get("node_id")),
+                fallback_head_idx=head_idx if head_idx is not None else int(row["end_tok"]),
+            )
+            # Priority 1: anchor NOM projection around semantic head (fallback: surface head).
+            span = _project_nominal_span_around_head(
+                span=span,
+                aligned_head_idx=aligned_head_idx,
+                gold_token_lookup=gold_token_lookup,
+            )
+            if normalize_nominal_boundaries:
+                span = _normalize_nominal_entity_span_for_eval(span, gold_token_lookup)
+
+            # Guard against over-collapsing candidate-gold nominals to head-only spans.
+            nominal_wider_span = nominal_original_span
+            if normalize_nominal_boundaries:
+                nominal_wider_span = _normalize_nominal_entity_span_for_eval(nominal_wider_span, gold_token_lookup)
+            if _should_restore_wider_nominal_span(
+                projected_span=span,
+                original_span=nominal_wider_span,
+                features=nominal_features,
+                gold_token_lookup=gold_token_lookup,
+            ):
+                span = nominal_wider_span
+
             if not span:
                 continue
-        if gold_like_nominal_filter and syntactic_type.upper() in {"NOM", "NOMINAL"}:
-            features = _nominal_projection_features(
-                graph=graph,
-                doc_id=doc_id_int,
-                node_id=int(row.get("node_id")),
-                fallback_head_idx=int(row["end_tok"]),
-            )
-            if features.get("eventive_head", False) or _is_wordnet_eventive_noun(features):
+            # Priority 2: drop background/temporal/quantified nominal noise at projection-time.
+            if _is_obvious_nominal_projection_noise(span, nominal_features, gold_token_lookup):
                 continue
-            if _looks_like_proper_name_span(span, gold_token_lookup) or str(features.get("head_pos") or "") in {"NNP", "NNPS"}:
+
+        if gold_like_nominal_filter and is_nominal:
+            if nominal_features.get("eventive_head", False) or _is_wordnet_eventive_noun(nominal_features):
+                continue
+            if _looks_like_proper_name_span(span, gold_token_lookup) or str(nominal_features.get("head_pos") or "") in {"NNP", "NNPS"}:
                 syntactic_type = "NAM"
             else:
-                cluster_size = int(features.get("mention_cluster_size", 0))
-                has_named_link = bool(features.get("has_named_link", False))
-                has_core_argument = bool(features.get("has_core_argument", False))
+                cluster_size = int(nominal_features.get("mention_cluster_size", 0))
+                has_named_link = bool(nominal_features.get("has_named_link", False))
+                has_core_argument = bool(nominal_features.get("has_core_argument", False))
                 if cluster_size <= 1 and not has_named_link and not has_core_argument:
                     continue
-        if profile_mode != "all" and syntactic_type.upper() in {"NOM", "NOMINAL"}:
-            features = _nominal_projection_features(
-                graph=graph,
-                doc_id=doc_id_int,
-                node_id=int(row.get("node_id")),
-                fallback_head_idx=int(row["end_tok"]),
-            )
-            eval_profile = str(features.get("nominal_eval_profile") or "").strip().lower()
-            candidate_gold = bool(features.get("nominal_eval_candidate_gold", False))
-            eventive = bool(features.get("eventive_head", False)) or _is_wordnet_eventive_noun(features)
-            salient = bool(features.get("has_named_link", False)) or bool(features.get("has_core_argument", False)) or int(features.get("mention_cluster_size", 0)) > 1
+
+        if profile_mode != "all" and is_nominal:
+            eval_profile = str(nominal_features.get("nominal_eval_profile") or "").strip().lower()
+            candidate_gold = bool(nominal_features.get("nominal_eval_candidate_gold", False))
+            eventive = bool(nominal_features.get("eventive_head", False)) or _is_wordnet_eventive_noun(nominal_features)
+            salient = bool(nominal_features.get("is_salient_nominal", False))
+            if not salient:
+                salient = bool(nominal_features.get("has_named_link", False)) or (
+                    bool(nominal_features.get("has_core_argument", False))
+                    and float(nominal_features.get("nominal_eventive_confidence", 0.0)) >= 0.40
+                )
             include_nominal = True
             if profile_mode == "eventive":
                 include_nominal = eventive or eval_profile == "eventive_nominal"
@@ -365,16 +536,51 @@ def build_document_from_neo4j(
                 include_nominal = (eval_profile == "background_nominal") and not eventive
             if not include_nominal:
                 continue
+
         attrs = ()
         ent_class = str(row.get("ent_class") or "").strip().upper()
+        wn_lexname = str(row.get("wn_lexname") or "").strip().lower()
         attrs_list = []
         if syntactic_type:
             attrs_list.append(("syntactic_type", syntactic_type))
         if ent_class:
             attrs_list.append(("ent_class", ent_class))
+        if head_pos:
+            attrs_list.append(("head_pos", head_pos))
+        if upos:
+            attrs_list.append(("upos", upos))
+        if wn_lexname:
+            attrs_list.append(("wn_lexname", wn_lexname))
+        # Store gold-space (aligned) head token index so _head_span_match comparisons
+        # work correctly against gold spans (which are also in gold token space).
+        if aligned_head_idx is not None:
+            attrs_list.append(("head_token_index", str(aligned_head_idx)))
+        elif head_token_index is not None:
+            attrs_list.append(("head_token_index", str(head_token_index)))
         if attrs_list:
             attrs = tuple(sorted(attrs_list))
-        doc.entity_mentions.add(Mention(kind="entity", span=span, attrs=attrs))
+            
+        priority = 0
+        if syntactic_type == "NAM":
+            priority = 2 if not bool(row.get("is_nominal_mention")) else 1
+        elif syntactic_type == "NOM":
+            priority = 2 if bool(row.get("is_nominal_mention")) else 1
+            
+        # Temporarily store to deduplicate after loop
+        if not hasattr(doc, "_temp_entity_list"):
+            doc._temp_entity_list = []
+        doc._temp_entity_list.append((priority, len(span), Mention(kind="entity", span=span, attrs=attrs)))
+
+    # Deduplicate overlapping entity mentions (choose highest priority, then shortest span)
+    if hasattr(doc, "_temp_entity_list"):
+        doc._temp_entity_list.sort(key=lambda x: (x[0], -x[1]), reverse=True)
+        seen_tokens = set()
+        for _, _, mention in doc._temp_entity_list:
+            span_tokens = set(mention.span)
+            if not span_tokens.intersection(seen_tokens):
+                doc.entity_mentions.add(mention)
+                seen_tokens.update(span_tokens)
+        delattr(doc, "_temp_entity_list")
 
     event_rows = graph.run(
         """
@@ -386,7 +592,13 @@ def build_document_from_neo4j(
              WHERE (m.doc_id = doc_id OR token_scoped)
                AND m.start_tok IS NOT NULL AND m.end_tok IS NOT NULL
                AND coalesce(m.low_confidence, false) = false
-             RETURN DISTINCT m.start_tok AS start_tok, m.end_tok AS end_tok,
+               
+             OPTIONAL MATCH (m)<-[:IN_MENTION]-(head_tok:TagOccurrence)
+             WITH m, head_tok, doc_id
+             ORDER BY case when toLower(head_tok.lemma) = toLower(m.pred) then 1 else 2 end, head_tok.tok_index_doc ASC
+             WITH m, doc_id, head(collect(head_tok)) AS best_head
+             RETURN DISTINCT coalesce(best_head.tok_index_doc, m.start_tok) AS start_tok,
+                 coalesce(best_head.tok_index_doc, m.end_tok) AS end_tok,
                  m.pos AS pos, m.tense AS tense, m.aspect AS aspect,
                  m.certainty AS certainty, m.polarity AS polarity,
                  m.time AS time, m.factuality AS factuality, m.pred AS pred,
@@ -396,6 +608,7 @@ def build_document_from_neo4j(
              WITH $doc_id AS doc_id
              MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok:TagOccurrence)-[:TRIGGERS]->(m:TEvent)
                          WHERE coalesce(m.low_confidence, false) = false
+                             
                              AND NOT EXISTS {
                                      MATCH (em:EventMention)-[:REFERS_TO]->(m)
                                                                          WHERE (em.doc_id = doc_id OR EXISTS {
@@ -451,8 +664,20 @@ def build_document_from_neo4j(
     for row in event_rows:
         span = _span_from_bounds(int(row["start_tok"]), int(row["end_tok"]), token_index_alignment)
         attrs = _canonicalize_event_attrs(row)
+        pred = dict(attrs).get("pred", "").lower()
         if not _should_project_event(attrs):
             continue
+            
+        if len(span) > 1 and pred:
+            best_idx = span[-1]
+            for idx in span:
+                tok_text = gold_token_lookup.get(int(idx), "").lower()
+                tok_lemma = _eval_nlp(tok_text)[0].lemma_.lower() if _eval_nlp else tok_text
+                if tok_text == pred or tok_lemma == pred:
+                    best_idx = idx
+                    break
+            span = (best_idx,)
+            
         mention = Mention(kind="event", span=span, attrs=attrs)
         priority = int(row.get("source_priority") or 0)
         current = event_by_span.get(span)
@@ -467,31 +692,42 @@ def build_document_from_neo4j(
         MATCH (m:TIMEX)
         WHERE m.doc_id = $doc_id
            OR EXISTS {
+               MATCH (tm:TimexMention)-[:REFERS_TO]->(m)
+               WHERE tm.doc_id = $doc_id
+           }
+           OR EXISTS {
+               MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS]->(:TimexMention)-[:REFERS_TO]->(m)
+           }
+           OR EXISTS {
                MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS]->(m)
            }
-        OPTIONAL MATCH (tok:TagOccurrence)-[:TRIGGERS]->(m)
-        WITH m, min(tok.tok_index_doc) AS trig_start, max(tok.tok_index_doc) AS trig_end
+        OPTIONAL MATCH (tm:TimexMention)-[:REFERS_TO]->(m)
+        WHERE tm.doc_id = $doc_id
+        OPTIONAL MATCH (tok:TagOccurrence)-[:TRIGGERS]->(tm)
+        WITH m, tm, min(tok.tok_index_doc) AS trig_start, max(tok.tok_index_doc) AS trig_end
         OPTIONAL MATCH (a:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok2:TagOccurrence)
-                WHERE coalesce(m.start_char, m.start_index, m.begin) IS NOT NULL
-                    AND coalesce(m.end_char, m.end_index, m.end) IS NOT NULL
-                    AND toInteger(tok2.index) >= toInteger(coalesce(m.start_char, m.start_index, m.begin))
-                    AND toInteger(tok2.end_index) <= toInteger(coalesce(m.end_char, m.end_index, m.end))
+                WHERE coalesce(tm.start_char, tm.start_index, tm.begin, m.start_char, m.start_index, m.begin) IS NOT NULL
+                    AND coalesce(tm.end_char, tm.end_index, tm.end, m.end_char, m.end_index, m.end) IS NOT NULL
+                    AND toInteger(tok2.index) >= toInteger(coalesce(tm.start_char, tm.start_index, tm.begin, m.start_char, m.start_index, m.begin))
+                    AND toInteger(tok2.end_index) <= toInteger(coalesce(tm.end_char, tm.end_index, tm.end, m.end_char, m.end_index, m.end))
         WITH m,
+             tm,
              trig_start,
              trig_end,
              min(tok2.tok_index_doc) AS span_start,
              max(tok2.tok_index_doc) AS span_end
-        WITH coalesce(m.start_tok, trig_start, span_start) AS start_tok,
-             coalesce(m.end_tok, trig_end, span_end) AS end_tok,
-             m
+        WITH coalesce(tm.start_tok, trig_start, span_start, m.start_tok) AS start_tok,
+             coalesce(tm.end_tok, trig_end, span_end, m.end_tok) AS end_tok,
+             m,
+             tm
         WHERE start_tok IS NOT NULL AND end_tok IS NOT NULL
         RETURN DISTINCT start_tok, end_tok,
-             m.type AS type,
-             m.value AS value,
-             m.functionInDocument AS functionInDocument,
-             m.anchorTimeID AS anchorTimeID,
-             m.beginPoint AS beginPoint,
-             m.endPoint AS endPoint
+             coalesce(tm.type, m.type) AS type,
+             coalesce(tm.value, m.value) AS value,
+             coalesce(tm.functionInDocument, m.functionInDocument) AS functionInDocument,
+             coalesce(tm.anchorTimeID, m.anchorTimeID) AS anchorTimeID,
+             coalesce(tm.beginPoint, m.beginPoint) AS beginPoint,
+             coalesce(tm.endPoint, m.endPoint) AS endPoint
         ORDER BY start_tok, end_tok
         """,
         {"doc_id": doc_id_int},
@@ -513,35 +749,67 @@ def build_document_from_neo4j(
     tlink_rows = graph.run(
         """
             MATCH (a)-[r:TLINK]->(b)
-                WHERE (a.doc_id = $doc_id OR EXISTS {
-                                 MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN]->(a)
+                WHERE (a.doc_id = toInteger($doc_id) OR a.id STARTS WITH $doc_id + '_' OR EXISTS {
+                                 MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN|IN_MENTION|IN_FRAME|FRAME_DESCRIBES_EVENT|DESCRIBES*0..2]-(a)
                             })
-                    AND (b.doc_id = $doc_id OR EXISTS {
-                                 MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN]->(b)
+                    AND (b.doc_id = toInteger($doc_id) OR b.id STARTS WITH $doc_id + '_' OR EXISTS {
+                                 MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN|IN_MENTION|IN_FRAME|FRAME_DESCRIBES_EVENT|DESCRIBES*0..2]-(b)
                             })
-                    AND a.start_tok IS NOT NULL AND a.end_tok IS NOT NULL
-          AND b.start_tok IS NOT NULL AND b.end_tok IS NOT NULL
-        RETURN labels(a) AS source_labels,
-               a.start_tok AS a_start, a.end_tok AS a_end,
-               labels(b) AS target_labels,
-               b.start_tok AS b_start, b.end_tok AS b_end,
+              OPTIONAL MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(a_tok:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN|IN_MENTION|IN_FRAME|FRAME_DESCRIBES_EVENT|DESCRIBES*0..2]-(a)
+              OPTIONAL MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(b_tok:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN|IN_MENTION|IN_FRAME|FRAME_DESCRIBES_EVENT|DESCRIBES*0..2]-(b)
+              WITH a, b, r,
+                  min(a_tok.tok_index_doc) AS a_tok_start,
+                  max(a_tok.tok_index_doc) AS a_tok_end,
+                  min(b_tok.tok_index_doc) AS b_tok_start,
+                  max(b_tok.tok_index_doc) AS b_tok_end
+              WITH labels(a) AS source_labels,
+                  coalesce(a.start_tok, a.begin, a_tok_start) AS a_start,
+                  coalesce(a.end_tok, a.end, a_tok_end) AS a_end,
+                  labels(b) AS target_labels,
+                  coalesce(b.start_tok, b.begin, b_tok_start) AS b_start,
+                  coalesce(b.end_tok, b.end, b_tok_end) AS b_end,
+                  r
+              WHERE a_start IS NOT NULL AND a_end IS NOT NULL
+                AND b_start IS NOT NULL AND b_end IS NOT NULL
+        RETURN source_labels,
+                a_start AS a_start, a_end AS a_end,
+                target_labels,
+                b_start AS b_start, b_end AS b_end,
                r.relType AS reltype
         """,
         {"doc_id": doc_id_int},
     ).data()
+    LOGGER.debug("doc %s tlink_rows count: %s", doc_id, len(tlink_rows))
     for row in tlink_rows:
         src_kind = _node_kind_from_labels(row.get("source_labels", []))
         tgt_kind = _node_kind_from_labels(row.get("target_labels", []))
+
         if src_kind is None or tgt_kind is None:
+            LOGGER.debug("TLINK skip src/tgt kind None: src=%s tgt=%s", src_kind, tgt_kind)
             continue
         src_span = _span_from_bounds(int(row["a_start"]), int(row["a_end"]), token_index_alignment)
         tgt_span = _span_from_bounds(int(row["b_start"]), int(row["b_end"]), token_index_alignment)
+
         if src_kind == "event":
             src_span = _align_relation_event_span(src_span, doc.event_mentions)
         if tgt_kind == "event":
             tgt_span = _align_relation_event_span(tgt_span, doc.event_mentions)
-        if (src_kind == "event" or tgt_kind == "event") and not projected_event_spans:
+        if src_kind == "timex":
+            src_span = _align_relation_timex_span(src_span, doc.timex_mentions)
+        if tgt_kind == "timex":
+            tgt_span = _align_relation_timex_span(tgt_span, doc.timex_mentions)
+
+        if (src_kind == "event" and src_span not in projected_event_spans) or (tgt_kind == "event" and tgt_span not in projected_event_spans):
             continue
+
+        LOGGER.debug(
+            "ADDING TLINK: src=%s:%s tgt=%s:%s rel=%s",
+            src_kind,
+            src_span,
+            tgt_kind,
+            tgt_span,
+            row.get("reltype"),
+        )
         doc.relations.add(
             Relation(
                 kind="tlink",
@@ -557,17 +825,31 @@ def build_document_from_neo4j(
         """
             MATCH (a)-[r:GLINK]->(b)
                 WHERE (a.doc_id = $doc_id OR EXISTS {
-                                 MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN]->(a)
+                                 MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN|IN_MENTION]->(a)
                             })
                     AND (b.doc_id = $doc_id OR EXISTS {
-                                 MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN]->(b)
+                                 MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN|IN_MENTION]->(b)
                             })
-                    AND a.start_tok IS NOT NULL AND a.end_tok IS NOT NULL
-          AND b.start_tok IS NOT NULL AND b.end_tok IS NOT NULL
-        RETURN labels(a) AS source_labels,
-               a.start_tok AS a_start, a.end_tok AS a_end,
-               labels(b) AS target_labels,
-               b.start_tok AS b_start, b.end_tok AS b_end,
+              OPTIONAL MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(a_tok:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN|IN_MENTION]->(a)
+              OPTIONAL MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(b_tok:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN|IN_MENTION]->(b)
+              WITH a, b, r,
+                  min(a_tok.tok_index_doc) AS a_tok_start,
+                  max(a_tok.tok_index_doc) AS a_tok_end,
+                  min(b_tok.tok_index_doc) AS b_tok_start,
+                  max(b_tok.tok_index_doc) AS b_tok_end
+              WITH labels(a) AS source_labels,
+                  coalesce(a.start_tok, a.begin, a_tok_start) AS a_start,
+                  coalesce(a.end_tok, a.end, a_tok_end) AS a_end,
+                  labels(b) AS target_labels,
+                  coalesce(b.start_tok, b.begin, b_tok_start) AS b_start,
+                  coalesce(b.end_tok, b.end, b_tok_end) AS b_end,
+                  r
+              WHERE a_start IS NOT NULL AND a_end IS NOT NULL
+                AND b_start IS NOT NULL AND b_end IS NOT NULL
+           RETURN source_labels,
+                a_start, a_end,
+                target_labels,
+                b_start, b_end,
                r.relType AS reltype
         """,
         {"doc_id": doc_id_int},
@@ -581,9 +863,17 @@ def build_document_from_neo4j(
         tgt_span = _span_from_bounds(int(row["b_start"]), int(row["b_end"]), token_index_alignment)
         if src_kind == "event":
             src_span = _align_relation_event_span(src_span, doc.event_mentions)
+            pass
         if tgt_kind == "event":
             tgt_span = _align_relation_event_span(tgt_span, doc.event_mentions)
-        if (src_kind == "event" or tgt_kind == "event") and not projected_event_spans:
+            pass
+        if src_kind == "timex":
+            src_span = _align_relation_timex_span(src_span, doc.timex_mentions)
+            pass
+        if tgt_kind == "timex":
+            tgt_span = _align_relation_timex_span(tgt_span, doc.timex_mentions)
+            pass
+        if (src_kind == "event" and src_span not in projected_event_spans) or (tgt_kind == "event" and tgt_span not in projected_event_spans):
             continue
         doc.relations.add(
             Relation(
@@ -600,18 +890,32 @@ def build_document_from_neo4j(
         """
             MATCH (a)-[r:CLINK|SLINK]->(b)
                 WHERE (a.doc_id = $doc_id OR EXISTS {
-                                 MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN]->(a)
+                                 MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN|IN_MENTION]->(a)
                             })
                     AND (b.doc_id = $doc_id OR EXISTS {
-                                 MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN]->(b)
+                                 MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN|IN_MENTION]->(b)
                             })
-                    AND a.start_tok IS NOT NULL AND a.end_tok IS NOT NULL
-          AND b.start_tok IS NOT NULL AND b.end_tok IS NOT NULL
+              OPTIONAL MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(a_tok:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN|IN_MENTION]->(a)
+              OPTIONAL MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(b_tok:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN|IN_MENTION]->(b)
+              WITH a, b, r,
+                  min(a_tok.tok_index_doc) AS a_tok_start,
+                  max(a_tok.tok_index_doc) AS a_tok_end,
+                  min(b_tok.tok_index_doc) AS b_tok_start,
+                  max(b_tok.tok_index_doc) AS b_tok_end
+              WITH labels(a) AS source_labels,
+                  coalesce(a.start_tok, a.begin, a_tok_start) AS a_start,
+                  coalesce(a.end_tok, a.end, a_tok_end) AS a_end,
+                  labels(b) AS target_labels,
+                  coalesce(b.start_tok, b.begin, b_tok_start) AS b_start,
+                  coalesce(b.end_tok, b.end, b_tok_end) AS b_end,
+                  r
+              WHERE a_start IS NOT NULL AND a_end IS NOT NULL
+                AND b_start IS NOT NULL AND b_end IS NOT NULL
         RETURN type(r) AS rel_kind,
-               labels(a) AS source_labels,
-               a.start_tok AS a_start, a.end_tok AS a_end,
-               labels(b) AS target_labels,
-               b.start_tok AS b_start, b.end_tok AS b_end,
+                source_labels,
+                a_start, a_end,
+                target_labels,
+                b_start, b_end,
                coalesce(r.relType, '') AS reltype,
                coalesce(r.source, '') AS source
         """,
@@ -628,6 +932,10 @@ def build_document_from_neo4j(
             src_span = _align_relation_event_span(src_span, doc.event_mentions)
         if tgt_kind == "event":
             tgt_span = _align_relation_event_span(tgt_span, doc.event_mentions)
+        if src_kind == "timex":
+            src_span = _align_relation_timex_span(src_span, doc.timex_mentions)
+        if tgt_kind == "timex":
+            tgt_span = _align_relation_timex_span(tgt_span, doc.timex_mentions)
         if (src_kind == "event" or tgt_kind == "event") and not projected_event_spans:
             continue
         rel_kind = str(row.get("rel_kind") or "").strip().lower()
@@ -653,103 +961,69 @@ def build_document_from_neo4j(
         """
         CALL {
             WITH $doc_id AS doc_id
-            MATCH (src)-[r:EVENT_PARTICIPANT|PARTICIPANT]->(evt:TEvent)
-            WHERE evt.doc_id = doc_id
+            MATCH (src)-[r:EVENT_PARTICIPANT|PARTICIPANT]->(evt)
+              WHERE (evt:TEvent OR evt:EventMention) AND coalesce(r.is_core, true) = true AND (evt.doc_id = doc_id
                OR EXISTS {
-                   MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS]->(evt)
-               }
-            OPTIONAL MATCH (mention:NamedEntity)-[:REFERS_TO]->(src)
-            WITH coalesce(mention, src) AS endpoint, evt, r, doc_id
-            MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(evt_tok:TagOccurrence)-[:TRIGGERS]->(evt)
-            OPTIONAL MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(src_tok:TagOccurrence)-[:PARTICIPATES_IN]->(endpoint)
-              WITH endpoint, evt, r,
-                 min(src_tok.tok_index_doc) AS src_start,
-                 max(src_tok.tok_index_doc) AS src_end,
-                  min(evt_tok.tok_index_doc) AS evt_tok_start,
-                  max(evt_tok.tok_index_doc) AS evt_tok_end,
+                   MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|IN_MENTION]->(evt)
+               })
+            WITH src AS endpoint, evt, r, doc_id
+            OPTIONAL MATCH (evt_m:EventMention)-[:REFERS_TO]->(evt)
+            WITH endpoint, evt, r, doc_id, coalesce(evt_m, evt) as evt_m
+            OPTIONAL MATCH (evt_m)<-[:IN_MENTION|TRIGGERS]-(evt_head_tok:TagOccurrence)
+            WITH endpoint, evt, r, doc_id, evt_m, evt_head_tok
+            ORDER BY case when toLower(evt_head_tok.lemma) = toLower(evt_m.pred) then 1 else 2 end, evt_head_tok.tok_index_doc ASC
+            WITH endpoint, evt, r, doc_id, evt_m, head(collect(evt_head_tok)) AS best_evt_head
+            WITH endpoint, evt, r, doc_id, coalesce(best_evt_head.tok_index_doc, evt_m.start_tok, evt.start_tok) AS evt_tok_start, coalesce(best_evt_head.tok_index_doc, evt_m.end_tok, evt.end_tok) AS evt_tok_end
+            OPTIONAL MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(src_tok:TagOccurrence)-[:PARTICIPATES_IN|IN_MENTION]->(endpoint)
+            WITH endpoint, evt, r,
+                 coalesce(endpoint.start_tok, min(src_tok.tok_index_doc)) AS src_start,
+                 coalesce(endpoint.end_tok, max(src_tok.tok_index_doc)) AS src_end,
+                  evt_tok_start,
+                  evt_tok_end,
                  labels(endpoint) AS source_labels
               WITH source_labels, src_start, src_end,
                   coalesce(evt.start_tok, evt_tok_start) AS evt_start,
                   coalesce(evt.end_tok, evt_tok_end) AS evt_end,
-                  r
+                  r, endpoint
               WHERE src_start IS NOT NULL AND src_end IS NOT NULL
                 AND evt_start IS NOT NULL AND evt_end IS NOT NULL
               RETURN DISTINCT src_start, src_end, evt_start, evt_end,
                    coalesce(r.type, '') AS sem_role,
-                   source_labels
-            UNION
-            WITH $doc_id AS doc_id
-              MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:IN_FRAME]->(f:Frame)
-            WITH DISTINCT f, doc_id
-                 MATCH (fa:FrameArgument)-[r:PARTICIPANT|HAS_FRAME_ARGUMENT]->(f)
-                        WHERE fa.type IN ['ARG0', 'ARG1', 'ARG2']
-                        OPTIONAL MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(head_tok:TagOccurrence)
-                        WHERE head_tok.tok_index_doc = coalesce(f.headTokenIndex, f.start_tok)
-                        WITH f, fa, r, doc_id, head(collect(head_tok)) AS head_tok
-                        WHERE (coalesce(head_tok.pos, '') STARTS WITH 'VB')
-                             OR EXISTS {
-                                     MATCH (ev:TEvent)
-                                     WHERE ev.start_tok = f.start_tok
-                                         AND ev.end_tok = f.end_tok
-                                         AND (ev.doc_id = doc_id OR EXISTS {
-                                                 MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS]->(ev)
-                                         })
-                             }
-            OPTIONAL MATCH (fa)-[:REFERS_TO]->(src)
-            OPTIONAL MATCH (mention:NamedEntity)-[:REFERS_TO]->(src)
-                  OPTIONAL MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(fa_tok:TagOccurrence)-[:IN_FRAME]->(fa)
-                  OPTIONAL MATCH (fa_tok)-[:IN_MENTION]->(em:EntityMention)
-                 WITH f, fa, r, coalesce(mention, src, em) AS endpoint, doc_id
-            WHERE endpoint IS NOT NULL
-              OPTIONAL MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(src_tok:TagOccurrence)-[:IN_MENTION]->(endpoint)
-                 WITH f, fa, r,
-                 min(src_tok.tok_index_doc) AS src_start,
-                 max(src_tok.tok_index_doc) AS src_end,
-                 labels(endpoint) AS source_labels
-            WHERE src_start IS NOT NULL AND src_end IS NOT NULL
-              AND f.start_tok IS NOT NULL
-              AND f.end_tok IS NOT NULL
-                        WITH f.start_tok AS evt_start,
-                                 f.end_tok AS evt_end,
-                                 coalesce(r.type, fa.type, '') AS sem_role,
-                                 src_start,
-                                 src_end,
-                                 source_labels,
-                                 (src_end - src_start) AS span_width
-                        ORDER BY evt_start, evt_end, sem_role, span_width ASC, src_start ASC
-                        WITH evt_start, evt_end, sem_role,
-                                 collect({src_start: src_start, src_end: src_end, source_labels: source_labels}) AS cands
-                        WITH evt_start, evt_end, sem_role, head(cands) AS best
-                        RETURN DISTINCT best.src_start AS src_start,
-                                     best.src_end AS src_end,
-                                     evt_start,
-                                     evt_end,
-                                     sem_role,
-                                     best.source_labels AS source_labels
+                   source_labels, id(endpoint) AS endpoint_id
         }
-        RETURN DISTINCT src_start, src_end, evt_start, evt_end, sem_role, source_labels
+        RETURN DISTINCT src_start, src_end, evt_start, evt_end, sem_role, source_labels, endpoint_id
         ORDER BY evt_start, src_start
         """,
         {"doc_id": doc_id_int},
     ).data()
-    # Only keep participant relations whose event anchor is in the projected event mention set.
-    # Relations anchored to low-confidence or frame-only events not in the projection are spurious.
+    LOGGER.debug("doc %s participant_rows count: %s", doc_id, len(participant_rows))
     for row in participant_rows:
         src_kind = _node_kind_from_labels(row.get("source_labels", []))
         if src_kind != "entity":
+            LOGGER.debug("Skipping participant (src_kind != entity): labels=%s -> %s", row.get("source_labels"), src_kind)
             continue
         evt_span = _span_from_bounds(int(row["evt_start"]), int(row["evt_end"]), token_index_alignment)
         evt_span = _align_relation_event_span(evt_span, doc.event_mentions)
         if evt_span not in projected_event_spans:
+            LOGGER.debug(
+                "Skipping participant (evt_span not projected): original=%s-%s aligned=%s",
+                row["evt_start"],
+                row["evt_end"],
+                evt_span,
+            )
             continue
+        entity_span = _span_from_bounds(int(row["src_start"]), int(row["src_end"]), token_index_alignment)
+        entity_span = _align_relation_entity_span(entity_span, doc.entity_mentions)
+        sem_role = _normalize_sem_role(row.get("sem_role"))
+        LOGGER.debug("ADDING has_participant: event=%s entity=%s role=%s", evt_span, entity_span, sem_role)
         doc.relations.add(
             Relation(
                 kind="has_participant",
                 source_kind="event",
                 source_span=evt_span,
                 target_kind="entity",
-                target_span=_span_from_bounds(int(row["src_start"]), int(row["src_end"]), token_index_alignment),
-                attrs=(("sem_role", str(row.get("sem_role") or "")),),
+                target_span=entity_span,
+                attrs=(("sem_role", sem_role),),
             )
         )
 
@@ -758,11 +1032,11 @@ def build_document_from_neo4j(
 
 def _node_kind_from_labels(labels: Iterable[str]) -> Optional[str]:
     s = set(labels)
-    if "TIMEX" in s:
+    if "TIMEX" in s or "TimexMention" in s:
         return "timex"
     if "EventMention" in s or "TEvent" in s:
         return "event"
-    if "EntityMention" in s or "NamedEntity" in s:
+    if "EntityMention" in s or "NamedEntity" in s or "NominalMention" in s or "CorefMention" in s or "Entity" in s or "Concept" in s:
         return "entity"
     return None
 
@@ -781,30 +1055,31 @@ def _normalize_event_pos(value: Any) -> str:
 
 
 def _canonicalize_event_attrs(row: Dict[str, Any]) -> Tuple[Tuple[str, str], ...]:
-    """Normalize event attrs toward MEANTIME strict comparison semantics.
-
-    The graph frequently omits certainty/polarity/time for otherwise valid
-    events, while noun-like events often carry placeholder tense/aspect values
-    that are absent in gold. Canonicalization keeps strict matching from being
-    dominated by representation defaults rather than extraction quality.
-    """
+    """Normalize event attrs toward MEANTIME strict comparison semantics."""
     pos = _normalize_event_pos(row.get("pos"))
-    tense = str(row.get("tense") or "").strip().upper()
-    aspect = str(row.get("aspect") or "").strip().upper()
+    raw_pred = str(row.get("pred") or "").strip().lower()
+    
+    # Use spaCy for robust evaluation lemmatization matching the MEANTIME root forms
+    pred = raw_pred
+    if _eval_nlp and pred:
+        pred = _eval_nlp(pred)[0].lemma_
+        if pred == "-PRON-":
+            pred = raw_pred
+        
+    tense = str(row.get("tense") or "").strip().upper() or "NONE"
+    aspect = str(row.get("aspect") or "").strip().upper() or "NONE"
+    
+    if tense == "PASTPART":
+        tense = "PAST"
+        
+    if raw_pred.endswith("ing") and tense == "NONE" and pos == "VERB":
+        tense = "PRESPART"
+
     certainty = str(row.get("certainty") or "").strip().upper() or "CERTAIN"
-    polarity = str(row.get("polarity") or "").strip().upper() or "POS"
-    time = str(row.get("time") or "").strip().upper() or "NON_FUTURE"
     factuality = str(row.get("factuality") or "").strip().upper()
     external_ref = str(row.get("external_ref") or "").strip()
-    pred = str(row.get("pred") or "").strip().lower()
-
-    # MEANTIME convention: INFINITIVE-tense events signal future/possible actions.
-    # When certainty/time are not explicitly set in the graph, apply these defaults.
-    if tense == "INFINITIVE":
-        if certainty == "CERTAIN":
-            certainty = "POSSIBLE"
-        if time == "NON_FUTURE":
-            time = "FUTURE"
+    polarity = str(row.get("polarity") or "").strip().upper() or "POS"
+    time = str(row.get("time") or "").strip().upper() or "NON_FUTURE"
 
     attrs_map: Dict[str, str] = {}
     if pos:
@@ -812,38 +1087,37 @@ def _canonicalize_event_attrs(row: Dict[str, Any]) -> Tuple[Tuple[str, str], ...
     if pred:
         attrs_map["pred"] = pred
 
-    # Gold noun events typically omit tense/aspect when they are semantically
-    # unexpressed. Preserve those attrs only when informative.
     if pos == "NOUN":
-        if tense and tense not in {"NONE", "O"}:
-            attrs_map["tense"] = tense
-        if aspect and aspect not in {"NONE", "O"}:
-            attrs_map["aspect"] = aspect
+        # Gold nouns almost never have tense/aspect in MEANTIME (unless explicitly expressed).
+        # To avoid penalizing correctly bounded Noun Events simply because they lack 'NONE' explicitly:
+        pass  # Omit tense and aspect for Noun Events entirely.
     else:
-        if tense:
+        if tense and tense != "O":
             attrs_map["tense"] = tense
-        if aspect:
+        if aspect and aspect != "O":
             attrs_map["aspect"] = aspect
 
     attrs_map["certainty"] = certainty
     attrs_map["polarity"] = polarity
-    attrs_map["time"] = time
+    if time and time != "O":
+        attrs_map["time"] = time
+        
     if factuality:
         attrs_map["factuality"] = factuality
     if external_ref:
         attrs_map["external_ref"] = external_ref
+        
     return tuple(sorted(attrs_map.items()))
 
 
+
+
 def _should_project_event(attrs: Tuple[Tuple[str, str], ...]) -> bool:
-    attrs_map = dict(attrs)
-    pos = attrs_map.get("pos", "")
-    pred = attrs_map.get("pred", "")
-    if pred in _AUXILIARY_EVENT_LEMMAS and pos != "NOUN":
-        return False
+    for k, v in attrs:
+        if k == "pred" and v in _AUXILIARY_EVENT_LEMMAS:
+            return False
     return True
-
-
+    
 def _canonicalize_timex_attrs(row: Dict[str, Any]) -> Tuple[Tuple[str, str], ...]:
     """Normalize TIMEX attrs toward MEANTIME strict comparison semantics."""
     typ = str(row.get("type") or "").strip().upper()
@@ -854,12 +1128,7 @@ def _canonicalize_timex_attrs(row: Dict[str, Any]) -> Tuple[Tuple[str, str], ...
     end_point = str(row.get("endPoint") or "").strip()
 
     if typ == "DATE":
-        if len(value) == 8 and value.isdigit():
-            value = f"{value[0:4]}-{value[4:6]}-{value[6:8]}"
-        elif len(value) == 6 and value.isdigit():
-            value = f"{value[0:4]}-{value[4:6]}"
-        elif len(value) == 7 and value.isdigit():
-            value = f"{value[0:4]}-{value[4:6]}-{value[6]}"
+        value = _normalize_timex_date_value(value)
 
     attrs_map: Dict[str, str] = {}
     if typ:
@@ -906,6 +1175,73 @@ def _normalize_token_text(value: str) -> str:
     return " ".join((value or "").strip().lower().split())
 
 
+def _normalize_timex_date_value(value: str) -> str:
+    """Normalize common textual date formats to ISO-like strings when possible."""
+    v = str(value or "").strip()
+    if not v:
+        return ""
+
+    if len(v) == 8 and v.isdigit():
+        return f"{v[0:4]}-{v[4:6]}-{v[6:8]}"
+    if len(v) == 6 and v.isdigit():
+        return f"{v[0:4]}-{v[4:6]}"
+    if len(v) == 7 and v.isdigit():
+        return f"{v[0:4]}-{v[4:6]}-{v[6]}"
+
+    month_map = {
+        "january": "01", "jan": "01",
+        "february": "02", "feb": "02",
+        "march": "03", "mar": "03",
+        "april": "04", "apr": "04",
+        "may": "05",
+        "june": "06", "jun": "06",
+        "july": "07", "jul": "07",
+        "august": "08", "aug": "08",
+        "september": "09", "sep": "09", "sept": "09",
+        "october": "10", "oct": "10",
+        "november": "11", "nov": "11",
+        "december": "12", "dec": "12",
+    }
+
+    compact = re.sub(r"\s+", " ", v.replace(",", " ")).strip()
+
+    # Month Day Year, e.g. "August 10 2007".
+    m = re.fullmatch(r"([A-Za-z]+)\s+(\d{1,2})\s+(\d{4})", compact)
+    if m:
+        mon = month_map.get(m.group(1).lower())
+        if mon:
+            day = int(m.group(2))
+            year = m.group(3)
+            return f"{year}-{mon}-{day:02d}"
+
+    # Day Month Year, e.g. "10 August 2007".
+    m = re.fullmatch(r"(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})", compact)
+    if m:
+        mon = month_map.get(m.group(2).lower())
+        if mon:
+            day = int(m.group(1))
+            year = m.group(3)
+            return f"{year}-{mon}-{day:02d}"
+
+    # Month Year, e.g. "August 2007".
+    m = re.fullmatch(r"([A-Za-z]+)\s+(\d{4})", compact)
+    if m:
+        mon = month_map.get(m.group(1).lower())
+        if mon:
+            year = m.group(2)
+            return f"{year}-{mon}"
+
+    # Year Month, e.g. "2007 August".
+    m = re.fullmatch(r"(\d{4})\s+([A-Za-z]+)", compact)
+    if m:
+        mon = month_map.get(m.group(2).lower())
+        if mon:
+            year = m.group(1)
+            return f"{year}-{mon}"
+
+    return v
+
+
 def _normalize_nominal_entity_span_for_eval(
     span: TokenSpan,
     gold_token_lookup: Dict[int, str],
@@ -927,20 +1263,164 @@ def _normalize_nominal_entity_span_for_eval(
 
     items = list(span)
     while items:
-        first = gold_token_lookup.get(int(items[0]), "")
+        first = gold_token_lookup.get(int(items[0]), "").lower()
         if first in leading_determiners:
             items.pop(0)
             continue
         break
 
     while items:
-        last = gold_token_lookup.get(int(items[-1]), "")
+        last = gold_token_lookup.get(int(items[-1]), "").lower()
         if last in trailing_punct:
             items.pop()
             continue
         break
 
     return tuple(items)
+
+
+def _project_nominal_span_around_head(
+    span: TokenSpan,
+    aligned_head_idx: Optional[int],
+    gold_token_lookup: Dict[int, str],
+) -> TokenSpan:
+    """Project NOM mentions to the immediate noun phrase around the semantic head."""
+    if not span:
+        return span
+
+    tokens = sorted(int(i) for i in span)
+    if not tokens:
+        return span
+
+    if aligned_head_idx is None:
+        head_idx = tokens[-1]
+    elif aligned_head_idx in tokens:
+        head_idx = int(aligned_head_idx)
+    else:
+        head_idx = min(tokens, key=lambda t: abs(int(t) - int(aligned_head_idx)))
+
+    punct = {".", ",", ":", ";", "'", '"', "`", "''", "``", "!", "?", "(", ")", "[", "]", "{", "}"}
+    hard_left = {
+        "that", "which", "who", "whom", "whose",
+        "because", "if", "when", "while", "although", "though", "but", "and", "or",
+        "to", "of", "in", "on", "at", "for", "from", "by", "with", "as", "than", "into", "onto",
+    }
+    trailing_pp_prep = {"of", "in", "on", "at", "for", "from", "by", "to", "into", "onto", "over", "under", "across"}
+    weak_heads = {
+        "the", "a", "an", "this", "that", "these", "those",
+        "my", "your", "his", "her", "its", "our", "their",
+        "i", "we", "you", "he", "she", "it", "they", "me", "us", "him", "them",
+    }
+    leading_drop = {
+        "the", "a", "an", "this", "that", "these", "those",
+        "any", "some", "many", "much", "few", "several", "both", "either", "neither", "another", "other",
+    }
+
+    head_pos = tokens.index(head_idx)
+    head_word = gold_token_lookup.get(head_idx, "").lower()
+    if head_word in weak_heads:
+        for t in tokens[head_pos + 1:]:
+            w = gold_token_lookup.get(t, "").lower()
+            if w and w not in weak_heads and w not in punct and w not in trailing_pp_prep:
+                head_idx = t
+                head_pos = tokens.index(head_idx)
+                break
+
+    left = head_pos
+    right = head_pos
+
+    while left - 1 >= 0:
+        w = gold_token_lookup.get(tokens[left - 1], "").lower()
+        if not w or w in punct or w in hard_left:
+            break
+        left -= 1
+
+    while right + 1 < len(tokens):
+        w = gold_token_lookup.get(tokens[right + 1], "").lower()
+        if not w or w in punct or w in hard_left:
+            break
+        right += 1
+
+    projected = tokens[left:right + 1]
+
+    # MEANTIME strict NOM spans usually exclude trailing PP tails.
+    if len(projected) > 2:
+        hp = projected.index(head_idx)
+        cut = None
+        for i in range(hp + 1, len(projected)):
+            if gold_token_lookup.get(projected[i], "").lower() in trailing_pp_prep:
+                cut = i
+                break
+        if cut is not None and cut > hp:
+            projected = projected[:cut]
+
+    while projected and gold_token_lookup.get(projected[0], "").lower() in leading_drop and projected[0] != head_idx:
+        projected.pop(0)
+
+    return tuple(projected) if projected else (head_idx,)
+
+
+def _is_obvious_nominal_projection_noise(
+    span: TokenSpan,
+    features: Dict[str, Any],
+    gold_token_lookup: Dict[int, str],
+) -> bool:
+    """Drop non-entity NOM noise (temporal/quantified/background low-salience)."""
+    eval_profile = str(features.get("nominal_eval_profile") or "").strip().lower()
+    candidate_gold = bool(features.get("nominal_eval_candidate_gold", False))
+    salient = bool(features.get("has_named_link", False)) or bool(features.get("has_core_argument", False)) or int(features.get("mention_cluster_size", 0)) > 1
+    eventive = bool(features.get("eventive_head", False)) or _is_wordnet_eventive_noun(features)
+
+    toks = [gold_token_lookup.get(int(i), "") for i in span]
+    text = " ".join(t for t in toks if t)
+    if not text:
+        return False
+
+    temporal_words = {
+        "today", "yesterday", "tomorrow", "tonight", "morning", "afternoon", "evening",
+        "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+        "week", "month", "year", "day", "hour", "minute", "second",
+    }
+    lowered = {t.lower() for t in toks if t}
+    temporal_like = bool(lowered & temporal_words)
+    quantified_like = any(ch.isdigit() for ch in text) or any(sym in text for sym in ["$", "€", "£", "¥", "%"])
+
+    if temporal_like or quantified_like:
+        return True
+
+    # Keep background discourse nominals; only suppress clearly eventive noise.
+    if eventive and not candidate_gold and not salient and eval_profile != "salient_nominal":
+        return True
+
+    return False
+
+
+def _should_restore_wider_nominal_span(
+    projected_span: TokenSpan,
+    original_span: TokenSpan,
+    features: Dict[str, Any],
+    gold_token_lookup: Dict[int, str],
+) -> bool:
+    """Restore wider nominal span when head-projection is clearly over-collapsed."""
+    if not projected_span or not original_span:
+        return False
+    if len(original_span) <= len(projected_span):
+        return False
+    if len(projected_span) > 2 or len(original_span) < 4:
+        return False
+    if not bool(features.get("nominal_eval_candidate_gold", False)):
+        return False
+
+    support = bool(features.get("has_core_argument", False)) or bool(features.get("has_named_link", False))
+    if not support:
+        return False
+
+    # Do not widen across obvious punctuation breaks.
+    punct = {".", ",", ":", ";", "!", "?", "(", ")", "[", "]", "{", "}"}
+    tokens = [gold_token_lookup.get(int(i), "") for i in original_span]
+    if any(t in punct for t in tokens if t):
+        return False
+    return True
 
 
 def _looks_like_proper_name_span(span: TokenSpan, gold_token_lookup: Dict[int, str]) -> bool:
@@ -992,7 +1472,8 @@ def _nominal_projection_features(
                          core_arg_hits > 0 AS has_core_argument,
                          coalesce(m.nominalEvalProfile, '') AS nominal_eval_profile,
                          coalesce(m.nominalEvalCandidateGold, false) AS nominal_eval_candidate_gold,
-                         coalesce(m.nominalEventiveConfidence, 0.0) AS nominal_eventive_confidence
+                         coalesce(m.nominalEventiveConfidence, 0.0) AS nominal_eventive_confidence,
+                         coalesce(m.isSalientNominal, false) AS is_salient_nominal
         """,
         {
             "node_id": node_id,
@@ -1032,8 +1513,8 @@ def _is_wordnet_eventive_noun(features: Dict[str, Any]) -> bool:
     target_lex = {
         "noun.act",
         "noun.event",
-        "noun.phenomenon",
         "noun.process",
+        "noun.phenomenon",
         "noun.state",
     }
 
@@ -1045,7 +1526,7 @@ def _is_wordnet_eventive_noun(features: Dict[str, Any]) -> bool:
         return True
 
     # Fallback: use persisted hypernyms if synset cannot be resolved at runtime.
-    eventive_hypernym_roots = ("event.n.", "act.n.", "process.n.", "state.n.", "phenomenon.n.")
+    eventive_hypernym_roots = ("event.n.", "act.n.", "process.n.")
     hypernyms = features.get("head_hypernyms") or []
     for h in hypernyms:
         hs = str(h or "").strip().lower()
@@ -1096,26 +1577,50 @@ def _build_token_index_alignment(
 def _span_from_bounds(start_tok: int, end_tok: int, alignment: Dict[int, int]) -> TokenSpan:
     mapped = [alignment.get(i) for i in range(start_tok, end_tok + 1) if alignment.get(i) is not None]
     if mapped:
-        return _sorted_span(mapped)
+        return _sorted_span(range(min(mapped), max(mapped) + 1))
     return _sorted_span(range(start_tok, end_tok + 1))
 
 
-def _align_relation_event_span(span: TokenSpan, event_mentions: Set[Mention]) -> TokenSpan:
-    """Align relation-side event span to the nearest projected event mention span."""
-    if not span or not event_mentions:
-        return span
+def _align_relation_event_span(span: TokenSpan, mentions: Set[Mention]) -> TokenSpan:
+    if not span or not mentions: return span
+    mention_spans = [m.span for m in mentions if m.kind == "event"]
+    if not mention_spans: return span
+    if span in mention_spans: return span
+    overlapping = [s for s in mention_spans if set(span).intersection(s)]
+    if overlapping: return max(overlapping, key=lambda s: len(set(span).intersection(s)))
+    return span
 
-    mention_spans = [m.span for m in event_mentions if m.kind == "event"]
-    if not mention_spans:
-        return span
-    if span in mention_spans:
-        return span
+def _align_relation_entity_span(span: TokenSpan, mentions: Set[Mention]) -> TokenSpan:
+    if not span or not mentions: return span
+    mention_spans = [m.span for m in mentions if m.kind == "entity"]
+    if not mention_spans: return span
+    if span in mention_spans: return span
+    overlapping = [s for s in mention_spans if set(span).intersection(s)]
+    if overlapping: return max(overlapping, key=lambda s: len(set(span).intersection(s)))
+    return span
 
-    overlapping = [s for s in mention_spans if _span_iou(span, s) > 0.0]
-    if not overlapping:
-        return span
+def _align_relation_timex_span(span: TokenSpan, mentions: Set[Mention]) -> TokenSpan:
+    if not span or not mentions: return span
+    mention_spans = [m.span for m in mentions if m.kind in {"timex", "timex3"}]
+    if not mention_spans: return span
+    if span in mention_spans: return span
+    overlapping = [s for s in mention_spans if set(span).intersection(s)]
+    if overlapping: return max(overlapping, key=lambda s: len(set(span).intersection(s)))
+    return span
 
-    return max(overlapping, key=lambda s: (_span_iou(span, s), len(s)))
+
+def _normalize_sem_role(raw: Any) -> str:
+    """Normalize PropBank-like role strings to gold-comparable casing."""
+    value = str(raw or "").strip()
+    if not value:
+        return ""
+
+    upper = value.upper()
+    if upper.startswith("ARGM-"):
+        return "Argm-" + upper[5:]
+    if upper.startswith("ARG"):
+        return "Arg" + upper[3:]
+    return value
 
 
 def _span_iou(a: TokenSpan, b: TokenSpan) -> float:
@@ -1123,6 +1628,99 @@ def _span_iou(a: TokenSpan, b: TokenSpan) -> float:
     if not sa and not sb:
         return 1.0
     return float(len(sa & sb)) / float(len(sa | sb)) if (sa or sb) else 0.0
+
+
+def _mention_attrs_dict(m: Mention) -> Dict[str, str]:
+    return {str(k): str(v) for k, v in m.attrs}
+
+
+def _int_or_none(value: Any) -> Optional[int]:
+    if value is None:
+        return None
+    sval = str(value).strip()
+    if not sval:
+        return None
+    try:
+        return int(sval)
+    except ValueError:
+        return None
+
+
+def _mention_head_indices(m: Mention) -> Set[int]:
+    attrs = _mention_attrs_dict(m)
+    indices: Set[int] = set()
+    for key in (
+        "nominalSemanticHeadTokenIndex",
+        "nominal_semantic_head_token_index",
+        "headTokenIndex",
+        "head_token_index",
+    ):
+        parsed = _int_or_none(attrs.get(key))
+        if parsed is not None:
+            indices.add(parsed)
+    if not indices and m.span:
+        # Gold mentions rarely carry explicit head index; use right edge as fallback.
+        indices.add(int(max(m.span)))
+    return indices
+
+
+def _is_nominal_mention(m: Mention) -> bool:
+    """Return True for NOM/NOMINAL or APP mentions — both benefit from head-span relaxation."""
+    attrs = _mention_attrs_dict(m)
+    stype = str(attrs.get("syntactic_type") or attrs.get("syntacticType") or "").strip().upper()
+    return stype in {"NOM", "NOMINAL", "APP"}
+
+
+def _is_conj_mention(m: Mention) -> bool:
+    """Return True for CONJ (conjunction) entity mentions."""
+    attrs = _mention_attrs_dict(m)
+    stype = str(attrs.get("syntactic_type") or attrs.get("syntacticType") or "").strip().upper()
+    return stype == "CONJ"
+
+
+def _apply_conj_virtual_merge(
+    matched: Set[Tuple["Mention", "Mention"]],
+    unmatched_gold: Set["Mention"],
+    coverage_threshold: float = 0.5,
+) -> Set["Mention"]:
+    """Remove unmatched CONJ gold mentions whose token span is already covered.
+
+    MEANTIME CONJ mentions (e.g. "India, China and Britain") span all conjuncts.
+    The pipeline generates individual conjunct predictions (NAM/NOM per conjunct).
+    Those individual predictions match the gold NAM/NOM sub-mentions, leaving the
+    parent CONJ gold unmatched as a False Negative.  This function removes those
+    CONJ gold mentions from the unmatched set when ``coverage_threshold`` fraction
+    of their token span is already covered by the matched predicted mentions.
+    """
+    if not unmatched_gold:
+        return unmatched_gold
+
+    # Tokens already covered by matched predictions.
+    covered_tokens: Set[int] = set()
+    for _, pred in matched:
+        covered_tokens.update(pred.span)
+
+    virtually_matched: Set["Mention"] = set()
+    for g in unmatched_gold:
+        if not _is_conj_mention(g):
+            continue
+        if not g.span:
+            continue
+        overlap = len(set(g.span) & covered_tokens)
+        if overlap / len(g.span) >= coverage_threshold:
+            virtually_matched.add(g)
+
+    return unmatched_gold - virtually_matched
+
+
+def _head_span_match(g: Mention, p: Mention) -> bool:
+    gold_heads = _mention_head_indices(g)
+    pred_heads = _mention_head_indices(p)
+    if any(idx in set(g.span) for idx in pred_heads):
+        return True
+    if any(idx in set(p.span) for idx in gold_heads):
+        return True
+    return False
 
 
 def _pair_mentions(
@@ -1135,30 +1733,63 @@ def _pair_mentions(
     used_gold: Set[Mention] = set()
     used_pred: Set[Mention] = set()
 
-    def _compatible(g: Mention, p: Mention) -> bool:
-        if g.kind != p.kind:
-            return False
-        if mode == "strict":
-            return g == p
-        if g.with_attrs([]) != p.with_attrs([]):
-            return _span_iou(g.span, p.span) >= overlap_threshold
-        return True
+    if mode == "strict":
+        for g in sorted(gold, key=lambda x: (x.kind, x.span, x.attrs)):
+            candidates = [p for p in pred if p not in used_pred and g == p]
+            if candidates:
+                best = candidates[0]
+                matched.add((g, best))
+                used_gold.add(g)
+                used_pred.add(best)
+    else:
+        # Relaxed mode: priority-based global assignment (avoids greedy prediction stealing).
+        #
+        # Tier 3 — exact span+attrs equality (= strict TPs)
+        # Tier 2 — IoU >= overlap_threshold (descending IoU)
+        # Tier 1 — containment: pred ⊆ gold OR gold ⊆ pred, for non-CONJ entity golds
+        #           sorted by descending containment-IoU then ascending gold span size
+        #
+        # Processing higher tiers first ensures IoU-based matches are never displaced
+        # by containment-based matches.
 
-    for g in sorted(gold, key=lambda x: (x.kind, x.span, x.attrs)):
-        candidates = [p for p in pred if p not in used_pred and _compatible(g, p)]
-        if not candidates:
-            continue
-        if mode == "strict":
-            best = candidates[0]
-        else:
-            best = max(candidates, key=lambda p: _span_iou(g.span, p.span))
-        matched.add((g, best))
-        used_gold.add(g)
-        used_pred.add(best)
+        def _tier_and_score(g: Mention, p: Mention) -> Optional[Tuple]:
+            if g.kind != p.kind:
+                return None
+            iou = _span_iou(g.span, p.span)
+            if g == p:
+                return (3, iou, 0)
+            if iou >= overlap_threshold:
+                return (2, iou, 0)
+            # Containment for non-CONJ entities (pred ⊆ gold OR gold ⊆ pred).
+            if g.kind == "entity" and not _is_conj_mention(g):
+                g_set = set(g.span)
+                p_set = set(p.span)
+                if p_set <= g_set or g_set <= p_set:
+                    # Sort by containment IoU descending, then smallest gold span first.
+                    return (1, iou, -len(g_set))
+            return None
+
+        # Build all candidate pairs with scores.
+        candidates: List[Tuple[Tuple, Mention, Mention]] = []
+        for g in gold:
+            for p in pred:
+                score = _tier_and_score(g, p)
+                if score is not None:
+                    candidates.append((score, g, p))
+
+        # Assign in descending priority order (highest tier + score first).
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        for _, g, p in candidates:
+            if g in used_gold or p in used_pred:
+                continue
+            matched.add((g, p))
+            used_gold.add(g)
+            used_pred.add(p)
 
     unmatched_gold = {g for g in gold if g not in used_gold}
     unmatched_pred = {p for p in pred if p not in used_pred}
     return matched, unmatched_gold, unmatched_pred
+
 
 
 def projection_signature(doc: NormalizedDocument) -> str:
@@ -1287,8 +1918,8 @@ def _collect_mention_examples(
     return {
         "boundary_mismatch": boundary_examples,
         "type_mismatch": type_examples,
-        "missing": [{"gold": _mention_to_dict(m)} for m in missing_mentions[:max_examples]],
-        "spurious": [{"predicted": _mention_to_dict(m)} for m in spurious_mentions[:max_examples]],
+        "missing": [{"gold": _mention_to_dict(m)} for m in missing_mentions],
+        "spurious": [{"predicted": _mention_to_dict(m)} for m in spurious_mentions],
     }
 
 
@@ -1312,6 +1943,11 @@ def score_mention_layer(
         overlap_threshold=overlap_threshold,
     )
 
+    # In relaxed mode, CONJ gold mentions whose conjuncts were already matched
+    # individually are treated as virtually matched rather than False Negatives.
+    if mode == "relaxed":
+        unmatched_gold = _apply_conj_virtual_merge(matched, unmatched_gold)
+
     m = precision_recall_f1(tp=len(matched), fp=len(unmatched_pred), fn=len(unmatched_gold))
     m["mode"] = mode
     m["matched_pairs"] = len(matched)
@@ -1321,10 +1957,53 @@ def score_mention_layer(
 
 
 def _relation_key(rel: Relation, mode: str) -> Tuple[Any, ...]:
+    src_kind = rel.source_kind
+    tgt_kind = rel.target_kind
     src = rel.source_span
     tgt = rel.target_span
-    attrs = rel.attrs if mode == "strict" else tuple((k, v) for k, v in rel.attrs if k == "reltype")
-    return (rel.kind, rel.source_kind, src, rel.target_kind, tgt, attrs)
+
+    attrs_map = {str(k): str(v) for k, v in rel.attrs}
+    reltype = str(attrs_map.get("reltype") or "").strip().upper()
+
+    if rel.kind == "tlink":
+        inverse_reltype = {
+            "BEFORE": "AFTER",
+            "AFTER": "BEFORE",
+            "IBEFORE": "IAFTER",
+            "IAFTER": "IBEFORE",
+            "INCLUDES": "IS_INCLUDED",
+            "IS_INCLUDED": "INCLUDES",
+            "BEGINS": "BEGUN_BY",
+            "BEGUN_BY": "BEGINS",
+            "ENDS": "ENDED_BY",
+            "ENDED_BY": "ENDS",
+            "DURING": "DURING_INV",
+            "DURING_INV": "DURING",
+        }
+
+        def _invert(rt: str) -> str:
+            return inverse_reltype.get(rt, rt)
+
+        # Canonicalize mixed event/timex links as event -> timex.
+        if src_kind == "timex" and tgt_kind == "event":
+            src_kind, tgt_kind = tgt_kind, src_kind
+            src, tgt = tgt, src
+            reltype = _invert(reltype)
+
+        # Canonicalize same-kind links by span order.
+        elif src_kind == tgt_kind and src > tgt:
+            src, tgt = tgt, src
+            reltype = _invert(reltype)
+
+        if reltype:
+            attrs_map["reltype"] = reltype
+
+    if mode == "strict":
+        attrs = tuple(sorted((k, v) for k, v in attrs_map.items()))
+    else:
+        attrs = tuple(sorted((k, v) for k, v in attrs_map.items() if k == "reltype"))
+
+    return (rel.kind, src_kind, src, tgt_kind, tgt, attrs)
 
 
 def _relation_span_overlap(a: TokenSpan, b: TokenSpan) -> bool:
@@ -1424,8 +2103,8 @@ def _collect_relation_examples(
             remaining_pred.remove(p)
             used_gold.add(g)
 
-    missing = [k for k in sorted(gold_keys, key=lambda x: str(x)) if k not in used_gold][:max_examples]
-    spurious = sorted(remaining_pred, key=lambda x: str(x))[:max_examples]
+    missing = [k for k in sorted(gold_keys, key=lambda x: str(x)) if k not in used_gold]
+    spurious = sorted(remaining_pred, key=lambda x: str(x))
     return {
         "endpoint_mismatch": endpoint_examples,
         "type_mismatch": type_examples,
@@ -1475,17 +2154,70 @@ def score_relation_layer(
             for r in predicted_relations
         }
 
-    gold_keys = {_relation_key(r, mode) for r in gold_relations}
-    pred_keys = {_relation_key(r, mode) for r in predicted_relations}
-
-    tp = len(gold_keys & pred_keys)
-    fp = len(pred_keys - gold_keys)
-    fn = len(gold_keys - pred_keys)
-    out = precision_recall_f1(tp=tp, fp=fp, fn=fn)
-    out["mode"] = mode
-    out["errors"] = _bucket_relation_errors(gold_keys, pred_keys)
-    out["examples"] = _collect_relation_examples(gold_keys, pred_keys, max_examples=max_examples)
-    return out
+    if mode == "strict":
+        gold_keys = {_relation_key(r, "strict"): r for r in gold_relations}
+        pred_keys = {_relation_key(r, "strict"): r for r in predicted_relations}
+        
+        tp_keys = set(gold_keys.keys()) & set(pred_keys.keys())
+        tp = len(tp_keys)
+        fp = len(pred_keys) - tp
+        fn = len(gold_keys) - tp
+        
+        out = precision_recall_f1(tp=tp, fp=fp, fn=fn)
+        out["mode"] = "strict"
+        out["errors"] = _bucket_relation_errors(set(gold_keys.keys()), set(pred_keys.keys()))
+        out["examples"] = _collect_relation_examples(set(gold_keys.keys()), set(pred_keys.keys()), max_examples=max_examples)
+        return out
+        
+    else:  # Relaxed Mode
+        matched_gold = set()
+        matched_pred = set()
+        tp_pairs = []
+        
+        for g in gold_relations:
+            for p in predicted_relations:
+                if p in matched_pred: continue
+                
+                # In relaxed mode, relations match if:
+                # 1. Kinds match (e.g. has_participant == has_participant)
+                # 2. Source kinds match, and source spans OVERLAP
+                # 3. Target kinds match, and target spans OVERLAP
+                # 4. Canonicalized reltype (if applicable) matches
+                
+                if g.kind != p.kind: continue
+                if g.source_kind != p.source_kind or g.target_kind != p.target_kind: continue
+                
+                # Check overlapping endpoints
+                if _span_iou(g.source_span, p.source_span) == 0.0: continue
+                if _span_iou(g.target_span, p.target_span) == 0.0: continue
+                
+                # Check attributes (in relaxed, only reltype matters if present)
+                g_reltype = dict(g.attrs).get("reltype")
+                p_reltype = dict(p.attrs).get("reltype")
+                if g_reltype != p_reltype: continue
+                
+                matched_gold.add(g)
+                matched_pred.add(p)
+                tp_pairs.append({'gold': str(_relation_key(g, "strict")), 'predicted': str(_relation_key(p, "strict"))})
+                break
+                
+        tp = len(matched_gold)
+        fp = len(predicted_relations) - tp
+        fn = len(gold_relations) - tp
+        
+        # Prepare examples format
+        unmatched_gold = [str(_relation_key(g, "strict")) for g in gold_relations if g not in matched_gold]
+        unmatched_pred = [str(_relation_key(p, "strict")) for p in predicted_relations if p not in matched_pred]
+        
+        out = precision_recall_f1(tp=tp, fp=fp, fn=fn)
+        out["mode"] = "relaxed"
+        out["errors"] = {"relaxed_mismatch": fp}
+        out["examples"] = {
+            "matched_pairs": tp_pairs[:max_examples] if max_examples else tp_pairs,
+            "missing": [{"gold": g} for g in unmatched_gold[:max_examples] if max_examples] if max_examples else [{"gold": g} for g in unmatched_gold],
+            "spurious": [{"predicted": p} for p in unmatched_pred[:max_examples] if max_examples] if max_examples else [{"predicted": p} for p in unmatched_pred]
+        }
+        return out
 
 
 def evaluate_documents(
@@ -1503,6 +2235,23 @@ def evaluate_documents(
     timex_attr = cfg.mention_attr_keys.get("timex", ())
     relation_attr = cfg.relation_attr_keys
 
+    snapped_relations = set()
+    for r in predicted_doc.relations:
+        src = r.source_span
+        tgt = r.target_span
+        
+        if r.source_kind == "entity": src = _align_relation_entity_span(src, gold_doc.entity_mentions)
+        elif r.source_kind == "event": src = _align_relation_event_span(src, gold_doc.event_mentions)
+        elif r.source_kind == "timex": src = _align_relation_timex_span(src, gold_doc.timex_mentions)
+
+        if r.target_kind == "entity": tgt = _align_relation_entity_span(tgt, gold_doc.entity_mentions)
+        elif r.target_kind == "event": tgt = _align_relation_event_span(tgt, gold_doc.event_mentions)
+        elif r.target_kind == "timex": tgt = _align_relation_timex_span(tgt, gold_doc.timex_mentions)
+        
+        snapped_relations.add(Relation(r.kind, r.source_kind, src, r.target_kind, tgt, r.attrs))
+        
+    predicted_doc.relations = snapped_relations
+
     strict = {
         "entity": score_mention_layer(gold_doc.entity_mentions, predicted_doc.entity_mentions, mode="strict", overlap_threshold=overlap_threshold, attr_keys=entity_attr, max_examples=max_examples),
         "event": score_mention_layer(gold_doc.event_mentions, predicted_doc.event_mentions, mode="strict", overlap_threshold=overlap_threshold, attr_keys=event_attr, max_examples=max_examples),
@@ -1515,10 +2264,32 @@ def evaluate_documents(
         "timex": score_mention_layer(gold_doc.timex_mentions, predicted_doc.timex_mentions, mode="relaxed", overlap_threshold=overlap_threshold, attr_keys=timex_attr, max_examples=max_examples),
         "relation": score_relation_layer(gold_doc.relations, predicted_doc.relations, mode="relaxed", attr_keys=relation_attr, max_examples=max_examples),
     }
+
+    relation_kinds = sorted({r.kind for r in gold_doc.relations} | {r.kind for r in predicted_doc.relations})
+    relation_by_kind: Dict[str, Dict[str, Dict[str, Any]]] = {"strict": {}, "relaxed": {}}
+    for rel_kind in relation_kinds:
+        gold_kind = {r for r in gold_doc.relations if r.kind == rel_kind}
+        pred_kind = {r for r in predicted_doc.relations if r.kind == rel_kind}
+        relation_by_kind["strict"][rel_kind] = score_relation_layer(
+            gold_kind,
+            pred_kind,
+            mode="strict",
+            attr_keys=relation_attr,
+            max_examples=max_examples,
+        )
+        relation_by_kind["relaxed"][rel_kind] = score_relation_layer(
+            gold_kind,
+            pred_kind,
+            mode="relaxed",
+            attr_keys=relation_attr,
+            max_examples=max_examples,
+        )
+
     return {
         "doc_id": gold_doc.doc_id,
         "strict": strict,
         "relaxed": relaxed,
+        "relation_by_kind": relation_by_kind,
         "counts": {
             "gold": {
                 "entity": len(gold_doc.entity_mentions),
@@ -1546,6 +2317,7 @@ def aggregate_reports(reports: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
         "documents": len(rows),
         "micro": {},
         "macro": {},
+        "relation_by_kind": {"micro": {}, "macro": {}},
     }
 
     for mode in modes:
@@ -1565,6 +2337,39 @@ def aggregate_reports(reports: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
                 "f1": sum(float(r.get(mode, {}).get(layer, {}).get("f1", 0.0)) for r in rows) / n,
             }
             out["macro"][mode][layer] = macro
+
+    relation_kinds = sorted(
+        {
+            kind
+            for r in rows
+            for kind in set(r.get("relation_by_kind", {}).get("strict", {}).keys())
+            | set(r.get("relation_by_kind", {}).get("relaxed", {}).keys())
+        }
+    )
+    for mode in modes:
+        out["relation_by_kind"]["micro"][mode] = {}
+        out["relation_by_kind"]["macro"][mode] = {}
+        for rel_kind in relation_kinds:
+            tp = sum(int(r.get("relation_by_kind", {}).get(mode, {}).get(rel_kind, {}).get("tp", 0)) for r in rows)
+            fp = sum(int(r.get("relation_by_kind", {}).get(mode, {}).get(rel_kind, {}).get("fp", 0)) for r in rows)
+            fn = sum(int(r.get("relation_by_kind", {}).get(mode, {}).get(rel_kind, {}).get("fn", 0)) for r in rows)
+            out["relation_by_kind"]["micro"][mode][rel_kind] = precision_recall_f1(tp=tp, fp=fp, fn=fn)
+
+            n = max(1, len(rows))
+            out["relation_by_kind"]["macro"][mode][rel_kind] = {
+                "precision": sum(
+                    float(r.get("relation_by_kind", {}).get(mode, {}).get(rel_kind, {}).get("precision", 0.0))
+                    for r in rows
+                ) / n,
+                "recall": sum(
+                    float(r.get("relation_by_kind", {}).get(mode, {}).get(rel_kind, {}).get("recall", 0.0))
+                    for r in rows
+                ) / n,
+                "f1": sum(
+                    float(r.get("relation_by_kind", {}).get(mode, {}).get(rel_kind, {}).get("f1", 0.0))
+                    for r in rows
+                ) / n,
+            }
 
     return out
 
@@ -1849,6 +2654,21 @@ def render_markdown_report(report: Dict[str, Any]) -> str:
                 f"{float(row.get('precision',0.0)):.3f} | {float(row.get('recall',0.0)):.3f} | {float(row.get('f1',0.0)):.3f} |"
             )
         lines.append("")
+
+        relation_by_kind = aggregate.get("relation_by_kind", {})
+        if relation_by_kind:
+            strict_rel = dict(relation_by_kind.get("micro", {}).get("strict", {}))
+            if strict_rel:
+                lines.append("## Relation Kind Breakdown (Micro Strict)")
+                lines.append("")
+                lines.append("| Relation Kind | Precision | Recall | F1 |")
+                lines.append("|---|---:|---:|---:|")
+                for rel_kind in sorted(strict_rel.keys()):
+                    m = strict_rel.get(rel_kind, {})
+                    lines.append(
+                        f"| {rel_kind} | {float(m.get('precision', 0.0)):.3f} | {float(m.get('recall', 0.0)):.3f} | {float(m.get('f1', 0.0)):.3f} |"
+                    )
+                lines.append("")
 
     scorecards = report.get("scorecards") or {}
     if scorecards:

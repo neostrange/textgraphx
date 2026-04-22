@@ -30,11 +30,38 @@ class EntityFuser:
             MATCH p= (text:AnnotatedText where text.id =  $documentId)-[:CONTAINS_SENTENCE]->(sentence:Sentence)-[:HAS_TOKEN]->(a:TagOccurrence)-[:PARTICIPATES_IN]-(ne:NamedEntity),q= (a)-[:IS_DEPENDENT]->()--(ne)
             where not exists ((a)<-[:IS_DEPENDENT]-()--(ne))
             WITH ne, a, p
-            set ne.head = a.text, ne.headTokenIndex = a.tok_index_doc, 
-            (case when a.pos in ['NNS', 'NN'] then ne END).syntacticType ='NOMINAL' ,
-            (case when a.pos in ['NNP', 'NNPS'] then ne END).syntacticType ='NAM',
-            (case when a.pos in ['NNS', 'NN'] then ne END).syntactic_type ='NOM',
-            (case when a.pos in ['NNP', 'NNPS'] then ne END).syntactic_type ='NAM' 
+            WITH ne, a,
+                 coalesce(ne.type, '') AS ne_type,
+                 coalesce(ne.syntactic_type, '') AS existing_type
+            set ne.head = a.text, ne.headTokenIndex = a.tok_index_doc,
+                ne.syntacticType = CASE a.pos
+                    WHEN 'PRP' THEN 'PRO'
+                    WHEN 'PRP$' THEN 'PRO'
+                    WHEN 'WP' THEN 'PRO'
+                    WHEN 'WP$' THEN 'PRO'
+                    WHEN 'NNP' THEN 'NAM'
+                    WHEN 'NNPS' THEN 'NAM'
+                    WHEN 'NNS' THEN CASE
+                        WHEN NOT ne_type IN ['CARDINAL', 'DATE', 'ORDINAL', 'MONEY', 'TIME', 'QUANTITY', 'PERCENT'] and existing_type <> 'PRO' THEN 'NOMINAL'
+                        ELSE coalesce(ne.syntacticType, 'NAM') END
+                    WHEN 'NN' THEN CASE
+                        WHEN NOT ne_type IN ['CARDINAL', 'DATE', 'ORDINAL', 'MONEY', 'TIME', 'QUANTITY', 'PERCENT'] and existing_type <> 'PRO' THEN 'NOMINAL'
+                        ELSE coalesce(ne.syntacticType, 'NAM') END
+                    ELSE coalesce(ne.syntacticType, 'NAM') END,
+                ne.syntactic_type = CASE a.pos
+                    WHEN 'PRP' THEN 'PRO'
+                    WHEN 'PRP$' THEN 'PRO'
+                    WHEN 'WP' THEN 'PRO'
+                    WHEN 'WP$' THEN 'PRO'
+                    WHEN 'NNS' THEN CASE
+                        WHEN NOT ne_type IN ['CARDINAL', 'DATE', 'ORDINAL', 'MONEY', 'TIME', 'QUANTITY', 'PERCENT'] and existing_type <> 'PRO' THEN 'NOM'
+                        ELSE coalesce(ne.syntactic_type, 'NAM') END
+                    WHEN 'NN' THEN CASE
+                        WHEN NOT ne_type IN ['CARDINAL', 'DATE', 'ORDINAL', 'MONEY', 'TIME', 'QUANTITY', 'PERCENT'] and existing_type <> 'PRO' THEN 'NOM'
+                        ELSE coalesce(ne.syntactic_type, 'NAM') END
+                    WHEN 'NNP' THEN 'NAM'
+                    WHEN 'NNPS' THEN 'NAM'
+                    ELSE coalesce(ne.syntactic_type, 'NAM') END
         """
         self.logger.debug("assign_head_info_to_multitoken_entities: running for %s", document_id)
         self.execute_query(query, {'documentId': document_id})
@@ -52,11 +79,38 @@ class EntityFuser:
             MATCH p= (text:AnnotatedText where text.id =  $documentId )-[:CONTAINS_SENTENCE]->(sentence:Sentence)-[:HAS_TOKEN]->(a:TagOccurrence)-[:PARTICIPATES_IN]-(ne:NamedEntity)
             where not exists ((a)<-[:IS_DEPENDENT]-()--(ne)) and not exists ((a)-[:IS_DEPENDENT]->()--(ne))
             WITH ne, a, p
-            set ne.head = a.text, ne.headTokenIndex = a.tok_index_doc, 
-            (case when a.pos in ['NNS', 'NN'] then ne END).syntacticType ='NOMINAL' ,
-            (case when a.pos in ['NNP', 'NNPS'] then ne END).syntacticType ='NAM',
-            (case when a.pos in ['NNS', 'NN'] then ne END).syntactic_type ='NOM',
-            (case when a.pos in ['NNP', 'NNPS'] then ne END).syntactic_type ='NAM'   
+            WITH ne, a,
+                 coalesce(ne.type, '') AS ne_type,
+                 coalesce(ne.syntactic_type, '') AS existing_type
+            set ne.head = a.text, ne.headTokenIndex = a.tok_index_doc,
+                ne.syntacticType = CASE a.pos
+                    WHEN 'PRP' THEN 'PRO'
+                    WHEN 'PRP$' THEN 'PRO'
+                    WHEN 'WP' THEN 'PRO'
+                    WHEN 'WP$' THEN 'PRO'
+                    WHEN 'NNP' THEN 'NAM'
+                    WHEN 'NNPS' THEN 'NAM'
+                    WHEN 'NNS' THEN CASE
+                        WHEN NOT ne_type IN ['CARDINAL', 'DATE', 'ORDINAL', 'MONEY', 'TIME', 'QUANTITY', 'PERCENT'] and existing_type <> 'PRO' THEN 'NOMINAL'
+                        ELSE coalesce(ne.syntacticType, 'NAM') END
+                    WHEN 'NN' THEN CASE
+                        WHEN NOT ne_type IN ['CARDINAL', 'DATE', 'ORDINAL', 'MONEY', 'TIME', 'QUANTITY', 'PERCENT'] and existing_type <> 'PRO' THEN 'NOMINAL'
+                        ELSE coalesce(ne.syntacticType, 'NAM') END
+                    ELSE coalesce(ne.syntacticType, 'NAM') END,
+                ne.syntactic_type = CASE a.pos
+                    WHEN 'PRP' THEN 'PRO'
+                    WHEN 'PRP$' THEN 'PRO'
+                    WHEN 'WP' THEN 'PRO'
+                    WHEN 'WP$' THEN 'PRO'
+                    WHEN 'NNS' THEN CASE
+                        WHEN NOT ne_type IN ['CARDINAL', 'DATE', 'ORDINAL', 'MONEY', 'TIME', 'QUANTITY', 'PERCENT'] and existing_type <> 'PRO' THEN 'NOM'
+                        ELSE coalesce(ne.syntactic_type, 'NAM') END
+                    WHEN 'NN' THEN CASE
+                        WHEN NOT ne_type IN ['CARDINAL', 'DATE', 'ORDINAL', 'MONEY', 'TIME', 'QUANTITY', 'PERCENT'] and existing_type <> 'PRO' THEN 'NOM'
+                        ELSE coalesce(ne.syntactic_type, 'NAM') END
+                    WHEN 'NNP' THEN 'NAM'
+                    WHEN 'NNPS' THEN 'NAM'
+                    ELSE coalesce(ne.syntactic_type, 'NAM') END
         """
         self.logger.debug("assign_head_info_to_singletoken_entities: running for %s", document_id)
         self.execute_query(query, {'documentId': document_id})

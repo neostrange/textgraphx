@@ -30,6 +30,10 @@ Thumbs.db
 # Large generated datastore copies (subfolders)
 datastore/**/copy_of_current_latest/
 
+# Temporary evaluation XML mirror directories
+datastore/evaluation/tmp_gold_xml/
+datastore/evaluation/tmp_pred_xml/
+
 # Ignore editor temporary files
 *.swp
 *.swo

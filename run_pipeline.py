@@ -46,8 +46,8 @@ def main():
     parser.add_argument(
         "--model",
         type=str,
-        default="en_core_web_sm",
-        help="spaCy model name (default: en_core_web_sm)"
+        default="en_core_web_trf",
+        help="spaCy model name (default: en_core_web_trf)"
     )
     parser.add_argument(
         "--phases",

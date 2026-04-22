@@ -127,6 +127,7 @@ class EntityExtractor:
                         ne.legacy_span_id = coalesce(ne.legacy_span_id, $id),
                         ne.uid = $uid,
                         ne.type = $type, 
+                        ne.ent_class = $ent_class,
                         ne.value = $value, 
                         ne.start_index = $start_index, 
                         ne.end_index = $end_index,
@@ -142,6 +143,7 @@ class EntityExtractor:
                     "start_index": start_index,
                     "end_index": end_index,
                     "type": label,
+                    "ent_class": label, # Could add full map later, but label protects schema
                     "value": entity['text'],
                     "id": ne_id,
                     "uid": ne_uid,

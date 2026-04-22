@@ -129,14 +129,31 @@ class RefinementPhase():
             "detect_quantified_entities_from_frameArgument",
         ],
         "nominal_mentions": [
+            "materialize_predicate_nominal_mentions",
+            "materialize_appositive_mentions",
+            "materialize_event_argument_mentions",
             "materialize_nominal_mentions_from_frame_arguments",
             "materialize_nominal_mentions_from_noun_chunks",
             "resolve_nominal_semantic_heads",
             "annotate_nominal_semantic_profiles",
+            "assign_meantime_syntactic_types",
         ],
         "mention_cleanup": [
             "trim_trailing_punctuation_from_entity_mentions",
             "tag_discourse_relevant_entities",
+        ],
+        "meantime_boundary_alignment": [
+            "trim_determiners_from_mentions",
+            "trim_punctuation_from_mentions",
+            "update_mention_span_boundaries",
+        ],
+        "morphological_projection": [
+            "project_event_polarity",
+            "project_event_tense_aspect",
+        ],
+        "syntactic_semantic_coercion": [
+            "promote_nominal_events",
+            "coerce_role_based_types",
         ],
         "entity_state": [
             "annotate_entity_state_signals",
@@ -247,6 +264,7 @@ class RefinementPhase():
                 "end_tok": row["end_tok"],
                 "start_char": row.get("start_char"),
                 "end_char": row.get("end_char"),
+                "syntactic_type": row.get("syntactic_type", "NOM"),
                 "mention_source": mention_source,
                 "confidence": confidence,
                 "provenance_rule_id": provenance_rule_id,
@@ -271,8 +289,8 @@ class RefinementPhase():
                     em.value = row.value,
                     em.head = row.head,
                     em.headTokenIndex = row.headTokenIndex,
-                    em.syntacticType = 'NOMINAL',
-                    em.syntactic_type = 'NOMINAL',
+                          em.syntacticType = row.syntactic_type,
+                          em.syntactic_type = row.syntactic_type,
                     em.start_tok = row.start_tok,
                     em.end_tok = row.end_tok,
                     em.start_char = row.start_char,
@@ -285,6 +303,7 @@ class RefinementPhase():
                  WITH em, row
                  MATCH (d:AnnotatedText {{id: row.doc_id}})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok:TagOccurrence)
                  WHERE tok.tok_index_doc >= row.start_tok AND tok.tok_index_doc <= row.end_tok
+                 MERGE (tok)-[:IN_MENTION]->(em)
                  MERGE (tok)-[:PARTICIPATES_IN]->(em)
                  RETURN count(DISTINCT em) AS mentions_materialized
         """
@@ -347,30 +366,42 @@ class RefinementPhase():
         - Idempotent: safe to run multiple times.
         """
         query = """
-            MATCH (ne:NamedEntity)
+            MATCH (ne:NamedEntity)-[:PARTICIPATES_IN|IN_RELATION|HAS_STATE|IS_A*1..2]-(ev)
             WHERE ne.type IN ['ORG', 'GPE', 'PERSON', 'FAC', 'LOC',
-                              'PRODUCT', 'WORK_OF_ART', 'EVENT', 'LAW']
+                              'PRODUCT', 'WORK_OF_ART', 'EVENT', 'LAW', 'PER']
             SET ne:DiscourseEntity
-            RETURN count(ne) AS tagged
+            RETURN count(DISTINCT ne) AS tagged
         """
         data = self.graph.run(query).data()
         tagged_ne = data[0].get("tagged", 0) if data else 0
 
         nominal_query = """
-            MATCH (em:EntityMention:NominalMention)
-            MATCH (tok:TagOccurrence)-[:IN_MENTION]->(em)
-            MATCH (tok)-[:IN_FRAME]->(fa:FrameArgument)
-            WHERE fa.type IN ['ARG0', 'ARG1', 'ARG2']
+            MATCH (em)
+            WHERE em:NominalMention OR em:CorefMention OR em:EntityMention
+            OPTIONAL MATCH (em)-[:REFERS_TO]->(ent:Entity)
+            WITH em, coalesce(ent, em) AS anchor
+            MATCH (anchor)-[:EVENT_PARTICIPANT|PARTICIPANT|PARTICIPATES_IN|IN_RELATION|HAS_STATE|IS_A*1..2]-(ev)
             SET em:DiscourseEntity
             RETURN count(DISTINCT em) AS tagged
         """
         data_nom = self.graph.run(nominal_query).data()
         tagged_nom = data_nom[0].get("tagged", 0) if data_nom else 0
 
+
+        fa_query = """
+            MATCH (fa:FrameArgument)
+            MATCH (fa)-[:EVENT_PARTICIPANT|PARTICIPANT|PARTICIPATES_IN|IN_RELATION|HAS_STATE|IS_A*1..2]-(ev)
+            SET fa:DiscourseEntity
+            RETURN count(DISTINCT fa) AS tagged
+        """
+        data_fa = self.graph.run(fa_query).data()
+        tagged_fa = data_fa[0].get("tagged", 0) if data_fa else 0
+
         logger.info(
-            "tag_discourse_relevant_entities: tagged %d NamedEntity + %d nominal mentions as :DiscourseEntity",
+            "tag_discourse_relevant_entities: tagged %d NamedEntity + %d nominal mentions + %d FrameArgument as :DiscourseEntity",
             tagged_ne,
             tagged_nom,
+            tagged_fa,
         )
         return ""
 
@@ -664,8 +695,10 @@ class RefinementPhase():
                         where not exists ((a)<-[:IS_DEPENDENT]-()--(f)) and f.headTokenIndex is null
                         WITH f, a, p
                         set f.head = a.text, f.headTokenIndex = a.tok_index_doc,
-                        (case when a.pos in ['NNS', 'NN'] then f END).syntacticType ='NOMINAL',
-                        (case when a.pos in ['NNP', 'NNPS'] then f END).syntacticType ='NAM'
+                            f.syntacticType = CASE
+                                WHEN a.pos IN ['NNS', 'NN'] THEN 'NOMINAL'
+                                WHEN a.pos IN ['NNP', 'NNPS'] THEN 'NAM'
+                                ELSE coalesce(f.syntacticType, 'NAM') END
                         return p
 
         """
@@ -689,9 +722,11 @@ class RefinementPhase():
                         where not exists ((a)<-[:IS_DEPENDENT]-()--(c)) and not exists ((a)-[:IS_DEPENDENT]->()--(c)) and c.headTokenIndex is null
                         WITH c, a, p
                         set c.head = a.text, c.headTokenIndex = a.tok_index_doc,
-                        (case when a.pos in ['NNS', 'NN'] then c END).syntacticType ='NOMINAL',
-                        (case when a.pos in ['NNP', 'NNPS'] then c END).syntacticType ='NAM',
-                        (case when a.pos in ['PRP', 'PRP$'] then c END).syntacticType ='PRO'
+                            c.syntacticType = CASE
+                                WHEN a.pos IN ['NNS', 'NN'] THEN 'NOMINAL'
+                                WHEN a.pos IN ['NNP', 'NNPS'] THEN 'NAM'
+                                WHEN a.pos IN ['PRP', 'PRP$'] THEN 'PRO'
+                                ELSE coalesce(c.syntacticType, 'NAM') END
                         return p
 
         """
@@ -718,8 +753,10 @@ class RefinementPhase():
                         where not exists ((a)<-[:IS_DEPENDENT]-()--(f))
                         WITH f, a, p
                         set f.head = a.text, f.headTokenIndex = a.tok_index_doc, 
-                        (case when a.pos in ['NNS', 'NN'] then f END).syntacticType ='NOMINAL' ,
-                        (case when a.pos in ['NNP', 'NNPS'] then f END).syntacticType ='NAM'
+                            f.syntacticType = CASE
+                                WHEN a.pos IN ['NNS', 'NN'] THEN 'NOMINAL'
+                                WHEN a.pos IN ['NNP', 'NNPS'] THEN 'NAM'
+                                ELSE coalesce(f.syntacticType, 'NAM') END
                         return p     
         
         """
@@ -758,9 +795,11 @@ class RefinementPhase():
                                                 where not exists ((a)<-[:IS_DEPENDENT]-()--(c)) and not exists ((a)-[:IS_DEPENDENT]->()--(c))
                                                 WITH c, a, p
                                                 set c.head = a.text, c.headTokenIndex = a.tok_index_doc, 
-                                                (case when a.pos in ['NNS', 'NN'] then c END).syntacticType ='NOMINAL' , 
-                                                (case when a.pos in ['NNP', 'NNPS'] then c END).syntacticType ='NAM', 
-                                                (case when a.pos in ['PRP', 'PRP$'] then c END).syntacticType ='PRO'
+                                                    c.syntacticType = CASE
+                                                        WHEN a.pos IN ['NNS', 'NN'] THEN 'NOMINAL'
+                                                        WHEN a.pos IN ['NNP', 'NNPS'] THEN 'NAM'
+                                                        WHEN a.pos IN ['PRP', 'PRP$'] THEN 'PRO'
+                                                        ELSE coalesce(c.syntacticType, 'NAM') END
                                                 return p     
         
                 """
@@ -785,9 +824,17 @@ class RefinementPhase():
                         match p= (a:TagOccurrence)-[:IN_MENTION]->(f:CorefMention), q= (a)-[:IS_DEPENDENT]->()--(f)
                         where not exists ((a)<-[:IS_DEPENDENT]-()--(f))
                         WITH f, a, p
-                        set f.head = a.text, f.headTokenIndex = a.tok_index_doc, 
-                        (case when a.pos in ['NNS', 'NN'] then f END).syntacticType ='NOMINAL' ,
-                        (case when a.pos in ['NNP', 'NNPS'] then f END).syntacticType ='NAM'
+                        set f.head = a.text, f.headTokenIndex = a.tok_index_doc,
+                            f.syntacticType = CASE
+                                WHEN a.pos IN ['PRP', 'PRP$', 'WP', 'WP$'] THEN 'PRO'
+                                WHEN a.pos IN ['NNP', 'NNPS'] THEN 'NAM'
+                                WHEN a.pos IN ['NNS', 'NN'] THEN 'NOMINAL'
+                                ELSE coalesce(f.syntacticType, 'NAM') END,
+                            f.syntactic_type = CASE
+                                WHEN a.pos IN ['PRP', 'PRP$', 'WP', 'WP$'] THEN 'PRO'
+                                WHEN a.pos IN ['NNP', 'NNPS'] THEN 'NAM'
+                                WHEN a.pos IN ['NNS', 'NN'] THEN 'NOM'
+                                ELSE coalesce(f.syntactic_type, 'NAM') END
                         return p     
         
         """
@@ -814,10 +861,17 @@ class RefinementPhase():
                         match p= (a:TagOccurrence)-[:IN_MENTION]->(c:CorefMention)
                         where not exists ((a)<-[:IS_DEPENDENT]-()--(c)) and not exists ((a)-[:IS_DEPENDENT]->()--(c))
                         WITH c, a, p
-                        set c.head = a.text, c.headTokenIndex = a.tok_index_doc, 
-                        (case when a.pos in ['NNS', 'NN'] then c END).syntacticType ='NOMINAL' , 
-                        (case when a.pos in ['NNP', 'NNPS'] then c END).syntacticType ='NAM', 
-                        (case when a.pos in ['PRP', 'PRP$'] then c END).syntacticType ='PRO'
+                        set c.head = a.text, c.headTokenIndex = a.tok_index_doc,
+                            c.syntacticType = CASE
+                                WHEN a.pos IN ['PRP', 'PRP$', 'WP', 'WP$'] THEN 'PRO'
+                                WHEN a.pos IN ['NNP', 'NNPS'] THEN 'NAM'
+                                WHEN a.pos IN ['NNS', 'NN'] THEN 'NOMINAL'
+                                ELSE coalesce(c.syntacticType, 'NAM') END,
+                            c.syntactic_type = CASE
+                                WHEN a.pos IN ['PRP', 'PRP$', 'WP', 'WP$'] THEN 'PRO'
+                                WHEN a.pos IN ['NNP', 'NNPS'] THEN 'NAM'
+                                WHEN a.pos IN ['NNS', 'NN'] THEN 'NOM'
+                                ELSE coalesce(c.syntactic_type, 'NAM') END
                         return p     
         
         """
@@ -843,9 +897,11 @@ class RefinementPhase():
                         where not exists ((a)<-[:IS_DEPENDENT]-()--(c)) and not exists ((a)-[:IS_DEPENDENT]->()--(c))
                         WITH c, a, p
                         set c.head = a.text, c.headTokenIndex = a.tok_index_doc,
-                        (case when a.pos in ['NNS', 'NN'] then c END).syntacticType ='NOMINAL' , 
-                        (case when a.pos in ['NNP', 'NNPS'] then c END).syntacticType ='NAM', 
-                        (case when a.pos in ['PRP', 'PRP$'] then c END).syntacticType ='PRO'
+                            c.syntacticType = CASE
+                                WHEN a.pos IN ['NNS', 'NN'] THEN 'NOMINAL'
+                                WHEN a.pos IN ['NNP', 'NNPS'] THEN 'NAM'
+                                WHEN a.pos IN ['PRP', 'PRP$'] THEN 'PRO'
+                                ELSE coalesce(c.syntacticType, 'NAM') END
                         return p    
         
         """
@@ -926,10 +982,12 @@ class RefinementPhase():
                         where not exists ((a)<-[:IS_DEPENDENT]-()--(c)) and not exists ((a)-[:IS_DEPENDENT]->()--(c))
                         WITH c, a, p
                         set c.head = a.text, c.headTokenIndex = a.tok_index_doc,
-                        (case when a.pos in ['NNS', 'NN'] then c END).syntacticType ='NOMINAL' , 
-                        (case when a.pos in ['NNP', 'NNPS'] then c END).syntacticType ='NAM', 
-                        (case when a.pos in ['PRP', 'PRP$'] then c END).syntacticType ='PRO',
-                        (case when a.pos in ['RB'] then c END).syntacticType ='ADV'
+                            c.syntacticType = CASE
+                                WHEN a.pos IN ['NNS', 'NN'] THEN 'NOMINAL'
+                                WHEN a.pos IN ['NNP', 'NNPS'] THEN 'NAM'
+                                WHEN a.pos IN ['PRP', 'PRP$'] THEN 'PRO'
+                                WHEN a.pos IN ['RB'] THEN 'ADV'
+                                ELSE coalesce(c.syntacticType, 'NAM') END
                         return p    
         
         """
@@ -966,9 +1024,11 @@ class RefinementPhase():
                                                 where not exists ((a)<-[:IS_DEPENDENT]-()--(f))
                                                 WITH f, a, p
                                                 set f.head = a.text, f.headTokenIndex = a.tok_index_doc, 
-                                                (case when a.pos in ['NNS', 'NN'] then f END).syntacticType ='NOMINAL' , 
-                                                (case when a.pos in ['NNP', 'NNPS'] then f END).syntacticType ='NAM',  
-                                                (case when a.pos in ['PRP', 'PRP$'] then f END).syntacticType ='PRO'
+                                                    f.syntacticType = CASE
+                                                        WHEN a.pos IN ['NNS', 'NN'] THEN 'NOMINAL'
+                                                        WHEN a.pos IN ['NNP', 'NNPS'] THEN 'NAM'
+                                                        WHEN a.pos IN ['PRP', 'PRP$'] THEN 'PRO'
+                                                        ELSE coalesce(f.syntacticType, 'NAM') END
                                                 return p    
         
                 """
@@ -1559,6 +1619,22 @@ class RefinementPhase():
     #// cases - 1. kb_id of both namedEntities are not null (DONE in this query)
     #//         2. ne1 doesnt have kb_id and ne2 has kb_id  (e.g., Fed as a spacy entity but actually refering to dbpedia Federal Researve)(DONE in next query v2)
     #//               
+
+    def filter_orphan_entities(self):
+        """Flag isolated pronouns and background nominals as non-core (is_timeml_core=false)."""
+        logger.info("filter_orphan_entities: running coreference-gated salience filter")
+        query = """
+        MATCH (em:EntityMention)
+        WHERE em.syntactic_type IN ['pro', 'nom', 'NOMINAL', 'PRONOUN']
+        OPTIONAL MATCH (em)-[r:COREFERENT_WITH]-()
+        WITH em, count(r) as coref_count
+        SET em.is_timeml_core = CASE 
+            WHEN coref_count = 0 THEN false
+            ELSE true
+        END
+        """
+        self.graph.run(query)
+
     def detect_correct_NEL_result_for_having_kb_id(self):
         """Correct Named Entity Linking (NEL) when both NE candidates have KB ids.
 
@@ -1765,13 +1841,9 @@ class RefinementPhase():
                  OPTIONAL MATCH (ne:NamedEntity)
                  WHERE coalesce(ne.start_tok, ne.token_start, ne.index) = min_tok
                    AND coalesce(ne.end_tok, ne.token_end, ne.end_index, ne.index) = max_tok
-                                 OPTIONAL MATCH (tok_fa:TagOccurrence)-[:PARTICIPATES_IN]->(nc)
-                                 OPTIONAL MATCH (tok_fa)-[:IN_FRAME]->(fa:FrameArgument)
                                  WITH nc, d, min_tok, max_tok, min_char, max_char, chunk_text_lc,
-                                            count(ne) AS ne_count,
-                                            count(DISTINCT CASE WHEN fa.type IN ['ARG0', 'ARG1', 'ARG2'] THEN fa END) AS core_arg_hits
+                                            count(ne) AS ne_count
                                  WHERE ne_count = 0
-                                     AND core_arg_hits > 0
                                      AND chunk_text_lc <> ''
                                      AND NOT chunk_text_lc IN ['yesterday', 'today', 'tomorrow']
                                      AND NOT chunk_text_lc CONTAINS '%'
@@ -1794,9 +1866,11 @@ class RefinementPhase():
                      max_char AS end_char
                  WITH nc, doc_id, start_tok, end_tok, start_char, end_char,
                      'nominal_chunk_' + toString(doc_id) + '_' + toString(start_tok) + '_' + toString(end_tok) AS entity_id,
-                     'nom_mention_nc_' + toString(doc_id) + '_' + toString(start_tok) + '_' + toString(end_tok) AS mention_id
+                     'nom_mention_nc_' + toString(doc_id) + '_' + toString(start_tok) + '_' + toString(end_tok) AS mention_id,
+                     coalesce(nc.syntactic_type, nc.syntacticType, 'NOM') AS syntactic_type
                  MERGE (e:Entity {id: entity_id, type: 'NOMINAL'})
-                 SET e.syntacticType = 'NOMINAL',
+                 SET e.syntacticType = syntactic_type,
+                                     e.syntactic_type = syntactic_type,
                     e.head = coalesce(e.head, nc.value),
                     e.start_tok = start_tok,
                     e.end_tok = end_tok,
@@ -1817,6 +1891,7 @@ class RefinementPhase():
                     end_tok,
                     start_char,
                     end_char,
+                    syntactic_type,
                     mention_id
         """
         rows = graph.run(candidate_query).data()
@@ -1843,7 +1918,7 @@ class RefinementPhase():
 
         query = """
                  MATCH (em:EntityMention:NominalMention)
-                 OPTIONAL MATCH (tok:TagOccurrence)-[:IN_MENTION]->(em)
+                 OPTIONAL MATCH (tok:TagOccurrence)-[:IN_MENTION|PARTICIPATES_IN]->(em)
                  WITH em, tok,
                       CASE
                           WHEN tok IS NULL THEN 99
@@ -1904,10 +1979,10 @@ class RefinementPhase():
 
         query = """
                  MATCH (em:EntityMention:NominalMention)
-                 OPTIONAL MATCH (head_tok:TagOccurrence)-[:IN_MENTION]->(em)
+                 OPTIONAL MATCH (head_tok:TagOccurrence)-[:IN_MENTION|PARTICIPATES_IN]->(em)
                   WHERE head_tok.tok_index_doc = coalesce(em.nominalSemanticHeadTokenIndex, em.headTokenIndex, em.end_tok, em.start_tok)
                  WITH em, head(collect(head_tok)) AS head_tok
-                 OPTIONAL MATCH (arg_tok:TagOccurrence)-[:IN_MENTION]->(em)
+                 OPTIONAL MATCH (arg_tok:TagOccurrence)-[:IN_MENTION|PARTICIPATES_IN]->(em)
                  OPTIONAL MATCH (arg_tok)-[:IN_FRAME]->(fa:FrameArgument)
                  WITH em, head_tok,
                       count(DISTINCT CASE WHEN fa.type IN ['ARG0', 'ARG1', 'ARG2'] THEN fa END) AS core_arg_hits
@@ -1937,9 +2012,12 @@ class RefinementPhase():
                       coalesce(head_tok.hypernyms, []) AS head_hypernyms,
                                             event_trigger,
                                             wordnet_eventive
-                                                OR head_wn_lexname IN ['noun.event', 'noun.act', 'noun.phenomenon', 'noun.process', 'noun.state'] AS eventive_by_wordnet,
-                                            (core_arg_hits > 0) AS eventive_by_argument,
-                                            head_lemma_lc =~ '.*(tion|sion|ment|ance|ence|al|ure|ing)$' AS eventive_by_morphology,
+                                                OR head_wn_lexname IN ['noun.event', 'noun.act', 'noun.process'] AS eventive_by_wordnet,
+                                            false AS eventive_by_argument,
+                                            (
+                                                size(head_lemma_lc) >= 5
+                                                AND head_lemma_lc =~ '.*(tion|sion|ment|ance|ence|ure|ing)$'
+                                            ) AS eventive_by_morphology,
                       proper_like
                                  WITH em, core_arg_hits, mention_cluster_size, has_named_link, head_wn_lexname, head_pos, head_nltk_synset, head_hypernyms,
                                             event_trigger, eventive_by_wordnet, eventive_by_argument, eventive_by_morphology,
@@ -2006,6 +2084,11 @@ class RefinementPhase():
                      em.nominalEvalLayerSuggestion = eval_layer,
                      em.nominalEvalProfile = eval_profile,
                      em.nominalEvalCandidateGold = eval_candidate_gold,
+                     em.isSalientNominal = (
+                         has_named_link
+                         OR event_trigger
+                         OR ((core_arg_hits > 0) AND eventive_confidence >= 0.40)
+                     ),
                      em.nominalSemanticSignals = semantic_signals
                  SET e.nominalHeadPos = coalesce(e.nominalHeadPos, head_pos),
                      e.nominalHeadNltkSynset = coalesce(e.nominalHeadNltkSynset, head_nltk_synset),
@@ -2029,10 +2112,54 @@ class RefinementPhase():
                      END,
                      e.nominalEvalLayerSuggestion = coalesce(e.nominalEvalLayerSuggestion, eval_layer),
                      e.nominalEvalProfile = coalesce(e.nominalEvalProfile, eval_profile),
-                     e.nominalEvalCandidateGold = coalesce(e.nominalEvalCandidateGold, eval_candidate_gold)
+                     e.nominalEvalCandidateGold = coalesce(e.nominalEvalCandidateGold, eval_candidate_gold),
+                     e.isSalientNominal = coalesce(e.isSalientNominal, false)
+                         OR has_named_link
+                         OR event_trigger
+                         OR ((core_arg_hits > 0) AND eventive_confidence >= 0.40)
                  RETURN count(DISTINCT em) AS nominals_profiled
         """
         graph.run(query).data()
+
+        eval_span_query = """
+                 MATCH (em:EntityMention:NominalMention)
+                 WHERE em.start_tok IS NOT NULL AND em.end_tok IS NOT NULL
+                 OPTIONAL MATCH (start_tok:TagOccurrence)-[:IN_MENTION|PARTICIPATES_IN]->(em)
+                  WHERE start_tok.tok_index_doc = em.start_tok
+                 OPTIONAL MATCH (end_tok:TagOccurrence)-[:IN_MENTION|PARTICIPATES_IN]->(em)
+                  WHERE end_tok.tok_index_doc = em.end_tok
+                 WITH em,
+                      coalesce(em.nominalSemanticHeadTokenIndex, em.headTokenIndex, em.end_tok, em.start_tok) AS head_idx,
+                      CASE
+                          WHEN em.start_tok < em.end_tok
+                               AND (
+                                   coalesce(start_tok.upos, '') = 'DET'
+                                   OR coalesce(start_tok.pos, '') IN ['DT', 'PDT', 'WDT']
+                               )
+                          THEN em.start_tok + 1
+                          ELSE em.start_tok
+                      END AS eval_start,
+                      CASE
+                          WHEN em.end_tok > em.start_tok
+                               AND (
+                                   coalesce(end_tok.upos, '') = 'PUNCT'
+                                   OR coalesce(end_tok.pos, '') IN ['.', ',', ':', ';', '``', "''"]
+                               )
+                          THEN em.end_tok - 1
+                          ELSE em.end_tok
+                      END AS eval_end
+                 WITH em,
+                      CASE WHEN head_idx < eval_start THEN head_idx ELSE eval_start END AS final_start,
+                      head_idx AS final_end
+                 OPTIONAL MATCH (em)-[:REFERS_TO]->(e:Entity)
+                 SET em.nominalEvalStartTok = final_start,
+                     em.nominalEvalEndTok = final_end,
+                     em.nominalEvalHasContraction = (final_start <> em.start_tok OR final_end <> em.end_tok),
+                     e.nominalEvalStartTok = coalesce(e.nominalEvalStartTok, final_start),
+                     e.nominalEvalEndTok = coalesce(e.nominalEvalEndTok, final_end)
+                 RETURN count(DISTINCT em) AS nominals_eval_spans
+        """
+        graph.run(eval_span_query).data()
 
         return ""
 
@@ -2103,7 +2230,212 @@ class RefinementPhase():
         logger.debug("link_frameArgument_to_numeric_entities: linked %d frame arguments", linked)
         return ""
 
+    # ------------------------------------------------------------------
+    # Phase 3 — NAF-compliant syntactic type correction
+    # ------------------------------------------------------------------
 
+    def assign_meantime_syntactic_types(self):
+        """Correct syntactic_type on NamedEntity nodes using NAF-compliant rules.
+
+        Rules applied (idempotent — safe to re-run):
+        - PRP / PRP$ / WP / WP$ or upos=PRON  → PRO
+        - NNP / NNPS                            → NAM
+        - NN / NNS                              → NOM
+        - DT / PDT / WDT / CD                  → PTV
+        Nodes already typed as APP / CONJ / ARC by dep-structure rules are
+        intentionally not overridden.
+        """
+        logger.debug("assign_meantime_syntactic_types")
+        graph = self.graph
+
+        query = """
+            MATCH (ne:NamedEntity)
+            WHERE ne.headTokenIndex IS NOT NULL
+              AND NOT coalesce(ne.stale, false)
+              AND NOT coalesce(ne.syntactic_type, '') IN ['APP', 'CONJ', 'ARC']
+            MATCH (tok:TagOccurrence)-[:IN_MENTION|PARTICIPATES_IN]->(ne)
+            WHERE tok.tok_index_doc = ne.headTokenIndex
+            WITH ne, head(collect(tok)) AS head_tok
+            WITH ne,
+                 coalesce(head_tok.pos, '')  AS head_pos,
+                 coalesce(head_tok.upos, '') AS upos
+            WITH ne, head_pos, upos,
+                 CASE
+                     WHEN head_pos IN ['PRP', 'PRP$', 'WP', 'WP$'] OR upos = 'PRON' THEN 'PRO'
+                     WHEN head_pos IN ['NNP', 'NNPS']                                THEN 'NAM'
+                     WHEN head_pos IN ['NN', 'NNS']                                  THEN 'NOM'
+                     WHEN head_pos IN ['DT', 'PDT', 'WDT', 'CD']                    THEN 'PTV'
+                     ELSE coalesce(ne.syntactic_type, 'NAM')
+                 END AS new_stype,
+                 CASE
+                     WHEN head_pos IN ['PRP', 'PRP$', 'WP', 'WP$'] OR upos = 'PRON' THEN 'PRO'
+                     WHEN head_pos IN ['NNP', 'NNPS']                                THEN 'NAM'
+                     WHEN head_pos IN ['NN', 'NNS']                                  THEN 'NOMINAL'
+                     WHEN head_pos IN ['DT', 'PDT', 'WDT', 'CD']                    THEN 'PTV'
+                     ELSE coalesce(ne.syntacticType, 'NAM')
+                 END AS new_syntacticType
+            SET ne.syntactic_type = new_stype,
+                ne.syntacticType  = new_syntacticType
+            RETURN count(ne) AS updated
+        """
+        data = graph.run(query).data()
+        updated = data[0].get("updated", 0) if data else 0
+        logger.info("assign_meantime_syntactic_types: updated %d NamedEntity nodes", updated)
+        return ""
+
+    # ------------------------------------------------------------------
+    # Phase 4 — Hybrid dep-parse nominal extraction
+    # ------------------------------------------------------------------
+
+    def materialize_predicate_nominal_mentions(self):
+        """Create NominalMention nodes for predicate nominatives (attr dep).
+
+        Pattern: [verb: be/become/remain] -[:IS_DEPENDENT {type:'attr'}]-> [noun]
+        Creates EntityMention:NominalMention for the noun head when no
+        NamedEntity or EntityMention already covers it.  Syntactic type is
+        set to NAM for NNP/NNPS heads, NOM otherwise.
+        """
+        logger.debug("materialize_predicate_nominal_mentions")
+        graph = self.graph
+
+        query = """
+            MATCH (doc:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(head_tok:TagOccurrence)
+            MATCH (verb_tok:TagOccurrence)-[:IS_DEPENDENT {type: 'attr'}]->(head_tok)
+            WHERE head_tok.pos IN ['NN', 'NNS', 'NNP', 'NNPS']
+              AND toLower(coalesce(verb_tok.lemma, verb_tok.text, '')) IN ['be', 'become', 'remain', 'stay']
+            OPTIONAL MATCH (ne:NamedEntity)-[:IN_MENTION|PARTICIPATES_IN]-(head_tok)
+            WHERE NOT coalesce(ne.stale, false)
+            WITH doc, head_tok, count(ne) AS ne_cov
+            WHERE ne_cov = 0
+            OPTIONAL MATCH (em:EntityMention)-[:IN_MENTION|PARTICIPATES_IN]-(head_tok)
+            WITH doc, head_tok, ne_cov, count(em) AS em_cov
+            WHERE em_cov = 0
+            WITH doc, head_tok,
+                 toInteger(doc.id) AS doc_id,
+                 'pred_nom_' + toString(doc.id) + '_' + toString(head_tok.tok_index_doc) AS em_id,
+                 CASE WHEN head_tok.pos IN ['NNP', 'NNPS'] THEN 'NAM' ELSE 'NOM' END AS stype
+            WITH doc, head_tok, doc_id, em_id, stype,
+                 CASE WHEN stype = 'NAM' THEN 'NAM' ELSE 'NOMINAL' END AS legacy_stype
+            MERGE (em:EntityMention:NominalMention {id: em_id})
+            SET em.doc_id          = doc_id,
+                em.value           = head_tok.text,
+                em.head            = head_tok.text,
+                em.headTokenIndex  = head_tok.tok_index_doc,
+                em.start_tok       = head_tok.tok_index_doc,
+                em.end_tok         = head_tok.tok_index_doc,
+                em.syntactic_type  = stype,
+                em.syntacticType   = legacy_stype,
+                em.source          = 'pred_nominal',
+                em.confidence      = 0.75,
+                em.provenance_rule_id = 'refinement.materialize_predicate_nominal_mentions'
+            MERGE (head_tok)-[:IN_MENTION]->(em)
+            RETURN count(DISTINCT em) AS created
+        """
+        data = graph.run(query).data()
+        created = data[0].get("created", 0) if data else 0
+        logger.info("materialize_predicate_nominal_mentions: created %d mentions", created)
+        return ""
+
+    def materialize_appositive_mentions(self):
+        """Create NominalMention nodes for appositive phrases (appos dep).
+
+        Pattern: [parent noun] -[:IS_DEPENDENT {type:'appos'}]-> [appositive noun]
+        The appositive head receives syntactic_type=APP (or NAM if NNP/NNPS).
+        Skipped when a NamedEntity or EntityMention already covers the head token.
+        """
+        logger.debug("materialize_appositive_mentions")
+        graph = self.graph
+
+        query = """
+            MATCH (doc:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(head_tok:TagOccurrence)
+            MATCH (parent_tok:TagOccurrence)-[:IS_DEPENDENT {type: 'appos'}]->(head_tok)
+            WHERE head_tok.pos IN ['NN', 'NNS', 'NNP', 'NNPS']
+            OPTIONAL MATCH (ne:NamedEntity)-[:IN_MENTION|PARTICIPATES_IN]-(head_tok)
+            WHERE NOT coalesce(ne.stale, false)
+            WITH doc, head_tok, count(ne) AS ne_cov
+            WHERE ne_cov = 0
+            OPTIONAL MATCH (em:EntityMention)-[:IN_MENTION|PARTICIPATES_IN]-(head_tok)
+            WITH doc, head_tok, ne_cov, count(em) AS em_cov
+            WHERE em_cov = 0
+            WITH doc, head_tok,
+                 toInteger(doc.id) AS doc_id,
+                 'appos_' + toString(doc.id) + '_' + toString(head_tok.tok_index_doc) AS em_id,
+                 CASE WHEN head_tok.pos IN ['NNP', 'NNPS'] THEN 'NAM' ELSE 'APP' END AS stype
+            WITH doc, head_tok, doc_id, em_id, stype,
+                 CASE WHEN stype = 'NAM' THEN 'NAM' WHEN stype = 'APP' THEN 'APP' ELSE 'NOMINAL' END AS legacy_stype
+            MERGE (em:EntityMention:NominalMention {id: em_id})
+            SET em.doc_id          = doc_id,
+                em.value           = head_tok.text,
+                em.head            = head_tok.text,
+                em.headTokenIndex  = head_tok.tok_index_doc,
+                em.start_tok       = head_tok.tok_index_doc,
+                em.end_tok         = head_tok.tok_index_doc,
+                em.syntactic_type  = stype,
+                em.syntacticType   = legacy_stype,
+                em.source          = 'appositive',
+                em.confidence      = 0.80,
+                em.provenance_rule_id = 'refinement.materialize_appositive_mentions'
+            MERGE (head_tok)-[:IN_MENTION]->(em)
+            RETURN count(DISTINCT em) AS created
+        """
+        data = graph.run(query).data()
+        created = data[0].get("created", 0) if data else 0
+        logger.info("materialize_appositive_mentions: created %d mentions", created)
+        return ""
+
+    def materialize_event_argument_mentions(self):
+        """Ensure EventMention arguments (nsubj/dobj/nsubjpass) have EntityMention coverage.
+
+        For every TEvent whose head token governs an nsubj or dobj dependent
+        that is a NN/NNS/NNP/NNPS token without existing NamedEntity or EntityMention
+        coverage, create a NominalMention.  This is the highest-KG-impact rule since
+        event arguments are exactly the entities needed for temporal reasoning.
+        """
+        logger.debug("materialize_event_argument_mentions")
+        graph = self.graph
+
+        query = """
+            MATCH (doc:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(evt_tok:TagOccurrence)
+            MATCH (evt_tok)-[:TRIGGERS]->(event:TEvent)
+            MATCH (evt_tok)-[:IS_DEPENDENT {type: $dep_type}]->(arg_tok:TagOccurrence)
+            WHERE arg_tok.pos IN ['NN', 'NNS', 'NNP', 'NNPS']
+            OPTIONAL MATCH (ne:NamedEntity)-[:IN_MENTION|PARTICIPATES_IN]-(arg_tok)
+            WHERE NOT coalesce(ne.stale, false)
+            WITH doc, arg_tok, event, $dep_type AS dep_type, count(ne) AS ne_cov
+            WHERE ne_cov = 0
+            OPTIONAL MATCH (em:EntityMention)-[:IN_MENTION|PARTICIPATES_IN]-(arg_tok)
+            WITH doc, arg_tok, event, dep_type, ne_cov, count(em) AS em_cov
+            WHERE em_cov = 0
+            WITH doc, arg_tok, event, dep_type,
+                 toInteger(doc.id) AS doc_id,
+                 'evt_arg_' + dep_type + '_' + toString(doc.id) + '_' + toString(arg_tok.tok_index_doc) AS em_id,
+                 CASE WHEN arg_tok.pos IN ['NNP', 'NNPS'] THEN 'NAM' ELSE 'NOM' END AS stype
+            WITH doc, arg_tok, event, dep_type, doc_id, em_id, stype,
+                 CASE WHEN stype = 'NAM' THEN 'NAM' ELSE 'NOMINAL' END AS legacy_stype
+            MERGE (em:EntityMention:NominalMention {id: em_id})
+            SET em.doc_id          = doc_id,
+                em.value           = arg_tok.text,
+                em.head            = arg_tok.text,
+                em.headTokenIndex  = arg_tok.tok_index_doc,
+                em.start_tok       = arg_tok.tok_index_doc,
+                em.end_tok         = arg_tok.tok_index_doc,
+                em.syntactic_type  = stype,
+                em.syntacticType   = legacy_stype,
+                em.source          = 'event_argument_' + dep_type,
+                em.confidence      = 0.80,
+                em.provenance_rule_id = 'refinement.materialize_event_argument_mentions'
+            MERGE (arg_tok)-[:IN_MENTION]->(em)
+            MERGE (event)-[:HAS_PARTICIPANT]->(em)
+            RETURN count(DISTINCT em) AS created
+        """
+        total = 0
+        for dep_type in ("nsubj", "dobj", "nsubjpass"):
+            data = graph.run(query, {"dep_type": dep_type}).data()
+            n = data[0].get("created", 0) if data else 0
+            total += n
+            logger.debug("materialize_event_argument_mentions dep=%s created=%d", dep_type, n)
+        logger.info("materialize_event_argument_mentions: total %d mentions created", total)
+        return ""
 
 
 
@@ -2223,4 +2555,132 @@ if __name__ == '__main__':
 
 
 
+
+
+    # =============== NEW LINGUISTIC REFINEMENT RULES ===============
+
+    def project_event_polarity(self):
+        """Set event polarity based on dependency graph negation."""
+        logger.debug("project_event_polarity")
+        query = """
+        MATCH (e:EventMention)<-[:IN_MENTION]-(head:TagOccurrence)
+        WHERE head.tok_index_doc = e.headTokenIndex OR e.headTokenIndex IS NULL
+        MATCH (head)-[dep:IS_DEPENDENT]-(mod:TagOccurrence)
+        WHERE dep.type = 'neg'
+        SET e.polarity = "NEG"
+        """
+        self.graph.run(query)
+
+    def project_event_tense_aspect(self):
+        """Set event tense based on dependency graph auxiliaries."""
+        logger.debug("project_event_tense_aspect")
+        query = """
+        MATCH (e:EventMention)<-[:IN_MENTION]-(head:TagOccurrence)
+        WHERE head.tok_index_doc = e.headTokenIndex OR e.headTokenIndex IS NULL
+        MATCH (head)-[dep:IS_DEPENDENT]-(mod:TagOccurrence)
+        WHERE dep.type IN ['aux', 'auxpass']
+        WITH e, collect(toLower(mod.text)) as aux_words
+        SET e.tense = CASE 
+            WHEN any(w IN aux_words WHERE w IN ['was', 'were', 'had', 'did', 'been']) THEN 'PAST'
+            WHEN any(w IN aux_words WHERE w IN ['will', 'shall', 'would', 'could']) THEN 'FUTURE'
+            ELSE coalesce(e.tense, 'PRESENT') END,
+            e.aspect = CASE 
+            WHEN any(w IN aux_words WHERE w IN ['is', 'are', 'am', 'was', 'were', 'be', 'been']) AND e.value ENDS WITH 'ing' THEN 'PROGRESSIVE'
+            WHEN any(w IN aux_words WHERE w IN ['has', 'have', 'had']) THEN 'PERFECTIVE'
+            ELSE coalesce(e.aspect, 'NONE') END
+        """
+        self.graph.run(query)
+
+    def trim_determiners_from_mentions(self):
+        """Remove determiner tokens from the boundaries of Mentions."""
+        logger.debug("trim_determiners_from_mentions")
+        query = """
+        MATCH (m)
+        WHERE m:EntityMention OR m:EventMention
+        MATCH (m)<-[r:IN_MENTION]-(t:TagOccurrence)
+        WHERE t.pos IN ['DT', 'PRP$', 'WDT']
+        // Only strip if it's currently at the boundaries
+        AND (t.tok_index_doc = m.startIndex OR t.tok_index_doc = m.endIndex)
+        // And ensure we don't delete the head token
+        AND (m.headTokenIndex IS NULL OR t.tok_index_doc <> m.headTokenIndex)
+        DELETE r
+        """
+        self.graph.run(query)
+
+    def trim_punctuation_from_mentions(self):
+        """Remove trailing/leading punctuation tokens from the boundaries of Mentions."""
+        logger.debug("trim_punctuation_from_mentions")
+        query = """
+        MATCH (m)
+        WHERE m:EntityMention OR m:EventMention
+        MATCH (m)<-[r:IN_MENTION]-(t:TagOccurrence)
+        WHERE t.pos IN ['.', ',', ':', 'HYPH', '``', "''", '-LRB-', '-RRB-']
+           OR t.text =~ '^[\\\\.,;:_\\\'\\"?!\\[\\]()\\\\-]+$'
+        AND (t.tok_index_doc = m.startIndex OR t.tok_index_doc = m.endIndex)
+        AND (m.headTokenIndex IS NULL OR t.tok_index_doc <> m.headTokenIndex)
+        DELETE r
+        """
+        self.graph.run(query)
+
+    def update_mention_span_boundaries(self):
+        """Recompute the startIndex, endIndex, and string value of all Mentions."""
+        logger.debug("update_mention_span_boundaries")
+        query = """
+        MATCH (m)
+        WHERE m:EntityMention OR m:EventMention
+        MATCH (m)<-[:IN_MENTION]-(t:TagOccurrence)
+        WITH m, t ORDER BY t.tok_index_doc
+        WITH m, collect(t) AS tokens
+        WHERE size(tokens) > 0
+        WITH m, tokens, tokens[0].tok_index_doc AS newStart, tokens[-1].tok_index_doc AS newEnd
+        WHERE m.startIndex <> newStart OR m.endIndex <> newEnd OR m.span[0] <> newStart
+        SET m.startIndex = newStart,
+            m.endIndex = newEnd,
+            m.span = [x IN tokens | x.tok_index_doc],
+            m.value = reduce(s = '', x IN tokens | CASE WHEN s = '' THEN x.text ELSE s + ' ' + x.text END)
+        """
+        self.graph.run(query)
+
+    def promote_nominal_events(self):
+        """Promote nominals that act as Frame heads into EventMentions."""
+        logger.debug("promote_nominal_events")
+        query = """
+        MATCH (f:Frame)-[:IS_FRAME_OF]->(t:TagOccurrence)
+        WHERE t.pos IN ['NN', 'NNS']
+        AND NOT (t)-[:IN_MENTION]->(:EventMention)
+        WITH f, t
+        // Create the new EventMention tied to this document
+        MERGE (ev:EventMention { uid: 'nom_ev_' + f.uuid })
+        ON CREATE SET 
+            ev.value = t.text,
+            ev.startIndex = t.tok_index_doc,
+            ev.endIndex = t.tok_index_doc,
+            ev.span = [t.tok_index_doc],
+            ev.headTokenIndex = t.tok_index_doc,
+            ev.syntacticType = 'NOMINAL',
+            ev.doc_id = t.doc_id
+        MERGE (t)-[:IN_MENTION]->(ev)
+        // Ensure the semantic frame points to this new event representation
+        MERGE (f)-[:MENTIONS]->(ev)
+        """
+        self.graph.run(query)
+
+    def coerce_role_based_types(self):
+        """Refine generic EntityMentions serving as LOC or TMP frame arguments."""
+        logger.debug("coerce_role_based_types")
+        query = """
+        MATCH (fa:FrameArgument)-[:PARTICIPATES_IN]->(m:EntityMention)
+        WHERE fa.type IN ['ARGM-LOC', 'ARGM-TMP']
+        // Only safely coerce if not already a specialized entity class
+        // (Avoiding overwriting PERSON or ORGANIZATION without care)
+        AND NOT m:Location AND NOT m:Timex
+        WITH fa, m
+        FOREACH (ignore IN CASE WHEN fa.type = 'ARGM-LOC' THEN [1] ELSE [] END |
+            SET m:Location
+        )
+        FOREACH (ignore IN CASE WHEN fa.type = 'ARGM-TMP' THEN [1] ELSE [] END |
+            SET m:Timex
+        )
+        """
+        self.graph.run(query)
 

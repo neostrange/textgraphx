@@ -68,6 +68,7 @@ class RuntimeConfig:
     strict_transition_gate: Optional[bool] = None
     naf_sentence_mode: str = "auto"
     tlink_shadow_mode: bool = False
+    enable_tlink_xml_seed: bool = False
     enable_cross_document_fusion: bool = False
 
 
@@ -416,6 +417,9 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
         env_naf_mode = os.getenv('TEXTGRAPHX_NAF_SENTENCE_MODE')
         if env_naf_mode is not None:
             runtime.naf_sentence_mode = _coerce_naf_sentence_mode(env_naf_mode)
+        env_enable_tlink_xml_seed = os.getenv("TEXTGRAPHX_ENABLE_TLINK_XML_SEED")
+        if env_enable_tlink_xml_seed is not None:
+            runtime.enable_tlink_xml_seed = _coerce_bool(env_enable_tlink_xml_seed)
         env_tlink_shadow = os.getenv('TEXTGRAPHX_TLINK_SHADOW_MODE')
         if env_tlink_shadow is not None:
             runtime.tlink_shadow_mode = _coerce_bool(env_tlink_shadow)

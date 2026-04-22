@@ -567,6 +567,14 @@ class RefinementPhaseWrapper:
                         step_func()
                         self.logger.debug(f"✓ Completed: {step_name}")
 
+                with log_subsection(self.logger, "Linking entities to semantic frames"):
+                    refiner.run_rule_family("linking")
+                    self.logger.debug("✓ Completed: linking family")
+
+                with log_subsection(self.logger, "NEL correction heuristics"):
+                    refiner.run_rule_family("nel_correction")
+                    self.logger.debug("✓ Completed: nel_correction family")
+
                 # Execute numeric/value refinement passes as a family so VALUE
                 # and NUMERIC semantics are materialized before event enrichment.
                 with log_subsection(self.logger, "Numeric/value normalization and materialization"):
@@ -1514,6 +1522,49 @@ class TlinksRecognizerWrapper:
                 with log_subsection(self.logger, "Initializing TlinksRecognizer"):
                     recognizer = TlinksRecognizer(argv=[])
                     self.logger.debug("TlinksRecognizer initialized")
+                enable_tlink_xml_seed = False
+                try:
+                    from textgraphx.config import get_config
+
+                    enable_tlink_xml_seed = bool(
+                        getattr(get_config().runtime, "enable_tlink_xml_seed", False)
+                    )
+                except Exception:
+                    self.logger.debug(
+                        "Runtime config unavailable for enable_tlink_xml_seed",
+                        exc_info=True,
+                    )
+
+                xml_docs_processed = 0
+                xml_e2e_runs = 0
+                xml_e2t_runs = 0
+                xml_t2t_runs = 0
+                if enable_tlink_xml_seed:
+                    with log_subsection(self.logger, "TTK XML-derived TLINK extraction (E2E/E2T/T2T)"):
+                        doc_ids = recognizer.get_annotated_text()
+                        self.logger.debug("Found %d documents for XML-derived TLINK extraction", len(doc_ids))
+                        for doc_id in doc_ids:
+                            try:
+                                recognizer.create_tlinks_e2e(doc_id, precision_mode=True)
+                                xml_e2e_runs += 1
+                                recognizer.create_tlinks_e2t(doc_id, precision_mode=True)
+                                xml_e2t_runs += 1
+                                xml_docs_processed += 1
+                            except Exception:
+                                self.logger.debug(
+                                    "XML-derived TLINK extraction failed for doc_id=%s (continuing)",
+                                    doc_id,
+                                    exc_info=True,
+                                )
+                        self.logger.debug(
+                            "✓ Completed: XML-derived TLINK extraction for %d docs (e2e=%d e2t=%d t2t=%d)",
+                            xml_docs_processed,
+                            xml_e2e_runs,
+                            xml_e2t_runs,
+                            xml_t2t_runs,
+                        )
+                else:
+                    self.logger.debug("Skipping XML-derived TLINK extraction (enable_tlink_xml_seed=false)")
 
                 tlink_shadow_mode = False
                 try:
@@ -1622,6 +1673,7 @@ class TlinksRecognizerWrapper:
                         rule_id="case_rules",
                         source_kind="rule",
                         conflict_policy="additive",
+                        preserve_existing=True,
                     )
                     assertion_result = PhaseAssertions(
                         recognizer.graph,
@@ -1638,6 +1690,11 @@ class TlinksRecognizerWrapper:
                 return {
                     "status": "success",
                     "tlinks_created": self.tlinks_created,
+                    "xml_docs_processed": xml_docs_processed,
+                    "xml_e2e_runs": xml_e2e_runs,
+                    "xml_e2t_runs": xml_e2t_runs,
+                    "xml_t2t_runs": xml_t2t_runs,
+                    "enable_tlink_xml_seed": enable_tlink_xml_seed,
                     "closure_created": closure_created,
                     "constraint_inverse_created": constraint_summary.get("inverse_created", 0),
                     "constraint_bidirectional_conflicts": constraint_summary.get("bidirectional_conflicts", 0),

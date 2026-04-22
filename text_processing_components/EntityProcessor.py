@@ -21,6 +21,7 @@ Contract and side-effects:
 from textgraphx.utils.id_utils import make_ne_id, make_ne_token_id, make_ne_uid
 import logging
 import time
+from textgraphx.TextProcessor import filter_spans as textgraphx_TextProcessor_filter_spans
 
 # module logger
 logger = logging.getLogger(__name__)
@@ -43,6 +44,30 @@ class EntityProcessor:
     def __init__(self, neo4j_repository):
         self.neo4j_repository = neo4j_repository
 
+    # Kept for backward compatibility with tests that reference this attribute.
+    # New code should use SPACY_TIMEX_TYPES or SPACY_VALUE_TYPES instead.
+    VALUE_LIKE_ENTITY_TYPES = {
+        "DATE", "TIME", "MONEY", "PERCENT", "QUANTITY", "CARDINAL", "ORDINAL",
+    }
+    SPACY_TIMEX_TYPES = {"DATE", "TIME"}
+    SPACY_VALUE_TYPES = {"MONEY", "PERCENT", "QUANTITY", "CARDINAL", "ORDINAL"}
+
+    MEANTIME_ENTITY_CLASS_MAP = {
+        "GPE": "LOC",
+        "LOC": "LOC",
+        "LOCATION": "LOC",
+        "FAC": "FAC",
+        "ORG": "ORG",
+        "ORGANIZATION": "ORG",
+        "PERSON": "PER",
+        "PER": "PER",
+    }
+
+    @classmethod
+    def _map_to_meantime_class(cls, label: str) -> str:
+        label = str(label or "").upper().strip()
+        return cls.MEANTIME_ENTITY_CLASS_MAP.get(label, label)
+
     @staticmethod
     def _normalize_syntactic_type(raw_type):
         t = str(raw_type or "").strip().upper()
@@ -64,8 +89,15 @@ class EntityProcessor:
             return "NOMINAL"
         return t or "NOMINAL"
 
+    SPACY_TIMEX_TYPES = {"DATE", "TIME"}
+    SPACY_VALUE_TYPES = {"MONEY", "PERCENT", "QUANTITY", "CARDINAL", "ORDINAL"}
+
     @classmethod
-    def _syntactic_type_from_tag(cls, tag, dep=None, raw_type=None):
+    def _syntactic_type_from_tag(cls, tag, dep=None, raw_type=None, ent_label=None):
+        ent_label = str(ent_label or "").strip().upper()
+        # VALUE_LIKE types are now stored as ValueMention/SpacyTimexCandidate nodes
+        # rather than NamedEntity, so they never reach this method.
+
         # Prefer upstream syntactic labels when present and valid.
         normalized = cls._normalize_syntactic_type(raw_type)
         if normalized:
@@ -107,12 +139,14 @@ class EntityProcessor:
         """
         logger.debug("process_entities called for text_id=%s", text_id)
         nes = []
+        value_mentions = []
+        timex_candidates = []
         spans = ''
         if doc.spans.get('ents_original') is not None:
             spans = list(doc.ents) + list(doc.spans['ents_original'])
         else:
             spans = list(doc.ents)
-        # spans = filter_spans(spans) - just disabled it as testing dbpedia spotlight
+        spans = textgraphx_TextProcessor_filter_spans(spans)
         for entity in spans:
             # Use token indices (spaCy token positions) for deterministic ids.
             # spaCy Span.start is the first token index, Span.end is one-past-last.
@@ -121,6 +155,42 @@ class EntityProcessor:
             head_token = entity.root
             head_text = head_token.text
             head_token_index = head_token.i
+            ent_label = getattr(entity, "label_", "")
+            start_char = entity.start_char
+            end_char = entity.end_char
+
+            # Reroute VALUE-like and temporal types away from NamedEntity.
+            # They become enrichment-only nodes and are excluded from the
+            # MEANTIME entity evaluation track.
+            if ent_label in self.SPACY_TIMEX_TYPES:
+                timex_candidates.append({
+                    'uid': make_ne_uid(text_id, entity.text, head_token_index),
+                    'type': ent_label,
+                    'value': entity.text,
+                    'start_tok': token_start,
+                    'end_tok': token_end,
+                    'start_char': start_char,
+                    'end_char': end_char,
+                    'source': 'spacy',
+                    'confidence': 0.6,
+                })
+                continue
+            if ent_label in self.SPACY_VALUE_TYPES:
+                value_mentions.append({
+                    'uid': make_ne_uid(text_id, entity.text, head_token_index),
+                    'type': ent_label,
+                    'value': entity.text,
+                    'start_tok': token_start,
+                    'end_tok': token_end,
+                    'start_char': start_char,
+                    'end_char': end_char,
+                    'head': head_text,
+                    'head_token_index': head_token_index,
+                    'source': 'spacy',
+                    'confidence': 0.7,
+                })
+                continue
+
             entity_raw_syntactic_type = getattr(entity, "syntactic_type", "")
             if not entity_raw_syntactic_type and hasattr(entity, "_"):
                 try:
@@ -131,15 +201,15 @@ class EntityProcessor:
                 getattr(head_token, "tag_", ""),
                 dep=getattr(head_token, "dep_", ""),
                 raw_type=entity_raw_syntactic_type,
+                ent_label=ent_label,
             )
             legacy_syntactic_type = self._legacy_syntactic_type(syntactic_type)
-            start_char = entity.start_char
-            end_char = entity.end_char
 
             if getattr(entity, 'kb_id_', '') != '':
                 ne = {
                     'value': entity.text,
-                    'type': entity.label_,
+                    'type': ent_label,
+                    'ent_class': self._map_to_meantime_class(ent_label),
                     'start_index': token_start,
                     'end_index': token_end,
                     'start_char': start_char,
@@ -157,7 +227,8 @@ class EntityProcessor:
             else:
                 ne = {
                     'value': entity.text,
-                    'type': entity.label_,
+                    'type': ent_label,
+                    'ent_class': self._map_to_meantime_class(ent_label),
                     'start_index': token_start,
                     'end_index': token_end,
                     'start_char': start_char,
@@ -169,8 +240,15 @@ class EntityProcessor:
                 }
 
             nes.append(ne)
-        logger.info("process_entities: extracted %d entities for text_id=%s", len(nes), text_id)
+        logger.info(
+            "process_entities: extracted %d entities, %d value_mentions, %d timex_candidates for text_id=%s",
+            len(nes), len(value_mentions), len(timex_candidates), text_id,
+        )
         self.store_entities(text_id, nes)
+        if value_mentions:
+            self.store_value_mentions(text_id, value_mentions)
+        if timex_candidates:
+            self.store_spacy_timex_candidates(text_id, timex_candidates)
         return nes
 
     def store_entities(self, document_id, nes):
@@ -222,7 +300,7 @@ class EntityProcessor:
                 RETURN ne
             }
             SET ne.id = item.id, ne.legacy_span_id = coalesce(ne.legacy_span_id, item.id), ne.uid = item.uid,
-            ne.type = item.type, ne.value = item.value, ne.index = item.start_index, ne.end_index = item.end_index,
+            ne.type = item.type, ne.ent_class = coalesce(item.ent_class, item.type), ne.value = item.value, ne.index = item.start_index, ne.end_index = item.end_index,
             ne.kb_id = item.kb_id, ne.url_wikidata = item.url_wikidata, ne.score = item.score, ne.normal_term = item.normal_term,
             ne.description = item.description,
             ne.start_tok = item.start_index, ne.end_tok = item.end_index,
@@ -312,6 +390,55 @@ class EntityProcessor:
                     retired_refers_to_edges,
                     document_id,
                 )
+
+    def store_value_mentions(self, document_id, items):
+        """Persist SpaCy VALUE-like spans (MONEY, PERCENT, QUANTITY, CARDINAL, ORDINAL)
+        as ValueMention nodes. These are excluded from the MEANTIME entity evaluation
+        track but remain available for downstream enrichment (e.g. numeric reasoning)."""
+        logger.debug("store_value_mentions: %d items for document_id=%s", len(items), document_id)
+        query = """
+            UNWIND $items AS item
+            MERGE (vm:ValueMention {uid: item.uid})
+            SET vm.type          = item.type,
+                vm.value         = item.value,
+                vm.start_tok     = item.start_tok,
+                vm.end_tok       = item.end_tok,
+                vm.start_char    = item.start_char,
+                vm.end_char      = item.end_char,
+                vm.head          = item.head,
+                vm.headTokenIndex = item.head_token_index,
+                vm.source        = item.source,
+                vm.confidence    = item.confidence
+            WITH vm, item
+            MATCH (text:AnnotatedText {id: $documentId})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok:TagOccurrence)
+            WHERE tok.tok_index_doc >= item.start_tok AND tok.tok_index_doc <= item.end_tok
+            MERGE (vm)<-[:IN_MENTION]-(tok)
+        """
+        self.execute_query(query, {"documentId": document_id, "items": items})
+
+    def store_spacy_timex_candidates(self, document_id, items):
+        """Persist SpaCy DATE/TIME spans as TimexMention:SpacyTimexCandidate nodes.
+        TemporalPhase will later reconcile these with HeidelTime TIMEX3 output:
+        overlapping candidates are confirmed; non-overlapping ones are promoted
+        with needs_review=true as fallback temporal anchors."""
+        logger.debug("store_spacy_timex_candidates: %d items for document_id=%s", len(items), document_id)
+        query = """
+            UNWIND $items AS item
+            MERGE (tc:TimexMention:SpacyTimexCandidate {uid: item.uid})
+            SET tc.type       = item.type,
+                tc.value      = item.value,
+                tc.start_tok  = item.start_tok,
+                tc.end_tok    = item.end_tok,
+                tc.start_char = item.start_char,
+                tc.end_char   = item.end_char,
+                tc.source     = item.source,
+                tc.confidence = item.confidence
+            WITH tc, item
+            MATCH (text:AnnotatedText {id: $documentId})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok:TagOccurrence)
+            WHERE tok.tok_index_doc >= item.start_tok AND tok.tok_index_doc <= item.end_tok
+            MERGE (tc)<-[:IN_MENTION]-(tok)
+        """
+        self.execute_query(query, {"documentId": document_id, "items": items})
 
     def execute_query(self, query, params):
         result = self.neo4j_repository.execute_query(query, params)

@@ -22,6 +22,7 @@ from textgraphx.evaluation.meantime_evaluator import (
     EvaluationMapping,
     NormalizedDocument,
     aggregate_reports,
+    apply_nominal_precision_filters,
     build_dual_scorecards_from_aggregate,
     build_dual_scorecards_from_report,
     build_document_from_neo4j,
@@ -112,6 +113,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Evaluator-side nominal profile projection mode for Neo4j predictions. "
             "Applies only to nominal entity mentions and leaves non-nominal entities unchanged."
+        ),
+    )
+    parser.add_argument(
+        "--nominal-precision-filters",
+        action="store_true",
+        default=False,
+        help=(
+            "Apply precision-first nominal filters to predicted entities: pronoun leak guard, "
+            "salience gate, and abstract noun drop."
         ),
     )
     parser.add_argument(
@@ -231,6 +241,8 @@ def _evaluate_single(args: argparse.Namespace, mapping: EvaluationMapping) -> di
                 graph.close()
 
     gold_doc = _apply_relation_scope(gold_doc, relation_scope)
+    if bool(getattr(args, "nominal_precision_filters", False)):
+        predicted_doc = apply_nominal_precision_filters(predicted_doc)
     predicted_doc = _apply_relation_scope(predicted_doc, relation_scope)
 
     base = evaluate_documents(
@@ -255,6 +267,7 @@ def _evaluate_single(args: argparse.Namespace, mapping: EvaluationMapping) -> di
         "relation_scope": "all" if relation_scope is None else sorted(relation_scope),
         "nominal_profile_mode": str(getattr(args, "nominal_profile_mode", "all")),
         "gold_like_nominal_filter": bool(getattr(args, "gold_like_nominal_filter", False)),
+        "nominal_precision_filters": bool(getattr(args, "nominal_precision_filters", False)),
     }
     return base
 
@@ -306,6 +319,8 @@ def _evaluate_batch(args: argparse.Namespace, mapping: EvaluationMapping) -> dic
                     )
 
             gold_doc = _apply_relation_scope(gold_doc, relation_scope)
+            if bool(getattr(args, "nominal_precision_filters", False)):
+                predicted_doc = apply_nominal_precision_filters(predicted_doc)
             predicted_doc = _apply_relation_scope(predicted_doc, relation_scope)
 
             reports.append(
@@ -359,6 +374,7 @@ def _evaluate_batch(args: argparse.Namespace, mapping: EvaluationMapping) -> dic
             "relation_scope": "all" if relation_scope is None else sorted(relation_scope),
             "nominal_profile_mode": str(getattr(args, "nominal_profile_mode", "all")),
             "gold_like_nominal_filter": bool(getattr(args, "gold_like_nominal_filter", False)),
+            "nominal_precision_filters": bool(getattr(args, "nominal_precision_filters", False)),
         },
         "aggregate": aggregate,
         "scorecards": scorecards,

@@ -135,6 +135,21 @@ class TestSchemaInvariants:
             "TagOccurrence->Tag must be governed by HAS_LEMMA endpoint contract"
         )
 
+    def test_timexmention_split_is_captured_in_schema_tiers_and_contracts(self):
+        payload = _payload()
+        canonical_labels = set(payload["schema_tiers"]["canonical"]["node_labels"])
+        canonical_rels = set(payload["schema_tiers"]["canonical"]["relationship_types"])
+        legacy_rels = set(payload["schema_tiers"]["legacy"]["relationship_types"])
+        refers_pairs = {
+            tuple(pair)
+            for pair in payload["relation_endpoint_contract"]["REFERS_TO"]["allowed_pairs"]
+        }
+        assert "TimexMention" in canonical_labels
+        assert {"IN_FRAME", "IN_MENTION"}.issubset(canonical_rels)
+        assert "PARTICIPATES_IN" not in canonical_rels
+        assert "PARTICIPATES_IN" in legacy_rels
+        assert ("TimexMention", "TIMEX") in refers_pairs
+
     def test_span_aliases_do_not_overlap_token_and_char_spaces(self):
         aliases = _payload()["span_contract"]["legacy_aliases"]
         token_aliases = set(aliases.get("start_tok", [])) | set(aliases.get("end_tok", []))
@@ -163,8 +178,8 @@ class TestMigrationManifest:
     def test_migration_manifest_covers_all_migration_files(self):
         manifest = _payload().get("migration_manifest", {})
         files = manifest.get("files", [])
-        assert len(files) == 22, (
-            f"migration_manifest.files must list exactly 22 migration files; found {len(files)}"
+        assert len(files) == 23, (
+            f"migration_manifest.files must list exactly 23 migration files; found {len(files)}"
         )
 
     def test_migration_manifest_files_are_ordered(self):
@@ -182,8 +197,8 @@ class TestMigrationManifest:
 
     def test_migration_manifest_ends_at_latest(self):
         files = _payload().get("migration_manifest", {}).get("files", [])
-        assert files and files[-1].startswith("0022"), (
-            "migration_manifest.files must end with the 0022 coref-uid-constraints migration"
+        assert files and files[-1].startswith("0023"), (
+            "migration_manifest.files must end with the 0023 timexmention-constraints migration"
         )
 
 
@@ -200,8 +215,8 @@ class TestMigrationFiles:
 
     def test_all_migration_files_exist(self):
         files = self._files()
-        assert len(files) == 22, (
-            f"Expected 22 .cypher migration files; found {len(files)}: {[f.name for f in files]}"
+        assert len(files) == 23, (
+            f"Expected 23 .cypher migration files; found {len(files)}: {[f.name for f in files]}"
         )
 
     def test_migration_files_are_non_empty(self):
@@ -308,7 +323,7 @@ class TestNegativeDriftDetection:
     def test_deprecated_rels_still_have_deprecation_records(self):
         """Guard against someone silently removing the deprecated_relationships section."""
         deprecated = _payload().get("deprecated_relationships", {})
-        for name in ("DESCRIBES", "PARTICIPANT"):
+        for name in ("DESCRIBES", "PARTICIPANT", "PARTICIPATES_IN"):
             assert name in deprecated, (
                 f"DRIFT DETECTED: '{name}' must remain in deprecated_relationships during "
                 f"the dual-write transition period"

@@ -131,6 +131,12 @@ DIAGNOSTIC_QUERY_REGISTRY: Dict[str, DiagnosticQuery] = {
         description="Counts PARTICIPATES_IN edges missing their IN_FRAME or IN_MENTION dual-write alias.",
         expected_fields=["metric", "item_count"],
     ),
+    "timexmention_contract_inventory": DiagnosticQuery(
+        name="timexmention_contract_inventory",
+        query_pack_name="timexmention_contract_inventory",
+        description="Inventories TimexMention contract violations and DCT metadata-exemption drift.",
+        expected_fields=["metric", "item_count"],
+    ),
 }
 
 
@@ -241,6 +247,11 @@ def query_participation_edge_migration_inventory(graph: Any) -> List[Dict[str, A
     return _execute_registered_query(graph, "participation_edge_migration_inventory")
 
 
+def query_timexmention_contract_inventory(graph: Any) -> List[Dict[str, Any]]:
+    """Return TimexMention contract inventory counts and DCT-exemption drift checks."""
+    return _execute_registered_query(graph, "timexmention_contract_inventory")
+
+
 def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
     """Collect runtime diagnostics in one payload.
 
@@ -266,6 +277,7 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
     factuality_alignment_violations = query_factuality_alignment_violations(graph)
     glink_relation_inventory = query_glink_relation_inventory(graph)
     participation_edge_inventory = query_participation_edge_migration_inventory(graph)
+    timexmention_contract_inventory = query_timexmention_contract_inventory(graph)
 
     total_endpoint_violations = sum(int(row.get("violation_count", 0) or 0) for row in endpoint_violations)
     total_referential_violations = sum(int(row.get("violation_count", 0) or 0) for row in referential_violations)
@@ -308,6 +320,10 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
         str(row.get("metric", "")): int(row.get("item_count", 0) or 0)
         for row in participation_edge_inventory
     }
+    timexmention_contract_counts = {
+        str(row.get("metric", "")): int(row.get("item_count", 0) or 0)
+        for row in timexmention_contract_inventory
+    }
 
     return {
         "diagnostics": get_registered_diagnostics(),
@@ -327,6 +343,7 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
         "factuality_alignment_violations": factuality_alignment_violations,
         "glink_relation_inventory": glink_relation_inventory,
         "participation_edge_migration_inventory": participation_edge_inventory,
+        "timexmention_contract_inventory": timexmention_contract_inventory,
         "tlink_consistency_violations": tlink_violations,
         "tlink_anchor_consistency_inventory": tlink_anchor_inventory,
         "totals": {
@@ -359,5 +376,9 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
             "tlink_missing_anchor_metadata_count": tlink_anchor_counts.get("missing_anchor_metadata_tlinks", 0),
             "participation_in_frame_missing_count": participation_edge_counts.get("in_frame_missing", 0),
             "participation_in_mention_missing_count": participation_edge_counts.get("in_mention_missing", 0),
+            "timexmention_missing_doc_id_count": timexmention_contract_counts.get("missing_doc_id", 0),
+            "timexmention_missing_span_coordinates_count": timexmention_contract_counts.get("missing_span_coordinates", 0),
+            "timexmention_broken_refers_to_count": timexmention_contract_counts.get("broken_refers_to_chain", 0),
+            "dct_timexmention_count": timexmention_contract_counts.get("dct_timexmention_count", 0),
         },
     }

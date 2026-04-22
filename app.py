@@ -8,8 +8,10 @@ import logging
 
 import streamlit as st
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent))
+# Add workspace root to path for imports so `textgraphx` package is importable
+# Insert the parent of the package directory (workspace root) rather than the
+# package directory itself.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from orchestration import PipelineOrchestrator, ExecutionHistory, JobScheduler
 from logging_utils import get_logger, log_section
@@ -56,7 +58,7 @@ def main() -> None:
     history = ExecutionHistory()
 
     # Create tabs for different views
-    tab1, tab2, tab3 = st.tabs(["Run Pipeline", "Execution History", "Scheduling"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Run Pipeline", "Execution History", "Scheduling", "Evaluation"])
 
     default_dataset = str((Path(__file__).resolve().parent / "datastore" / "dataset").resolve())
 
@@ -292,6 +294,16 @@ def main() -> None:
                     st.error("Failed to schedule job. Check logs.")
             except Exception as e:
                 st.error(f"Error scheduling job: {e}")
+
+    # ===== EVALUATION TAB =====
+    with tab4:
+        st.header("Evaluation")
+        try:
+            from textgraphx.ui.eval_dashboard import render_eval_page
+
+            render_eval_page()
+        except Exception as exc:
+            st.error(f"Failed to load Evaluation page: {exc}")
 
 
 if __name__ == "__main__":

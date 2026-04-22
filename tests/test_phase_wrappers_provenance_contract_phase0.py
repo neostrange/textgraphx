@@ -50,3 +50,4 @@ def test_tlinks_wrapper_stamps_before_assertions_and_enforces_contracts():
     assert stamp_idx < assert_idx
     assert 'source_kind="rule"' in src
     assert 'conflict_policy="additive"' in src
+    assert 'preserve_existing=True' in src

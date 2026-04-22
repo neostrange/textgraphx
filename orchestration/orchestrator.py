@@ -62,7 +62,7 @@ class PipelineOrchestrator:
         "MATCH ()-[r:TLINK]->() RETURN count(r) AS c": 1,
     }
 
-    def __init__(self, directory: str = "datastore/dataset", model_name: str = "en_core_web_sm"):
+    def __init__(self, directory: str = "datastore/dataset", model_name: str = "en_core_web_trf"):
         """Initialize the pipeline orchestrator.
         
         Args:
@@ -799,7 +799,7 @@ class JobScheduler:
         schedule_time: str,
         phases: List[str],
         dataset_dir: str,
-        model_name: str = "en_core_web_sm",
+        model_name: str = "en_core_web_trf",
     ) -> str:
         """Schedule a pipeline job.
         
@@ -832,7 +832,7 @@ class JobScheduler:
         dataset_path: str,
         phases: List[str],
         hours: int,
-        model_name: str = "en_core_web_sm",
+        model_name: str = "en_core_web_trf",
     ) -> bool:
         """Schedule a recurring pipeline job with interval.
         
@@ -867,7 +867,7 @@ class JobScheduler:
         dataset_path: str,
         phases: List[str],
         cron_expression: str,
-        model_name: str = "en_core_web_sm",
+        model_name: str = "en_core_web_trf",
     ) -> bool:
         """Schedule a recurring pipeline job with cron expression.
         
@@ -917,7 +917,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     parser = argparse.ArgumentParser(description="Run the full textgraphx pipeline for Neo4j review")
     parser.add_argument("--dir", dest="directory", default="datastore/dataset")
-    parser.add_argument("--model", dest="model_name", default="en_core_web_sm")
+    parser.add_argument("--model", dest="model_name", default="en_core_web_trf")
     parser.add_argument(
         "--phases",
         nargs="*",

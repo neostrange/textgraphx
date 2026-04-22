@@ -75,7 +75,9 @@ class GraphBasedNLP(GraphDBBase):
             pass
 
         # Allow an environment override for fast, lightweight runs (useful in CI/dev)
-        if os.getenv('TEXTGRAPHX_FAST', '0') == '1':
+        # but do not silently override an explicit transformer request.
+        fast_mode = os.getenv('TEXTGRAPHX_FAST', '0') == '1'
+        if fast_mode and model_name != 'en_core_web_trf':
             model_name = 'en_core_web_sm'
             logger.info("TEXTGRAPHX_FAST enabled: forcing spaCy model to %s", model_name)
 
@@ -84,6 +86,14 @@ class GraphBasedNLP(GraphDBBase):
             self.nlp = spacy.load(model_name)
             logger.info("Loaded spaCy model '%s'", model_name)
         except Exception as e:
+            fallback_allowed = os.getenv('TEXTGRAPHX_ALLOW_MODEL_FALLBACK', '0') == '1' or model_name == 'en_core_web_sm'
+            if not fallback_allowed:
+                logger.exception(
+                    "Failed to load requested spaCy model '%s' and fallback is disabled. "
+                    "Set TEXTGRAPHX_ALLOW_MODEL_FALLBACK=1 to permit downgrade.",
+                    model_name,
+                )
+                raise
             logger.warning("Failed to load spaCy model '%s': %s. Falling back to 'en_core_web_sm'", model_name, e)
             try:
                 self.nlp = spacy.load('en_core_web_sm')
@@ -448,8 +458,8 @@ if __name__ == '__main__':
     parser.add_argument('--dir', '-d', dest='directory',
                         default=str(Path(__file__).resolve().parent / 'datastore' / 'dataset'),
                         help='Path to datastore/dataset directory')
-    parser.add_argument('--model', '-m', choices=['trf', 'sm'], default='sm',
-                        help="Which spaCy model to load: 'trf' -> en_core_web_trf, 'sm' -> en_core_web_sm (default)")
+    parser.add_argument('--model', '-m', choices=['trf', 'sm'], default='trf',
+                        help="Which spaCy model to load: 'trf' -> en_core_web_trf (default), 'sm' -> en_core_web_sm")
     parser.add_argument('--require-neo4j', dest='require_neo4j', action='store_true', default=False,
                         help='Fail fast if Neo4j is unreachable at startup')
     parser.add_argument('--neo4j-retries', dest='neo4j_retries', type=int, default=None,
@@ -463,7 +473,7 @@ if __name__ == '__main__':
 
     # Create a GraphBasedNLP object. Pass through any unknown args for GraphDBBase
     # Map CLI choices to model names
-    model_name = model_map.get(args.model, 'en_core_web_sm')
+    model_name = model_map.get(args.model, 'en_core_web_trf')
 
     # If CLI provided explicit retries/backoff, set env vars so constructor picks them up
     if args.neo4j_retries is not None:

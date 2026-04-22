@@ -66,7 +66,7 @@ class PipelineOrchestrator:
 
     PHASE_ORDER = ["ingestion", "refinement", "temporal", "event_enrichment", "dbpedia_enrichment", "tlinks"]
 
-    def __init__(self, directory: str, model_name: str = "en_core_web_sm") -> None:
+    def __init__(self, directory: str, model_name: str = "en_core_web_trf") -> None:
         logger.warning(
             "textgraphx.PipelineOrchestrator is deprecated; using textgraphx.orchestration.orchestrator.PipelineOrchestrator"
         )
@@ -111,8 +111,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         "-m",
-        default="en_core_web_sm",
-        help="spaCy model (en_core_web_sm/en_core_web_trf or sm/trf)",
+        default="en_core_web_trf",
+        help="spaCy model (en_core_web_trf/en_core_web_sm or trf/sm)",
     )
     parser.add_argument(
         "--phases",

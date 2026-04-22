@@ -184,3 +184,237 @@ Artifacts:
 
 - Detailed per-mode reports are stored under `textgraphx/datastore/evaluation/nominal_profile_mode/`
 - Consolidated table: `textgraphx/datastore/evaluation/nominal_profile_mode/PROFILE_MODE_SUMMARY.md`
+
+## 2026-04-09 - Breadth-First Heuristic Sweep (A-to-Z) with Zero Regression
+
+### Context
+After the first breadth-first pass improved entity/timex/relation outcomes, we applied a second incremental sweep focused on:
+
+- relation-layer transparency by relation kind,
+- lightweight timex normalization hardening,
+- conservative nominal boundary guardrails,
+- strict zero-regression enforcement across all headline layers.
+
+### Changes
+
+1. Relation-kind breakdown reporting in evaluator output
+- File: `textgraphx/evaluation/meantime_evaluator.py`
+- Change:
+  - `evaluate_documents()` now emits `relation_by_kind` for `strict` and `relaxed`.
+  - `aggregate_reports()` now emits micro/macro `relation_by_kind` aggregates.
+  - `render_markdown_report()` now includes a `Relation Kind Breakdown (Micro Strict)` section.
+- Rationale: exposes where relation F1 is blocked (`tlink` vs `has_participant` vs `clink`/`slink`) without needing custom scripts.
+
+2. Timex date normalization hardening
+- File: `textgraphx/evaluation/meantime_evaluator.py`
+- Change:
+  - Added `_normalize_timex_date_value()` and integrated it into timex canonicalization.
+  - Supports common textual date forms such as `August 10, 2007`, `10 August 2007`, and month-year forms.
+- Rationale: preserve strict matching when extractor surface forms are textual but gold is ISO-like.
+
+3. Conservative nominal over-collapse guard
+- File: `textgraphx/evaluation/meantime_evaluator.py`
+- Change:
+  - Added `_should_restore_wider_nominal_span()` and restoration path during nominal projection.
+  - Only restores wider span when candidate-gold nominals were over-collapsed to very short spans and have structural support (`has_core_argument` or `has_named_link`).
+- Rationale: avoid head-only collapse on gold-aligned nominal mentions while minimizing precision risk.
+
+4. Relation alignment consistency for participants
+- File: `textgraphx/evaluation/meantime_evaluator.py`
+- Change:
+  - Added `_align_relation_entity_span()` for `has_participant` target endpoints.
+  - Added `_normalize_sem_role()` to normalize PropBank role casing (`ARG1` -> `Arg1`, `ARGM-LOC` -> `Argm-LOC`).
+- Rationale: convert trivial formatting/endpoint near-misses into true positives.
+
+### Zero-Regression Validation
+
+Command family (batch strict all-layer):
+
+- `python -m textgraphx.tools.evaluate_meantime --gold-dir textgraphx/datastore/annotated --pred-neo4j --analysis-mode strict --relation-scope all --nominal-profile-mode candidate-gold ...`
+
+Compared baseline `global_sweep_post_batch.json` to updated `global_sweep_post2_batch.json`:
+
+- entity strict F1: `0.1373 -> 0.1373` (`+0.0000`)
+- event strict F1: `0.2973 -> 0.2973` (`+0.0000`)
+- timex strict F1: `0.2353 -> 0.2353` (`+0.0000`)
+- relation strict F1: `0.1022 -> 0.1022` (`+0.0000`)
+
+Result: **zero regression confirmed** on all tracked strict layers.
+
+### New Relation-Kind Visibility (micro strict)
+
+From `global_sweep_post2_batch.json`:
+
+- `has_participant`: `P=0.0822`, `R=0.6000`, `F1=0.1446` (`TP=6`, `FP=67`, `FN=4`)
+- `tlink`: `P=0.0263`, `R=0.0909`, `F1=0.0408` (`TP=1`, `FP=37`, `FN=10`)
+- `clink`: `P=0.0000`, `R=0.0000`, `F1=0.0000` (`TP=0`, `FP=4`, `FN=0`)
+- `slink`: `P=0.0000`, `R=0.0000`, `F1=0.0000` (`TP=0`, `FP=1`, `FN=0`)
+
+Interpretation:
+
+- relation gains so far are concentrated in `has_participant` matching.
+- next relation-targeted low-hanging fruit should focus on TLINK normalization/alignment before deeper model changes.
+
+## 2026-04-09 - TLINK Directional Canonicalization Pass (Zero-Regression Safe)
+
+### Context
+Relation-kind breakdown from the breadth-first sweep showed TLINK as the weakest strict relation kind.
+Observed pattern: semantically equivalent TLINKs can be represented with opposite endpoint direction and inverse `reltype`, which strict keying previously treated as mismatches.
+
+### Changes
+
+1. TLINK canonical orientation in relation keying
+- File: `textgraphx/evaluation/meantime_evaluator.py`
+- Change:
+  - `_relation_key()` now canonicalizes TLINK direction before strict/relaxed key construction.
+  - Mixed links are normalized to `event -> timex` orientation when endpoints are `(timex,event)`.
+  - Same-kind TLINKs are normalized to stable span order.
+  - Inverse `reltype` normalization is applied when direction is flipped (`BEFORE/AFTER`, `INCLUDES/IS_INCLUDED`, `BEGINS/BEGUN_BY`, `ENDS/ENDED_BY`, etc.).
+- Rationale: score semantic equivalence rather than extractor-specific edge orientation artifacts.
+
+2. Timex endpoint alignment helper (safe no-op in this corpus)
+- File: `textgraphx/evaluation/meantime_evaluator.py`
+- Change:
+  - Added `_align_relation_timex_span()` and applied it in relation projection for TLINK/GLINK/CLINK/SLINK.
+- Rationale: mirror existing event/entity endpoint alignment behavior for temporal endpoints.
+
+### Measured Impact (strict, batch)
+
+Compared `global_sweep_post2_batch.json` to `global_sweep_post4_batch.json`:
+
+- entity strict F1: `0.1373 -> 0.1373` (`+0.0000`)
+- event strict F1: `0.2973 -> 0.2973` (`+0.0000`)
+- timex strict F1: `0.2353 -> 0.2353` (`+0.0000`)
+- relation strict F1: `0.1022 -> 0.1186` (`+0.0165`)
+
+TLINK micro strict detail:
+
+- `tlink` F1: `0.0408 -> 0.0667` (`+0.0259`)
+- counts: `TP 1 -> 1`, `FP 37 -> 18`, `FN 10 -> 10`
+
+Interpretation:
+
+- This pass is precision-led: it removed directional false positives without reducing any top-level strict layer score.
+- Remaining TLINK recall bottleneck is unchanged (`FN=10`), indicating next gains must come from extraction/coverage rather than matching-only heuristics.
+
+### Zero-Regression Check
+
+Result: **zero regression confirmed** across entity/event/timex/relation strict micro F1.
+
+## 2026-04-09 - Relation Endpoint Span Fallback Pass (Projection Robustness)
+
+### Context
+After TLINK directional canonicalization, strict TLINK recall remained limited (`FN=10`).
+Code inspection found relation projection required `start_tok/end_tok` on relation endpoints, which can drop links when canonical nodes expose only `begin/end` or token-anchor connectivity.
+
+### Change
+
+- File: `textgraphx/evaluation/meantime_evaluator.py`
+- Updated relation projection Cypher for `TLINK`, `GLINK`, and `CLINK|SLINK` to resolve endpoint spans with fallback order:
+  - `start_tok/end_tok`
+  - `begin/end`
+  - token-anchor min/max via `(:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN]->(node)`
+- Behavior is now consistent with other projection paths that already coalesce multiple span sources.
+
+### Measured Impact (strict, batch)
+
+Compared `global_sweep_post4_batch.json` to `global_sweep_post5_batch.json`:
+
+- entity strict F1: `0.1373 -> 0.1373` (`+0.0000`)
+- event strict F1: `0.2973 -> 0.2973` (`+0.0000`)
+- timex strict F1: `0.2353 -> 0.2353` (`+0.0000`)
+- relation strict F1: `0.1186 -> 0.1186` (`+0.0000`)
+
+TLINK micro strict detail:
+
+- `tlink` F1: `0.0667 -> 0.0667` (`+0.0000`)
+- counts unchanged: `TP=1`, `FP=18`, `FN=10`
+
+Interpretation:
+
+- The pass is robustness-hardening (avoids silent endpoint dropping in mixed-schema graphs) with neutral metrics on the current corpus snapshot.
+- Remaining TLINK recall gap still points to extraction/coverage, not evaluator keying/projection.
+
+### Zero-Regression Check
+
+Result: **zero regression confirmed** across strict entity/event/timex/relation micro F1.
+
+## 2026-04-09 - TLINK Coverage Path Activation in Wrapper
+
+### Context
+`TlinksRecognizer` exposes three direct TimeML/TTK XML-derived link builders:
+
+- `create_tlinks_e2e(doc_id)`
+- `create_tlinks_e2t(doc_id)`
+- `create_tlinks_t2t(doc_id)`
+
+but the production wrapper (`TlinksRecognizerWrapper.execute`) previously executed only heuristic case rules (`case1..case7`).
+
+This left a coverage gap where direct TLINKs from TTK XML were available in code but not activated in the standard pipeline path.
+
+### Change
+
+- File: `textgraphx/phase_wrappers.py`
+- In `TlinksRecognizerWrapper.execute()`, added an **opt-in** pre-case pass controlled by runtime flag `enable_tlink_xml_seed` (default `false`) that:
+  - retrieves document ids via `recognizer.get_annotated_text()`
+  - runs `create_tlinks_e2e/e2t/t2t` per document
+  - continues on per-document failure (non-blocking) to preserve pipeline robustness
+  - returns execution counters (`xml_docs_processed`, `xml_e2e_runs`, `xml_e2t_runs`, `xml_t2t_runs`) in the phase result payload
+
+### Validation
+
+- `tests/test_milestone7_schema_validation.py`: pass
+- `tests/test_evaluate_meantime_cli.py`: pass
+- `textgraphx/tests/test_tlinks_case7_phase_d.py`: pass
+
+### Exploratory Impact (flag enabled)
+
+When run with XML seeding enabled on current corpus snapshot (`post5 -> post6` strict batch):
+
+- relation strict F1: `0.1186 -> 0.1167` (`-0.0020`)
+- tlink strict F1: `0.0667 -> 0.0625` (`-0.0042`)
+- tlink counts: `TP 1 -> 1`, `FP 18 -> 20`, `FN 10 -> 10`
+
+Interpretation:
+
+- current XML seeding increased TLINK false positives without recall gain in this dataset profile.
+- to preserve zero-regression defaults, this capability remains behind `enable_tlink_xml_seed=false` unless explicitly enabled for targeted experimentation.
+
+### Expected Effect (when tuned)
+
+- Improves TLINK recall opportunity by enabling direct XML-derived temporal links before heuristic cases and consistency filters.
+- Keeps safety gates unchanged (normalization, closure, constraint solver, conflict suppression, anchor consistency, endpoint contract validation).
+
+### Precision-Safe Tuning Update
+
+To reduce precision drift when XML seeding is enabled:
+
+- `TlinksRecognizer.create_tlinks_e2e/e2t/t2t` now support `precision_mode` and stamp provenance (`source='ttk_xml'`, rule ids, confidence defaults).
+- Wrapper XML seeding uses `precision_mode=True` and currently seeds only E2E + E2T (T2T seeding is intentionally skipped in precision mode).
+- Precision-mode E2T policy allows:
+  - `BEFORE` / `AFTER`
+  - `IS_INCLUDED` only when target TIMEX is DCT (`functionInDocument='CREATION_TIME'`).
+
+These changes keep XML seeding available for controlled experimentation while tightening the default precision profile for the opt-in path.
+
+### Benchmarking Caveat
+
+Because the current Neo4j graph state already contains prior exploratory TLINK writes from earlier runs, a clean post-tuning benchmark should be run on a freshly rebuilt graph snapshot before promoting this path beyond opt-in mode.
+
+### Clean A/B Run (2026-04-09, Local)
+
+Executed two clean runs on a fully rebuilt graph using runtime-identical phase order:
+
+1. XML seed OFF: ingestion, refinement, temporal, event_enrichment, tlinks
+2. XML seed ON (precision mode): ingestion, refinement, temporal, event_enrichment, then `TlinksRecognizerWrapper` with `enable_tlink_xml_seed=true`
+
+Observed outcome on current local dataset snapshot:
+
+- strict batch deltas OFF -> ON: all tracked layers unchanged (`entity/event/timex/relation = 0.0000`)
+- TLINK strict unchanged (`TP=0`, `FP=0`, `FN=11`, `F1=0.0000`)
+- wrapper counters with XML seed ON: `xml_docs_processed=0`, `xml_e2e_runs=0`, `xml_e2t_runs=0`
+
+Interpretation:
+
+- This specific clean benchmark is **inconclusive** for XML seeding effectiveness because no documents were eligible for XML-derived TLINK seeding in the local run context.
+- Further promotion decisions should rely on a clean benchmark where XML seed counters are non-zero and comparable strict TLINK precision/recall is observed.

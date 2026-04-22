@@ -110,6 +110,47 @@ def _iter_timex_elements(xml_text):
 class TemporalPhase:
     """Materialize TIMEX, TEvent, DCT, and Signal graph nodes."""
 
+    _TIMEX_MENTION_QUERY = """
+        MERGE (t:TIMEX {tid: $tid, doc_id: toInteger($doc_id)})
+        SET t.type = $type,
+            t.value = $value,
+            t.text = $text,
+            t.start_char = toInteger($start_char),
+            t.end_char = toInteger($end_char),
+            t.start_index = toInteger($start_char),
+            t.end_index = toInteger($end_char),
+            t.origin = coalesce($origin, t.origin),
+            t.functionInDocument = coalesce($function_in_document, t.functionInDocument),
+            t.anchorTimeID = coalesce($anchor_time_id, t.anchorTimeID),
+            t.beginPoint = coalesce($begin_point, t.beginPoint),
+            t.endPoint = coalesce($end_point, t.endPoint)
+        MERGE (tm:TimexMention {id: $mention_id, doc_id: toInteger($doc_id)})
+        SET tm.tid = $tid,
+            tm.type = $type,
+            tm.value = $value,
+            tm.text = $text,
+            tm.start_char = toInteger($start_char),
+            tm.end_char = toInteger($end_char),
+            tm.start_index = toInteger($start_char),
+            tm.end_index = toInteger($end_char),
+            tm.origin = coalesce($origin, tm.origin),
+            tm.functionInDocument = coalesce($function_in_document, tm.functionInDocument),
+            tm.anchorTimeID = coalesce($anchor_time_id, tm.anchorTimeID),
+            tm.beginPoint = coalesce($begin_point, tm.beginPoint),
+            tm.endPoint = coalesce($end_point, tm.endPoint)
+        MERGE (tm)-[:REFERS_TO]->(t)
+        WITH t, tm
+        MATCH (a:AnnotatedText {id: toInteger($doc_id)})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(ta:TagOccurrence)
+        WHERE ta.index >= toInteger($start_char) AND ta.end_index <= toInteger($end_char)
+        WITH t, tm, collect(ta) AS tas, min(ta.tok_index_doc) AS min_tok, max(ta.tok_index_doc) AS max_tok
+        SET tm.start_tok = coalesce(min_tok, tm.start_tok),
+            tm.end_tok = coalesce(max_tok, tm.end_tok),
+            t.start_tok = coalesce(min_tok, t.start_tok),
+            t.end_tok = coalesce(max_tok, t.end_tok)
+        FOREACH (token IN tas | MERGE (token)-[:TRIGGERS]->(tm))
+        RETURN t, tm
+    """
+
     def __init__(self, argv):
         del argv
         self.graph = make_graph_from_config()
@@ -189,6 +230,45 @@ class TemporalPhase:
         self.graph.run(query, parameters={"doc_id": doc_id}).data()
         return ""
 
+    @staticmethod
+    def _timex_mention_id(doc_id, tid):
+        return f"timexmention_{doc_id}_{tid}"
+
+    def _upsert_timex_with_mention(
+        self,
+        doc_id,
+        *,
+        tid,
+        typ,
+        value,
+        text,
+        start_char,
+        end_char,
+        function_in_document=None,
+        anchor_time_id=None,
+        begin_point=None,
+        end_point=None,
+        origin=None,
+    ):
+        self.graph.run(
+            self._TIMEX_MENTION_QUERY,
+            parameters={
+                "doc_id": doc_id,
+                "mention_id": self._timex_mention_id(doc_id, tid),
+                "tid": tid,
+                "type": typ,
+                "value": value,
+                "text": text,
+                "start_char": int(start_char),
+                "end_char": int(end_char),
+                "function_in_document": function_in_document,
+                "anchor_time_id": anchor_time_id,
+                "begin_point": begin_point,
+                "end_point": end_point,
+                "origin": origin,
+            },
+        )
+
     def callHeidelTimeService(self, parameters):
         dct = parameters.get("dct")
         text = parameters.get("text")
@@ -230,6 +310,10 @@ class TemporalPhase:
         MERGE (t:TIMEX {tid: tid, doc_id: toInteger($doc_id)})
         SET t.begin = toInteger(begin),
             t.end = toInteger(end),
+            t.start_char = toInteger(begin),
+            t.end_char = toInteger(end),
+            t.start_index = toInteger(begin),
+            t.end_index = toInteger(end),
             t.origin = origin,
             t.type = typ,
             t.value = value,
@@ -237,10 +321,31 @@ class TemporalPhase:
             t.anchorTimeID = coalesce(anchorTimeID, t.anchorTimeID),
             t.beginPoint = coalesce(beginPoint, t.beginPoint),
             t.endPoint = coalesce(endPoint, t.endPoint)
-        WITH t
+        MERGE (tm:TimexMention {id: 'timexmention_' + toString($doc_id) + '_' + toString(tid), doc_id: toInteger($doc_id)})
+        SET tm.tid = tid,
+            tm.begin = toInteger(begin),
+            tm.end = toInteger(end),
+            tm.start_char = toInteger(begin),
+            tm.end_char = toInteger(end),
+            tm.start_index = toInteger(begin),
+            tm.end_index = toInteger(end),
+            tm.origin = origin,
+            tm.type = typ,
+            tm.value = value,
+            tm.functionInDocument = coalesce(functionInDocument, tm.functionInDocument),
+            tm.anchorTimeID = coalesce(anchorTimeID, tm.anchorTimeID),
+            tm.beginPoint = coalesce(beginPoint, tm.beginPoint),
+            tm.endPoint = coalesce(endPoint, tm.endPoint)
+        MERGE (tm)-[:REFERS_TO]->(t)
+        WITH t, tm
         MATCH (a:AnnotatedText {id: toInteger($doc_id)})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(ta:TagOccurrence)
-        WHERE ta.index >= toInteger(t.begin) AND ta.end_index <= toInteger(t.end)
-        MERGE (ta)-[:TRIGGERS]->(t)
+        WHERE ta.index >= toInteger(tm.begin) AND ta.end_index <= toInteger(tm.end)
+        WITH t, tm, collect(ta) AS tas, min(ta.tok_index_doc) AS min_tok, max(ta.tok_index_doc) AS max_tok
+        SET tm.start_tok = coalesce(min_tok, tm.start_tok),
+            tm.end_tok = coalesce(max_tok, tm.end_tok),
+            t.start_tok = coalesce(min_tok, t.start_tok),
+            t.end_tok = coalesce(max_tok, t.end_tok)
+        FOREACH (token IN tas | MERGE (token)-[:TRIGGERS]->(tm))
         RETURN count(DISTINCT t) AS timex_count
         """
         rows = self.graph.run(
@@ -254,28 +359,6 @@ class TemporalPhase:
     def _materialize_timexes_from_heideltime(self, doc_id):
         """Project TIMEX3 nodes from HeidelTime service output onto the token graph."""
         result_xml = self.callHeidelTimeService(self.get_doc_text_and_dct(doc_id))
-        query = """
-        MERGE (t:TIMEX {tid: $tid, doc_id: toInteger($doc_id)})
-        SET t.type = $type,
-            t.value = $value,
-            t.text = $text,
-            t.start_char = toInteger($start_char),
-            t.end_char = toInteger($end_char),
-            t.start_index = toInteger($start_char),
-            t.end_index = toInteger($end_char),
-            t.functionInDocument = coalesce($function_in_document, t.functionInDocument),
-            t.anchorTimeID = coalesce($anchor_time_id, t.anchorTimeID),
-            t.beginPoint = coalesce($begin_point, t.beginPoint),
-            t.endPoint = coalesce($end_point, t.endPoint)
-        WITH t
-        MATCH (a:AnnotatedText {id: toInteger($doc_id)})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(ta:TagOccurrence)
-        WHERE ta.index >= toInteger(t.start_char) AND ta.end_index <= toInteger(t.end_char)
-        WITH t, collect(ta) AS tas, min(ta.tok_index_doc) AS min_tok, max(ta.tok_index_doc) AS max_tok
-        SET t.start_tok = min_tok,
-            t.end_tok = max_tok
-        FOREACH (token IN tas | MERGE (token)-[:TRIGGERS]->(t))
-        """
-
         parsed = 0
         for timex in _iter_timex_elements(result_xml or ""):
             begin = timex.attrib.get("begin") or timex.attrib.get("start_index")
@@ -283,21 +366,18 @@ class TemporalPhase:
             if begin is None or end is None or not str(begin).isdigit() or not str(end).isdigit():
                 continue
             parsed += 1
-            self.graph.run(
-                query,
-                parameters={
-                    "doc_id": doc_id,
-                    "tid": timex.attrib.get("tid", ""),
-                    "type": timex.attrib.get("type", ""),
-                    "value": timex.attrib.get("value", ""),
-                    "text": (timex.text or "").strip(),
-                    "start_char": int(begin),
-                    "end_char": int(end),
-                    "function_in_document": timex.attrib.get("functionInDocument"),
-                    "anchor_time_id": timex.attrib.get("anchorTimeID"),
-                    "begin_point": timex.attrib.get("beginPoint"),
-                    "end_point": timex.attrib.get("endPoint"),
-                },
+            self._upsert_timex_with_mention(
+                doc_id,
+                tid=timex.attrib.get("tid", ""),
+                typ=timex.attrib.get("type", ""),
+                value=timex.attrib.get("value", ""),
+                text=(timex.text or "").strip(),
+                start_char=int(begin),
+                end_char=int(end),
+                function_in_document=timex.attrib.get("functionInDocument"),
+                anchor_time_id=timex.attrib.get("anchorTimeID"),
+                begin_point=timex.attrib.get("beginPoint"),
+                end_point=timex.attrib.get("endPoint"),
             )
         self._log_timex_diagnostics(doc_id, source="heideltime", parsed=parsed)
         return ""
@@ -352,28 +432,6 @@ class TemporalPhase:
         )
         logger.debug("create_timexes2 %s", doc_id)
         result_xml = self.callHeidelTimeService(self.get_doc_text_and_dct(doc_id))
-        query = """
-        MERGE (t:TIMEX {tid: $tid, doc_id: toInteger($doc_id)})
-        SET t.type = $type,
-            t.value = $value,
-            t.text = $text,
-            t.start_char = toInteger($start_char),
-            t.end_char = toInteger($end_char),
-            t.start_index = toInteger($start_char),
-            t.end_index = toInteger($end_char),
-            t.functionInDocument = coalesce($function_in_document, t.functionInDocument),
-            t.anchorTimeID = coalesce($anchor_time_id, t.anchorTimeID),
-            t.beginPoint = coalesce($begin_point, t.beginPoint),
-            t.endPoint = coalesce($end_point, t.endPoint)
-        WITH t
-        MATCH (a:AnnotatedText {id: toInteger($doc_id)})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(ta:TagOccurrence)
-        WHERE ta.index >= toInteger(t.start_char) AND ta.end_index <= toInteger(t.end_char)
-        WITH t, collect(ta) AS tas, min(ta.tok_index_doc) AS min_tok, max(ta.tok_index_doc) AS max_tok
-        SET t.start_tok = min_tok,
-            t.end_tok = max_tok
-        FOREACH (token IN tas | MERGE (token)-[:TRIGGERS]->(t))
-        """
-
         parsed = 0
         for timex in _iter_timex_elements(result_xml or ""):
             begin = timex.attrib.get("begin") or timex.attrib.get("start_index")
@@ -381,21 +439,18 @@ class TemporalPhase:
             if begin is None or end is None or not str(begin).isdigit() or not str(end).isdigit():
                 continue
             parsed += 1
-            self.graph.run(
-                query,
-                parameters={
-                    "doc_id": doc_id,
-                    "tid": timex.attrib.get("tid", ""),
-                    "type": timex.attrib.get("type", ""),
-                    "value": timex.attrib.get("value", ""),
-                    "text": (timex.text or "").strip(),
-                    "start_char": int(begin),
-                    "end_char": int(end),
-                    "function_in_document": timex.attrib.get("functionInDocument"),
-                    "anchor_time_id": timex.attrib.get("anchorTimeID"),
-                    "begin_point": timex.attrib.get("beginPoint"),
-                    "end_point": timex.attrib.get("endPoint"),
-                },
+            self._upsert_timex_with_mention(
+                doc_id,
+                tid=timex.attrib.get("tid", ""),
+                typ=timex.attrib.get("type", ""),
+                value=timex.attrib.get("value", ""),
+                text=(timex.text or "").strip(),
+                start_char=int(begin),
+                end_char=int(end),
+                function_in_document=timex.attrib.get("functionInDocument"),
+                anchor_time_id=timex.attrib.get("anchorTimeID"),
+                begin_point=timex.attrib.get("beginPoint"),
+                end_point=timex.attrib.get("endPoint"),
             )
         self._log_timex_diagnostics(doc_id, source="python_fallback", parsed=parsed)
         return ""
@@ -406,26 +461,73 @@ class TemporalPhase:
             rows = self.graph.run(
                 """
                 MATCH (t:TIMEX {doc_id: toInteger($doc_id)})
-                OPTIONAL MATCH (tok:TagOccurrence)-[:TRIGGERS]->(t)
+                OPTIONAL MATCH (tm:TimexMention {doc_id: toInteger($doc_id)})-[:REFERS_TO]->(t)
+                OPTIONAL MATCH (tok:TagOccurrence)-[:TRIGGERS]->(tm)
                 RETURN count(DISTINCT t) AS timex_nodes,
-                       count(DISTINCT CASE WHEN tok IS NOT NULL THEN t END) AS timex_with_tokens,
+                       count(DISTINCT tm) AS timex_mentions,
+                       count(DISTINCT CASE WHEN tok IS NOT NULL THEN tm END) AS mentions_with_tokens,
                        count(DISTINCT tok) AS trigger_tokens
                 """,
                 parameters={"doc_id": doc_id},
             ).data()
             stats = rows[0] if rows else {}
             logger.info(
-                "TIMEX diagnostics doc=%s source=%s parsed=%s merged=%s timex_nodes=%s timex_with_tokens=%s trigger_tokens=%s",
+                "TIMEX diagnostics doc=%s source=%s parsed=%s merged=%s timex_nodes=%s timex_mentions=%s mentions_with_tokens=%s trigger_tokens=%s",
                 doc_id,
                 source,
                 parsed if parsed is not None else "n/a",
                 merged if merged is not None else "n/a",
                 stats.get("timex_nodes", 0),
-                stats.get("timex_with_tokens", 0),
+                stats.get("timex_mentions", 0),
+                stats.get("mentions_with_tokens", 0),
                 stats.get("trigger_tokens", 0),
             )
         except Exception:
             logger.exception("Failed TIMEX diagnostics logging for doc_id=%s", doc_id)
+
+    def reconcile_spacy_timex_candidates(self, doc_id):
+        """Cross-validate SpaCy DATE/TIME candidates against HeidelTime TIMEX output.
+
+        SpaCy DATE/TIME spans were stored as TimexMention:SpacyTimexCandidate nodes
+        by EntityProcessor.  This method:
+        - Marks candidates whose tokens overlap with a HeidelTime-sourced TimexMention
+          as ``confirmed_by_heideltime=true``.
+        - Marks remaining candidates (no HeidelTime overlap) as ``needs_review=true``
+          so they can be audited or promoted with lower confidence.
+        """
+        logger.debug("reconcile_spacy_timex_candidates doc_id=%s", doc_id)
+        # Confirm candidates that share at least one token with a HeidelTime mention.
+        confirm_query = """
+            MATCH (:AnnotatedText {id: toInteger($doc_id)})-[:CONTAINS_SENTENCE]->(:Sentence)
+                  -[:HAS_TOKEN]->(tok:TagOccurrence)
+            MATCH (tok)-[:IN_MENTION]->(tc:SpacyTimexCandidate)
+            MATCH (tok)-[:TRIGGERS]->(hm:TimexMention)
+            WHERE NOT hm:SpacyTimexCandidate
+            WITH DISTINCT tc
+            SET tc.confirmed_by_heideltime = true,
+                tc.confidence = 0.85
+            RETURN count(tc) AS confirmed
+        """
+        rows = self.graph.run(confirm_query, parameters={"doc_id": doc_id}).data()
+        confirmed = int((rows[0].get("confirmed") or 0)) if rows else 0
+
+        # Mark unconfirmed candidates as needing review.
+        review_query = """
+            MATCH (:AnnotatedText {id: toInteger($doc_id)})-[:CONTAINS_SENTENCE]->(:Sentence)
+                  -[:HAS_TOKEN]->(tok:TagOccurrence)
+            MATCH (tok)-[:IN_MENTION]->(tc:SpacyTimexCandidate)
+            WHERE coalesce(tc.confirmed_by_heideltime, false) = false
+            WITH DISTINCT tc
+            SET tc.needs_review = true
+            RETURN count(tc) AS unconfirmed
+        """
+        rows2 = self.graph.run(review_query, parameters={"doc_id": doc_id}).data()
+        unconfirmed = int((rows2[0].get("unconfirmed") or 0)) if rows2 else 0
+
+        logger.info(
+            "reconcile_spacy_timex_candidates doc=%s confirmed=%d needs_review=%d",
+            doc_id, confirmed, unconfirmed,
+        )
 
     @staticmethod
     def _is_eventive_nominal(form):
@@ -682,6 +784,7 @@ if __name__ == '__main__':
         phase.materialize_tevents(doc_id)
         phase.materialize_signals(doc_id)
         phase.materialize_timexes_fallback(doc_id)
+        phase.reconcile_spacy_timex_candidates(doc_id)
         phase.materialize_glinks(doc_id)
 
     duration = _time.time() - start
