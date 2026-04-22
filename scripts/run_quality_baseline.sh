@@ -4,14 +4,14 @@
 # Usage:
 #   bash scripts/run_quality_baseline.sh [--dataset-dir DIR] [--output-dir DIR]
 #
-# Writes JSON + CSV + Markdown into --output-dir (default: out/evaluation/baseline).
+# Writes JSON + CSV + Markdown into --output-dir (default: src/textgraphx/datastore/evaluation/baseline).
 # The resulting kg_quality_report.json can be committed as the authoritative
 # regression threshold for the CI quality gate check.
 
 set -euo pipefail
 
 DATASET_DIR="src/textgraphx/datastore/dataset"
-OUTPUT_DIR="out/evaluation/baseline"
+OUTPUT_DIR="src/textgraphx/datastore/evaluation/baseline"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in

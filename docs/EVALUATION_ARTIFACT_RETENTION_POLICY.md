@@ -14,10 +14,8 @@ This policy keeps repository history clean while preserving reproducibility.
 	- mutable latest evaluation snapshot
 	- overwritten by current runs
 - `src/textgraphx/datastore/evaluation/baseline/`
-	- curated baseline snapshots for comparison
+	- curated baseline snapshots for comparison (including KG quality-gate baseline files)
 	- update intentionally when a new baseline is accepted
-- `out/evaluation/baseline/`
-	- quality-gate baseline path used by `scripts/run_quality_baseline.sh`
 
 ## Git Policy
 
@@ -33,6 +31,7 @@ This policy is enforced via `.gitignore` rules for `src/textgraphx/datastore/eva
 1. Use the cycle runner with the default `latest` tag for normal runs.
 2. If you need a historical snapshot, export it externally (artifact store, release asset, or local archive), not in git.
 3. Promote a baseline only when you intentionally accept quality changes.
+4. Use `scripts/run_quality_baseline.sh` defaults unless you explicitly need an alternate output directory.
 
 ## Related Files
 

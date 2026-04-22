@@ -28,7 +28,8 @@ Primary references:
 ## Repository layout
 
 - `src/textgraphx/`: importable package and runtime code
-- `docs/`: architecture, schema, evaluation, and roadmap docs
+- `docs/`: active architecture, schema, evaluation, and runbook docs
+- `docs/archive/`: historical implementation and migration notes
 - `src/textgraphx/tests/`: contract, regression, and integration tests
 - `src/textgraphx/tools/`: operator and diagnostics CLIs
 - `scripts/evaluation/`: curated evaluation scripts
@@ -83,6 +84,9 @@ Do not track generated artifacts:
 - machine-local virtualenv and cache directories
 
 See `.gitignore` for enforced rules.
+
+Contributor expectations and validation checklist:
+- `CONTRIBUTING.md`
 
 ## Roadmap context
 

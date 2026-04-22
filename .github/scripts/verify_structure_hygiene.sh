@@ -54,6 +54,15 @@ else
   echo "PASS"
 fi
 
+print_header "No tracked out/evaluation artifacts"
+tracked_out_evaluation="$(git ls-files out/evaluation || true)"
+if [[ -n "$tracked_out_evaluation" ]]; then
+  echo "$tracked_out_evaluation"
+  report_failure "Tracked files found under out/evaluation; use src/textgraphx/datastore/evaluation instead."
+else
+  echo "PASS"
+fi
+
 print_header "No tracked duplicate dataset copy files"
 tracked_copy_naf="$(git ls-files | grep -E '^src/textgraphx/datastore/.+ copy\.naf$' || true)"
 if [[ -n "$tracked_copy_naf" ]]; then

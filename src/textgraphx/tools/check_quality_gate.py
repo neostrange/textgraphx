@@ -7,7 +7,7 @@ Exit codes:
 
 Usage (in CI):
   python -m textgraphx.tools.check_quality_gate \\
-      --baseline out/evaluation/baseline/kg_quality_report.json \\
+    --baseline src/textgraphx/datastore/evaluation/baseline/kg_quality_report.json \\
       --current  out/evaluation/kg_quality_report.json \\
     --tolerance 0.02 \\
     --max-tlink-anchor-inconsistent-increase 0 \\
@@ -73,7 +73,7 @@ def main(argv=None) -> int:
     parser.add_argument(
         "--baseline",
         required=True,
-        help="Path to the baseline JSON (e.g. out/evaluation/baseline/kg_quality_report.json).",
+        help="Path to the baseline JSON (e.g. src/textgraphx/datastore/evaluation/baseline/kg_quality_report.json).",
     )
     parser.add_argument(
         "--current",

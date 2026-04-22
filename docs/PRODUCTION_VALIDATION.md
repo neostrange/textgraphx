@@ -61,7 +61,7 @@ counts were zero or below threshold.
 ```bash
 # Compare the post-run snapshot against the committed baseline.
 python -m textgraphx.tools.check_quality_gate \
-    --baseline out/evaluation/baseline/kg_quality_report.json \
+    --baseline src/textgraphx/datastore/evaluation/baseline/kg_quality_report.json \
     --current  out/evaluation/production-$(date -u +%Y%m%d)/kg_quality_report.json \
     --tolerance 0.02 \
     --max-tlink-anchor-inconsistent-increase 0 \
