@@ -1,0 +1,20 @@
+{
+  "doc_id": "dataset::/tmp/tmpu1w2gx8u",
+  "edge_counts": {},
+  "metadata": {
+    "documents_processed": 1,
+    "execution_id": "20ea0a91-bd1f-40aa-9960-0cb8342b5509",
+    "phase_duration_seconds": 2.0742416381835938e-05
+  },
+  "node_counts": {},
+  "phase": "temporal",
+  "phase_markers": [
+    "temporal"
+  ],
+  "properties_snapshot": {
+    "assertions_passed": null,
+    "endpoint_violations": 0,
+    "provenance_violations": 0
+  },
+  "timestamp": "2026-04-06T06:49:26.481916+00:00"
+}

@@ -1,0 +1,19 @@
+{
+  "doc_id": "dataset::/home/neo/environments/textgraphx/textgraphx/datastore/dataset",
+  "phase": "ingestion",
+  "node_counts": {},
+  "edge_counts": {},
+  "phase_markers": [
+    "ingestion"
+  ],
+  "properties_snapshot": {
+    "assertions_passed": null,
+    "provenance_violations": 0,
+    "endpoint_violations": 0
+  },
+  "metadata": {
+    "execution_id": "921faf94-045b-446c-906f-83212dc73e55",
+    "phase_duration_seconds": 72.2560682296753,
+    "documents_processed": 6
+  }
+}

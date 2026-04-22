@@ -1,0 +1,20 @@
+{
+  "doc_id": "dataset::/tmp/tmppcstwza1",
+  "edge_counts": {},
+  "metadata": {
+    "documents_processed": 0,
+    "execution_id": "26492489-62db-4438-8a7c-1d02decd1b51",
+    "phase_duration_seconds": 3.3855438232421875e-05
+  },
+  "node_counts": {},
+  "phase": "ingestion",
+  "phase_markers": [
+    "ingestion"
+  ],
+  "properties_snapshot": {
+    "assertions_passed": null,
+    "endpoint_violations": 0,
+    "provenance_violations": 0
+  },
+  "timestamp": "2026-04-14T09:24:58.082401+00:00"
+}

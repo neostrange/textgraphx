@@ -1,0 +1,19 @@
+{
+  "doc_id": "dataset::/tmp/tmpwrl8lq11",
+  "phase": "ingestion",
+  "node_counts": {},
+  "edge_counts": {},
+  "phase_markers": [
+    "ingestion"
+  ],
+  "properties_snapshot": {
+    "assertions_passed": null,
+    "provenance_violations": 0,
+    "endpoint_violations": 0
+  },
+  "metadata": {
+    "execution_id": "9c319999-cf00-49b7-9d34-f4065efa2d16",
+    "phase_duration_seconds": 2.4080276489257812e-05,
+    "documents_processed": 5
+  }
+}

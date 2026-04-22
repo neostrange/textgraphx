@@ -1,0 +1,20 @@
+{
+  "doc_id": "dataset::/tmp/textgraphx_76437_dataset",
+  "edge_counts": {},
+  "metadata": {
+    "documents_processed": 1,
+    "execution_id": "5f7d0f9a-4609-4e45-92a1-26781b71f3b4",
+    "phase_duration_seconds": 47.425119400024414
+  },
+  "node_counts": {},
+  "phase": "ingestion",
+  "phase_markers": [
+    "ingestion"
+  ],
+  "properties_snapshot": {
+    "assertions_passed": null,
+    "endpoint_violations": 0,
+    "provenance_violations": 0
+  },
+  "timestamp": "2026-04-08T07:34:32.472200+00:00"
+}

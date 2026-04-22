@@ -1,0 +1,20 @@
+{
+  "doc_id": "dataset::/tmp/tmpaa48amri",
+  "edge_counts": {},
+  "metadata": {
+    "documents_processed": 1,
+    "execution_id": "0f90d1e8-8662-4356-a57f-80bf35f4b0bb",
+    "phase_duration_seconds": 2.1457672119140625e-05
+  },
+  "node_counts": {},
+  "phase": "temporal",
+  "phase_markers": [
+    "temporal"
+  ],
+  "properties_snapshot": {
+    "assertions_passed": null,
+    "endpoint_violations": 0,
+    "provenance_violations": 0
+  },
+  "timestamp": "2026-04-08T03:08:23.677662+00:00"
+}

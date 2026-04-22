@@ -1,0 +1,21 @@
+{
+  "doc_id": "dataset::/tmp/tmp_ea1vrsg",
+  "edge_counts": {},
+  "metadata": {
+    "documents_processed": 1,
+    "execution_id": "e5526389-845e-45d6-a6fd-901391f68908",
+    "phase_duration_seconds": 1.9788742065429688e-05
+  },
+  "node_counts": {},
+  "phase": "event_enrichment",
+  "phase_markers": [
+    "temporal",
+    "event_enrichment"
+  ],
+  "properties_snapshot": {
+    "assertions_passed": null,
+    "endpoint_violations": 0,
+    "provenance_violations": 0
+  },
+  "timestamp": "2026-04-08T03:42:08.608403+00:00"
+}

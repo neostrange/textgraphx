@@ -1,0 +1,20 @@
+{
+  "doc_id": "dataset::/tmp/tmpwamrn_ap",
+  "edge_counts": {},
+  "metadata": {
+    "documents_processed": 5,
+    "execution_id": "d2751b7d-15a7-4182-922b-cd26a5e4f8de",
+    "phase_duration_seconds": 2.47955322265625e-05
+  },
+  "node_counts": {},
+  "phase": "ingestion",
+  "phase_markers": [
+    "ingestion"
+  ],
+  "properties_snapshot": {
+    "assertions_passed": null,
+    "endpoint_violations": 0,
+    "provenance_violations": 0
+  },
+  "timestamp": "2026-04-06T10:49:23.340906+00:00"
+}

@@ -1,0 +1,19 @@
+{
+  "doc_id": "dataset::/tmp/tmpm_vh3rft",
+  "phase": "temporal",
+  "node_counts": {},
+  "edge_counts": {},
+  "phase_markers": [
+    "temporal"
+  ],
+  "properties_snapshot": {
+    "assertions_passed": null,
+    "provenance_violations": 0,
+    "endpoint_violations": 0
+  },
+  "metadata": {
+    "execution_id": "0ba2ce4d-960b-4599-b121-602f51ea2f34",
+    "phase_duration_seconds": 2.9325485229492188e-05,
+    "documents_processed": 1
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "doc_id": "dataset::/tmp/tmp6ak_rdus",
+  "edge_counts": {},
+  "metadata": {
+    "documents_processed": 1,
+    "execution_id": "9415312b-4165-44eb-8d1b-017fdcc32dbc",
+    "phase_duration_seconds": 1.6927719116210938e-05
+  },
+  "node_counts": {},
+  "phase": "tlinks",
+  "phase_markers": [
+    "temporal",
+    "event_enrichment",
+    "tlinks"
+  ],
+  "properties_snapshot": {
+    "assertions_passed": null,
+    "endpoint_violations": 0,
+    "provenance_violations": 0
+  },
+  "timestamp": "2026-04-14T09:28:42.436505+00:00"
+}

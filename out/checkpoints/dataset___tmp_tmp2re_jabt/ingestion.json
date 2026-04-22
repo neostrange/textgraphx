@@ -1,0 +1,20 @@
+{
+  "doc_id": "dataset::/tmp/tmp2re_jabt",
+  "edge_counts": {},
+  "metadata": {
+    "documents_processed": 5,
+    "execution_id": "9619dbfe-cc71-445e-8c3e-366e10917296",
+    "phase_duration_seconds": 2.0265579223632812e-05
+  },
+  "node_counts": {},
+  "phase": "ingestion",
+  "phase_markers": [
+    "ingestion"
+  ],
+  "properties_snapshot": {
+    "assertions_passed": null,
+    "endpoint_violations": 0,
+    "provenance_violations": 0
+  },
+  "timestamp": "2026-04-08T03:42:08.591075+00:00"
+}

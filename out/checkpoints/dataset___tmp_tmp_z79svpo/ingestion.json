@@ -1,0 +1,20 @@
+{
+  "doc_id": "dataset::/tmp/tmp_z79svpo",
+  "edge_counts": {},
+  "metadata": {
+    "documents_processed": 5,
+    "execution_id": "00688c7b-7149-4ccb-9cb3-2fc697c4309e",
+    "phase_duration_seconds": 2.4557113647460938e-05
+  },
+  "node_counts": {},
+  "phase": "ingestion",
+  "phase_markers": [
+    "ingestion"
+  ],
+  "properties_snapshot": {
+    "assertions_passed": null,
+    "endpoint_violations": 0,
+    "provenance_violations": 0
+  },
+  "timestamp": "2026-04-08T04:54:20.534275+00:00"
+}

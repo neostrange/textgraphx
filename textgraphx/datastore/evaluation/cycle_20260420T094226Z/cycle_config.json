@@ -1,0 +1,27 @@
+{
+  "script": "scripts/run_meantime_eval_cycle.sh",
+  "fallback_used": false,
+  "runtime": {
+    "python_bin": "/home/neo/environments/textgraphx/textgraphx/../.venv310/bin/python",
+    "dataset_dir": "/home/neo/environments/textgraphx/textgraphx/datastore/dataset",
+    "gold_dir": "/home/neo/environments/textgraphx/textgraphx/datastore/annotated",
+    "out_dir": "/home/neo/environments/textgraphx/textgraphx/datastore/evaluation/cycle_20260420T094226Z"
+  },
+  "legacy_relation_scope": "tlink",
+  "full_relation_scope": "tlink,has_participant",
+  "reports": {
+    "legacy": {
+      "strict_json": "eval_report_strict.json",
+      "relaxed_json": "eval_report_relaxed.json"
+    },
+    "fullscope": {
+      "strict_json": "eval_report_strict_fullscope.json",
+      "relaxed_json": "eval_report_relaxed_fullscope.json"
+    }
+  },
+  "flags": {
+    "normalize_nominal_boundaries": true,
+    "nominal_precision_filters": true,
+    "gold_like_nominal_filter": true
+  }
+}

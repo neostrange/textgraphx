@@ -1,0 +1,24 @@
+{
+  "doc_id": "dataset::/home/neo/environments/textgraphx/textgraphx/datastore/annotated",
+  "edge_counts": {},
+  "metadata": {
+    "documents_processed": 0,
+    "execution_id": "6c43ebfd-0ca7-47c0-8110-b07568b4f87d",
+    "phase_duration_seconds": 1.2807385921478271
+  },
+  "node_counts": {},
+  "phase": "tlinks",
+  "phase_markers": [
+    "ingestion",
+    "refinement",
+    "temporal",
+    "event_enrichment",
+    "tlinks"
+  ],
+  "properties_snapshot": {
+    "assertions_passed": true,
+    "endpoint_violations": 0,
+    "provenance_violations": 0
+  },
+  "timestamp": "2026-04-09T07:20:16.686241+00:00"
+}

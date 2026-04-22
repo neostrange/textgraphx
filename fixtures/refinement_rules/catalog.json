@@ -1,0 +1,156 @@
+{
+  "catalog_version": "1.0",
+  "description": "Refinement rule catalog for RefinementPhase.py — documents rule families, input/output contracts, and provenance.",
+  "families": [
+    {
+      "id": "mention_span_repair",
+      "label": "Mention span repair",
+      "rules": [
+        {
+          "method": "trim_trailing_punctuation_from_entity_mentions",
+          "provenance_rule_id": "refinement.trim_trailing_punctuation",
+          "input": "NamedEntity with trailing punctuation token in PARTICIPATES_IN span",
+          "output": "Removed PARTICIPATES_IN edge for trailing punctuation token",
+          "idempotent": true
+        }
+      ]
+    },
+    {
+      "id": "entity_state_annotation",
+      "label": "Entity state annotation",
+      "rules": [
+        {
+          "method": "annotate_entity_state_signals",
+          "provenance_rule_id": "refinement.annotate_entity_state_signals",
+          "input": "Entity nodes with co-occurring state-bearing predicates",
+          "output": "Entity.stateSignals, Entity.stateType properties set",
+          "idempotent": true
+        },
+        {
+          "method": "annotate_entity_specificity_classes",
+          "provenance_rule_id": "refinement.annotate_entity_specificity_classes",
+          "input": "Entity nodes",
+          "output": "Entity.specificityClass property set (SPECIFIC / GENERIC / ABSTRACT)",
+          "idempotent": true
+        }
+      ]
+    },
+    {
+      "id": "frame_argument_linking",
+      "label": "Frame argument linking",
+      "rules": [
+        {
+          "method": "link_frameArgument_to_namedEntity_for_nam_nom",
+          "provenance_rule_id": "refinement.link_frameArgument_to_namedEntity_for_nam_nom",
+          "input": "FrameArgument with syntactic type NAM or NOM overlapping a NamedEntity span",
+          "output": "HAS_FRAME_ARGUMENT edge between FrameArgument and NamedEntity",
+          "idempotent": true
+        },
+        {
+          "method": "link_frameArgument_to_namedEntity_for_pobj",
+          "provenance_rule_id": "refinement.link_frameArgument_to_namedEntity_for_pobj",
+          "input": "FrameArgument with POBJ dependency overlapping NamedEntity",
+          "output": "HAS_FRAME_ARGUMENT edge",
+          "idempotent": true
+        },
+        {
+          "method": "link_frameArgument_to_namedEntity_for_pobj_entity",
+          "provenance_rule_id": "refinement.link_frameArgument_to_namedEntity_for_pobj_entity",
+          "input": "POBJ FrameArgument with backing Entity node",
+          "output": "HAS_FRAME_ARGUMENT edge",
+          "idempotent": true
+        },
+        {
+          "method": "link_frameArgument_to_namedEntity_for_pro",
+          "provenance_rule_id": "refinement.link_frameArgument_to_namedEntity_for_pro",
+          "input": "FrameArgument with syntactic type PRO linked to NamedEntity via REFERS_TO chain",
+          "output": "HAS_FRAME_ARGUMENT edge",
+          "idempotent": true
+        },
+        {
+          "method": "link_frameArgument_to_new_entity",
+          "provenance_rule_id": "refinement.link_frameArgument_to_new_entity",
+          "input": "FrameArgument with NAM or NOM type not yet linked to any entity",
+          "output": "New Entity + NamedEntity nodes; REFERS_TO and HAS_FRAME_ARGUMENT edges",
+          "idempotent": true
+        },
+        {
+          "method": "link_antecedent_to_namedEntity",
+          "provenance_rule_id": "refinement.link_antecedent_to_namedEntity",
+          "input": "Antecedent nodes overlapping NamedEntity spans",
+          "output": "REFERS_TO edge from Antecedent to NamedEntity",
+          "idempotent": true
+        },
+        {
+          "method": "link_frameArgument_to_entity_via_named_entity",
+          "provenance_rule_id": "refinement.link_frameArgument_to_entity_via_named_entity",
+          "input": "FrameArgument linked to NamedEntity; NamedEntity linked to Entity",
+          "output": "Direct HAS_FRAME_ARGUMENT edge to Entity",
+          "idempotent": true
+        },
+        {
+          "method": "link_frameArgument_to_numeric_entities",
+          "provenance_rule_id": "refinement.link_frameArgument_to_numeric_entities",
+          "input": "FrameArgument with numeric surface value",
+          "output": "Linked to matching numeric Entity",
+          "idempotent": true
+        }
+      ]
+    },
+    {
+      "id": "nominal_mention_materialization",
+      "label": "Nominal mention materialization",
+      "rules": [
+        {
+          "method": "materialize_nominal_mentions_from_frame_arguments",
+          "provenance_rule_id": "refinement.materialize_nominal_from_frame_arguments",
+          "input": "FrameArgument nodes with nominal candidate entities (type NAM/NOM); source_key = source_frame_argument_id",
+          "output": "EntityMention nodes with label NominalMention; REFERS_TO and PARTICIPATES_IN edges; em.mention_source = 'frame_argument_nominal'",
+          "idempotent": true,
+          "uid_formula": "make_entity_mention_uid(doc_id, value, head_token_index, source='fa')"
+        },
+        {
+          "method": "materialize_nominal_mentions_from_noun_chunks",
+          "provenance_rule_id": "refinement.materialize_nominal_from_noun_chunks",
+          "input": "NounChunk nodes satisfying core-arg and filter criteria; source_key = source_noun_chunk_id",
+          "output": "EntityMention nodes with label NominalMention; REFERS_TO and PARTICIPATES_IN edges; em.mention_source = 'noun_chunk_nominal'",
+          "idempotent": true,
+          "uid_formula": "make_entity_mention_uid(doc_id, value, head_token_index, source='nc')"
+        }
+      ]
+    },
+    {
+      "id": "nominal_semantic_annotation",
+      "label": "Nominal semantic annotation",
+      "rules": [
+        {
+          "method": "resolve_nominal_semantic_heads",
+          "provenance_rule_id": "refinement.resolve_nominal_semantic_heads",
+          "input": "NominalMention nodes with headTokenIndex",
+          "output": "em.nominalSemanticHead, em.nominalSemanticHeadSource properties set",
+          "idempotent": true
+        },
+        {
+          "method": "annotate_nominal_semantic_profiles",
+          "provenance_rule_id": "refinement.annotate_nominal_semantic_profiles",
+          "input": "NominalMention nodes with nominalSemanticHead; WordNet lexname lookup",
+          "output": "em.nominalEvalProfile, em.nominalEvalLayerSuggestion, em.nominalEventiveByWordNet, em.nominalEventiveConfidence, em.nominalSemanticSignals properties set",
+          "idempotent": true
+        }
+      ]
+    },
+    {
+      "id": "canonical_value_materialization",
+      "label": "Canonical value materialization",
+      "rules": [
+        {
+          "method": "materialize_canonical_value_nodes",
+          "provenance_rule_id": "refinement.materialize_canonical_value_nodes",
+          "input": "Entity nodes with normalized surface values",
+          "output": "CanonicalValue nodes with HAS_CANONICAL_VALUE edges",
+          "idempotent": true
+        }
+      ]
+    }
+  ]
+}

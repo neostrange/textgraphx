@@ -1,0 +1,19 @@
+{
+  "doc_id": "dataset::/nonexistent/path",
+  "phase": "ingestion",
+  "node_counts": {},
+  "edge_counts": {},
+  "phase_markers": [
+    "ingestion"
+  ],
+  "properties_snapshot": {
+    "assertions_passed": null,
+    "provenance_violations": 0,
+    "endpoint_violations": 0
+  },
+  "metadata": {
+    "execution_id": "fcabd55b-044f-428e-b82c-3c3b58d66070",
+    "phase_duration_seconds": 3.504753112792969e-05,
+    "documents_processed": 0
+  }
+}

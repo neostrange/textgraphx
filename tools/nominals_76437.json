@@ -1,0 +1,2212 @@
+{
+  "doc_id": "76437",
+  "count": 82,
+  "rows": [
+    {
+      "node_id": 11342,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "three large investment funds",
+      "head": "funds",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "start_char": 2682,
+        "head": "funds",
+        "syntactic_type": "NOMINAL",
+        "end_tok": 497,
+        "syntacticType": "NOMINAL",
+        "end_char": 2710,
+        "index": 494,
+        "start_tok": 494,
+        "id": "76437_494",
+        "type": "NP",
+        "value": "three large investment funds",
+        "headTokenIndex": 497
+      }
+    },
+    {
+      "node_id": 11339,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "France's largest bank",
+      "head": "bank",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "start_char": 2619,
+        "head": "bank",
+        "syntactic_type": "NOMINAL",
+        "end_tok": 485,
+        "syntacticType": "NOMINAL",
+        "end_char": 2640,
+        "index": 482,
+        "start_tok": 482,
+        "id": "76437_482",
+        "type": "NP",
+        "value": "France's largest bank",
+        "headTokenIndex": 485
+      }
+    },
+    {
+      "node_id": 11341,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "withdrawals",
+      "head": "withdrawals",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "withdrawals",
+        "start_char": 2665,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 492,
+        "syntacticType": "NOMINAL",
+        "end_char": 2676,
+        "index": 492,
+        "start_tok": 492,
+        "id": "76437_492",
+        "type": "NP",
+        "value": "withdrawals",
+        "headTokenIndex": 492
+      }
+    },
+    {
+      "node_id": 11344,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "sub-prime exposure",
+      "head": "exposure",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "exposure",
+        "start_char": 2734,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 503,
+        "syntacticType": "NOMINAL",
+        "end_char": 2752,
+        "index": 502,
+        "start_tok": 502,
+        "id": "76437_502",
+        "type": "NP",
+        "value": "sub-prime exposure",
+        "headTokenIndex": 503
+      }
+    },
+    {
+      "node_id": 11337,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "the government",
+      "head": "government",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "government",
+        "start_char": 2580,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 476,
+        "syntacticType": "NOMINAL",
+        "end_char": 2594,
+        "index": 475,
+        "start_tok": 475,
+        "id": "76437_475",
+        "type": "NP",
+        "value": "the government",
+        "headTokenIndex": 476
+      }
+    },
+    {
+      "node_id": 11336,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "share value",
+      "head": "value",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "value",
+        "start_char": 2559,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 472,
+        "syntacticType": "NOMINAL",
+        "end_char": 2570,
+        "index": 471,
+        "start_tok": 471,
+        "id": "76437_471",
+        "type": "NP",
+        "value": "share value",
+        "headTokenIndex": 472
+      }
+    },
+    {
+      "node_id": 11338,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "a bail-out",
+      "head": "bail-out",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "bail-out",
+        "start_char": 2607,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 480,
+        "syntacticType": "NOMINAL",
+        "end_char": 2617,
+        "index": 479,
+        "start_tok": 479,
+        "id": "76437_479",
+        "type": "NP",
+        "value": "a bail-out",
+        "headTokenIndex": 480
+      }
+    },
+    {
+      "node_id": 11400,
+      "labels": [
+        "NamedEntity"
+      ],
+      "value": "Asian",
+      "head": "Asian",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOM",
+      "token_id": "76437_445_445",
+      "props": {
+        "start_char": 2400,
+        "stale_run_id": "ne_reextract_1775633666038",
+        "token_start": 445,
+        "syntacticType": "NOMINAL",
+        "token_end": 445,
+        "end_char": 2405,
+        "start_tok": 445,
+        "index": 445,
+        "end_index": 445,
+        "type": "NORP",
+        "headTokenIndex": 445,
+        "head": "Asian",
+        "entClassSource": "refinement_specificity_heuristic",
+        "ent_class": "GEN",
+        "uid": "ne_76437_5418a779ecc0d28e2ea3",
+        "syntactic_type": "NOM",
+        "legacy_span_id": "76437_445_445_NORP",
+        "stale": false,
+        "entClass": "GEN",
+        "end_tok": 445,
+        "token_id": "76437_445_445",
+        "id": "76437_445_445_NORP",
+        "last_seen_at": 1775633667821,
+        "value": "Asian"
+      }
+    },
+    {
+      "node_id": 11331,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "Asian and European markets",
+      "head": "markets",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "markets",
+        "start_char": 2400,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 448,
+        "syntacticType": "NOMINAL",
+        "end_char": 2426,
+        "index": 445,
+        "start_tok": 445,
+        "id": "76437_445",
+        "type": "NP",
+        "value": "Asian and European markets",
+        "headTokenIndex": 448
+      }
+    },
+    {
+      "node_id": 11332,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "the subprime mortgage crisis",
+      "head": "crisis",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "crisis",
+        "start_char": 2465,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 457,
+        "syntacticType": "NOMINAL",
+        "end_char": 2493,
+        "index": 454,
+        "start_tok": 454,
+        "id": "76437_454",
+        "type": "NP",
+        "value": "the subprime mortgage crisis",
+        "headTokenIndex": 457
+      }
+    },
+    {
+      "node_id": 11330,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "rates",
+      "head": "rates",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "rates",
+        "start_char": 2381,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 442,
+        "syntacticType": "NOMINAL",
+        "end_char": 2386,
+        "start_tok": 442,
+        "index": 442,
+        "id": "76437_442",
+        "type": "NP",
+        "value": "rates",
+        "headTokenIndex": 442
+      }
+    },
+    {
+      "node_id": 11326,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "a tirade",
+      "head": "tirade",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "tirade",
+        "start_char": 2286,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 421,
+        "syntacticType": "NOMINAL",
+        "end_char": 2294,
+        "index": 420,
+        "start_tok": 420,
+        "id": "76437_420",
+        "type": "NP",
+        "value": "a tirade",
+        "headTokenIndex": 421
+      }
+    },
+    {
+      "node_id": 11438,
+      "labels": [
+        "Antecedent"
+      ],
+      "value": "as many as seven million people will",
+      "head": "will",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "will",
+        "uid": "antecedent_76437_41d79c90988403114075",
+        "startIndex": 400,
+        "end_tok": 406,
+        "syntacticType": "NOMINAL",
+        "endIndex": 406,
+        "start_tok": 400,
+        "id": "Antecedent_76437_400_406",
+        "text": "as many as seven million people will",
+        "headTokenIndex": 406
+      }
+    },
+    {
+      "node_id": 11322,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "as many as seven million people",
+      "head": "people",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "people",
+        "start_char": 2184,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 405,
+        "syntacticType": "NOMINAL",
+        "end_char": 2215,
+        "index": 400,
+        "start_tok": 400,
+        "id": "76437_400",
+        "type": "NP",
+        "value": "as many as seven million people",
+        "headTokenIndex": 405
+      }
+    },
+    {
+      "node_id": 11439,
+      "labels": [
+        "CorefMention"
+      ],
+      "value": "their homes",
+      "head": "homes",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "homes",
+        "uid": "corefmention_76437_d14234f2860a835acb4e",
+        "startIndex": 408,
+        "end_tok": 409,
+        "syntacticType": "NOMINAL",
+        "endIndex": 409,
+        "start_tok": 408,
+        "id": "CorefMention_76437_408_409",
+        "text": "their homes",
+        "headTokenIndex": 409
+      }
+    },
+    {
+      "node_id": 11323,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "their homes",
+      "head": "homes",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "homes",
+        "start_char": 2226,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 409,
+        "syntacticType": "NOMINAL",
+        "end_char": 2237,
+        "index": 408,
+        "start_tok": 408,
+        "id": "76437_408",
+        "type": "NP",
+        "value": "their homes",
+        "headTokenIndex": 409
+      }
+    },
+    {
+      "node_id": 11324,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "bad mortgages",
+      "head": "mortgages",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "mortgages",
+        "start_char": 2243,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 412,
+        "syntacticType": "NOMINAL",
+        "end_char": 2256,
+        "index": 411,
+        "start_tok": 411,
+        "id": "76437_411",
+        "type": "NP",
+        "value": "bad mortgages",
+        "headTokenIndex": 412
+      }
+    },
+    {
+      "node_id": 11311,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "a quagmire",
+      "head": "quagmire",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "quagmire",
+        "start_char": 1973,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 362,
+        "syntacticType": "NOMINAL",
+        "end_char": 1983,
+        "index": 361,
+        "start_tok": 361,
+        "id": "76437_361",
+        "type": "NP",
+        "value": "a quagmire",
+        "headTokenIndex": 362
+      }
+    },
+    {
+      "node_id": 11317,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "teaser rates",
+      "head": "rates",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "rates",
+        "start_char": 2078,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 380,
+        "syntacticType": "NOMINAL",
+        "end_char": 2090,
+        "index": 379,
+        "start_tok": 379,
+        "id": "76437_379",
+        "type": "NP",
+        "value": "teaser rates",
+        "headTokenIndex": 380
+      }
+    },
+    {
+      "node_id": 11312,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "millions",
+      "head": "millions",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "millions",
+        "start_char": 1989,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 364,
+        "syntacticType": "NOMINAL",
+        "end_char": 1997,
+        "index": 364,
+        "start_tok": 364,
+        "id": "76437_364",
+        "type": "NP",
+        "value": "millions",
+        "headTokenIndex": 364
+      }
+    },
+    {
+      "node_id": 11319,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "piggyback rates",
+      "head": "rates",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "rates",
+        "start_char": 2120,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 387,
+        "syntacticType": "NOMINAL",
+        "end_char": 2135,
+        "index": 386,
+        "start_tok": 386,
+        "id": "76437_386",
+        "type": "NP",
+        "value": "piggyback rates",
+        "headTokenIndex": 387
+      }
+    },
+    {
+      "node_id": 11313,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "people",
+      "head": "people",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "people",
+        "start_char": 2001,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 366,
+        "syntacticType": "NOMINAL",
+        "end_char": 2007,
+        "index": 366,
+        "start_tok": 366,
+        "id": "76437_366",
+        "type": "NP",
+        "value": "people",
+        "headTokenIndex": 366
+      }
+    },
+    {
+      "node_id": 11318,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "interest-only mortgages",
+      "head": "mortgages",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "mortgages",
+        "start_char": 2092,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 383,
+        "syntacticType": "NOMINAL",
+        "end_char": 2115,
+        "index": 382,
+        "start_tok": 382,
+        "id": "76437_382",
+        "type": "NP",
+        "value": "interest-only mortgages",
+        "headTokenIndex": 383
+      }
+    },
+    {
+      "node_id": 11316,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "adjustable rate mortgages",
+      "head": "mortgages",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "mortgages",
+        "start_char": 2051,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 377,
+        "syntacticType": "NOMINAL",
+        "end_char": 2076,
+        "index": 375,
+        "start_tok": 375,
+        "id": "76437_375",
+        "type": "NP",
+        "value": "adjustable rate mortgages",
+        "headTokenIndex": 377
+      }
+    },
+    {
+      "node_id": 11310,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "lenders",
+      "head": "lenders",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "lenders",
+        "start_char": 1958,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 358,
+        "syntacticType": "NOMINAL",
+        "end_char": 1965,
+        "index": 358,
+        "start_tok": 358,
+        "id": "76437_358",
+        "type": "NP",
+        "value": "lenders",
+        "headTokenIndex": 358
+      }
+    },
+    {
+      "node_id": 11315,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "loans",
+      "head": "loans",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "loans",
+        "start_char": 2032,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 372,
+        "syntacticType": "NOMINAL",
+        "end_char": 2037,
+        "start_tok": 372,
+        "index": 372,
+        "id": "76437_372",
+        "type": "NP",
+        "value": "loans",
+        "headTokenIndex": 372
+      }
+    },
+    {
+      "node_id": 11307,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "more than two years",
+      "head": "years",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "start_char": 1875,
+        "head": "years",
+        "syntactic_type": "NOMINAL",
+        "end_tok": 345,
+        "syntacticType": "NOMINAL",
+        "end_char": 1894,
+        "index": 342,
+        "start_tok": 342,
+        "id": "76437_342",
+        "type": "NP",
+        "value": "more than two years",
+        "headTokenIndex": 345
+      }
+    },
+    {
+      "node_id": 11306,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "The U.S. housing market",
+      "head": "market",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "market",
+        "start_char": 1828,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 337,
+        "syntacticType": "NOMINAL",
+        "end_char": 1851,
+        "index": 334,
+        "start_tok": 334,
+        "id": "76437_334",
+        "type": "NP",
+        "value": "The U.S. housing market",
+        "headTokenIndex": 337
+      }
+    },
+    {
+      "node_id": 11309,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "interest rates",
+      "head": "rates",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "rates",
+        "start_char": 1928,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 352,
+        "syntacticType": "NOMINAL",
+        "end_char": 1942,
+        "index": 351,
+        "start_tok": 351,
+        "id": "76437_351",
+        "type": "NP",
+        "value": "interest rates",
+        "headTokenIndex": 352
+      }
+    },
+    {
+      "node_id": 11304,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "another large lender",
+      "head": "lender",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "lender",
+        "start_char": 1775,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 327,
+        "syntacticType": "NOMINAL",
+        "end_char": 1795,
+        "index": 325,
+        "start_tok": 325,
+        "id": "76437_325",
+        "type": "NP",
+        "value": "another large lender",
+        "headTokenIndex": 327
+      }
+    },
+    {
+      "node_id": 11305,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "bankruptcy",
+      "head": "bankruptcy",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "bankruptcy",
+        "start_char": 1816,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 332,
+        "syntacticType": "NOMINAL",
+        "end_char": 1826,
+        "index": 332,
+        "start_tok": 332,
+        "id": "76437_332",
+        "type": "NP",
+        "value": "bankruptcy",
+        "headTokenIndex": 332
+      }
+    },
+    {
+      "node_id": 11301,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "a greater proportion",
+      "head": "proportion",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "proportion",
+        "start_char": 1701,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 315,
+        "syntacticType": "NOMINAL",
+        "end_char": 1721,
+        "index": 313,
+        "start_tok": 313,
+        "id": "76437_313",
+        "type": "NP",
+        "value": "a greater proportion",
+        "headTokenIndex": 315
+      }
+    },
+    {
+      "node_id": 11299,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "a statement",
+      "head": "statement",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "statement",
+        "start_char": 1641,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 302,
+        "syntacticType": "NOMINAL",
+        "end_char": 1652,
+        "index": 301,
+        "start_tok": 301,
+        "id": "76437_301",
+        "type": "NP",
+        "value": "a statement",
+        "headTokenIndex": 302
+      }
+    },
+    {
+      "node_id": 11428,
+      "labels": [
+        "CorefMention"
+      ],
+      "value": "this week,",
+      "head": ",",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": ",",
+        "uid": "corefmention_76437_9cdd59a9acbc08aa7d34",
+        "startIndex": 303,
+        "end_tok": 305,
+        "syntacticType": "NOMINAL",
+        "endIndex": 305,
+        "start_tok": 303,
+        "id": "CorefMention_76437_303_305",
+        "text": "this week,",
+        "headTokenIndex": 305
+      }
+    },
+    {
+      "node_id": 11302,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "mortgage",
+      "head": "mortgage",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "mortgage",
+        "start_char": 1725,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 317,
+        "syntacticType": "NOMINAL",
+        "end_char": 1733,
+        "index": 317,
+        "start_tok": 317,
+        "id": "76437_317",
+        "type": "NP",
+        "value": "mortgage",
+        "headTokenIndex": 317
+      }
+    },
+    {
+      "node_id": 11297,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "shares",
+      "head": "shares",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "shares",
+        "start_char": 1601,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 295,
+        "syntacticType": "NOMINAL",
+        "end_char": 1607,
+        "index": 295,
+        "start_tok": 295,
+        "id": "76437_295",
+        "type": "NP",
+        "value": "shares",
+        "headTokenIndex": 295
+      }
+    },
+    {
+      "node_id": 11296,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "both very large U.S. home loan lenders",
+      "head": "lenders",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "lenders",
+        "start_char": 1557,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 292,
+        "syntacticType": "NOMINAL",
+        "end_char": 1595,
+        "start_tok": 286,
+        "index": 286,
+        "id": "76437_286",
+        "type": "NP",
+        "value": "both very large U.S. home loan lenders",
+        "headTokenIndex": 292
+      }
+    },
+    {
+      "node_id": 11289,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "the massive sub-prime mortgage failure",
+      "head": "failure",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "failure",
+        "start_char": 1397,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 263,
+        "syntacticType": "NOMINAL",
+        "end_char": 1435,
+        "index": 259,
+        "start_tok": 259,
+        "id": "76437_259",
+        "type": "NP",
+        "value": "the massive sub-prime mortgage failure",
+        "headTokenIndex": 263
+      }
+    },
+    {
+      "node_id": 11434,
+      "labels": [
+        "CorefMention"
+      ],
+      "value": "The hedge funds had",
+      "head": "had",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "had",
+        "uid": "corefmention_76437_f07191c59981bf0834a3",
+        "startIndex": 251,
+        "end_tok": 254,
+        "syntacticType": "NOMINAL",
+        "endIndex": 254,
+        "start_tok": 251,
+        "id": "CorefMention_76437_251_254",
+        "text": "The hedge funds had",
+        "headTokenIndex": 254
+      }
+    },
+    {
+      "node_id": 11290,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "the company",
+      "head": "company",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "company",
+        "start_char": 1441,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 267,
+        "syntacticType": "NOMINAL",
+        "end_char": 1452,
+        "index": 266,
+        "start_tok": 266,
+        "id": "76437_266",
+        "type": "NP",
+        "value": "the company",
+        "headTokenIndex": 267
+      }
+    },
+    {
+      "node_id": 11288,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "The hedge funds",
+      "head": "funds",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "start_char": 1349,
+        "head": "funds",
+        "syntactic_type": "NOMINAL",
+        "end_tok": 253,
+        "syntacticType": "NOMINAL",
+        "end_char": 1364,
+        "index": 251,
+        "start_tok": 251,
+        "id": "76437_251",
+        "type": "NP",
+        "value": "The hedge funds",
+        "headTokenIndex": 253
+      }
+    },
+    {
+      "node_id": 11293,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "investors",
+      "head": "investors",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "investors",
+        "start_char": 1500,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 277,
+        "syntacticType": "NOMINAL",
+        "end_char": 1509,
+        "index": 277,
+        "start_tok": 277,
+        "id": "76437_277",
+        "type": "NP",
+        "value": "investors",
+        "headTokenIndex": 277
+      }
+    },
+    {
+      "node_id": 11292,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "any money",
+      "head": "money",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "money",
+        "start_char": 1487,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 275,
+        "syntacticType": "NOMINAL",
+        "end_char": 1496,
+        "index": 274,
+        "start_tok": 274,
+        "id": "76437_274",
+        "type": "NP",
+        "value": "any money",
+        "headTokenIndex": 275
+      }
+    },
+    {
+      "node_id": 11285,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "a result",
+      "head": "result",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "result",
+        "start_char": 1262,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 234,
+        "syntacticType": "NOMINAL",
+        "end_char": 1270,
+        "index": 233,
+        "start_tok": 233,
+        "id": "76437_233",
+        "type": "NP",
+        "value": "a result",
+        "headTokenIndex": 234
+      }
+    },
+    {
+      "node_id": 11286,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "its complete loss",
+      "head": "loss",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "loss",
+        "start_char": 1276,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 238,
+        "syntacticType": "NOMINAL",
+        "end_char": 1293,
+        "index": 236,
+        "start_tok": 236,
+        "id": "76437_236",
+        "type": "NP",
+        "value": "its complete loss",
+        "headTokenIndex": 238
+      }
+    },
+    {
+      "node_id": 11283,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "The volatile week",
+      "head": "week",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "start_char": 1196,
+        "head": "week",
+        "syntactic_type": "NOMINAL",
+        "end_tok": 224,
+        "syntacticType": "NOMINAL",
+        "end_char": 1213,
+        "index": 222,
+        "start_tok": 222,
+        "id": "76437_222",
+        "type": "NP",
+        "value": "The volatile week",
+        "headTokenIndex": 224
+      }
+    },
+    {
+      "node_id": 11433,
+      "labels": [
+        "Antecedent"
+      ],
+      "value": "two major hedge funds worth more than $1.5 billion.",
+      "head": ".",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": ".",
+        "uid": "antecedent_76437_1b38e173dbc670a246dd",
+        "startIndex": 240,
+        "end_tok": 250,
+        "syntacticType": "NOMINAL",
+        "endIndex": 250,
+        "start_tok": 240,
+        "id": "Antecedent_76437_240_250",
+        "text": "two major hedge funds worth more than $1.5 billion.",
+        "headTokenIndex": 250
+      }
+    },
+    {
+      "node_id": 11287,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "two major hedge funds",
+      "head": "funds",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "start_char": 1297,
+        "head": "funds",
+        "syntactic_type": "NOMINAL",
+        "end_tok": 243,
+        "syntacticType": "NOMINAL",
+        "end_char": 1318,
+        "index": 240,
+        "start_tok": 240,
+        "id": "76437_240",
+        "type": "NP",
+        "value": "two major hedge funds",
+        "headTokenIndex": 243
+      }
+    },
+    {
+      "node_id": 11281,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "a drop",
+      "head": "drop",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "drop",
+        "start_char": 1175,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 218,
+        "syntacticType": "NOMINAL",
+        "end_char": 1181,
+        "index": 217,
+        "start_tok": 217,
+        "id": "76437_217",
+        "type": "NP",
+        "value": "a drop",
+        "headTokenIndex": 218
+      }
+    },
+    {
+      "node_id": 11426,
+      "labels": [
+        "Antecedent"
+      ],
+      "value": "this week,",
+      "head": ",",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": ",",
+        "uid": "antecedent_76437_2c3138fdb9cf45043fec",
+        "startIndex": 189,
+        "end_tok": 191,
+        "syntacticType": "NOMINAL",
+        "endIndex": 191,
+        "start_tok": 189,
+        "id": "Antecedent_76437_189_191",
+        "text": "this week,",
+        "headTokenIndex": 191
+      }
+    },
+    {
+      "node_id": 11276,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "its target rate",
+      "head": "rate",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "rate",
+        "start_char": 1072,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 198,
+        "syntacticType": "NOMINAL",
+        "end_char": 1087,
+        "index": 196,
+        "start_tok": 196,
+        "id": "76437_196",
+        "type": "NP",
+        "value": "its target rate",
+        "headTokenIndex": 198
+      }
+    },
+    {
+      "node_id": 11282,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "liquidity",
+      "head": "liquidity",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "liquidity",
+        "start_char": 1185,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 220,
+        "syntacticType": "NOMINAL",
+        "end_char": 1194,
+        "index": 220,
+        "start_tok": 220,
+        "id": "76437_220",
+        "type": "NP",
+        "value": "liquidity",
+        "headTokenIndex": 220
+      }
+    },
+    {
+      "node_id": 11277,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "5.25%",
+      "head": "%",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "%",
+        "start_char": 1091,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 201,
+        "syntacticType": "NOMINAL",
+        "end_char": 1096,
+        "index": 200,
+        "start_tok": 200,
+        "id": "76437_200",
+        "type": "NP",
+        "value": "5.25%",
+        "headTokenIndex": 201
+      }
+    },
+    {
+      "node_id": 11279,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "the federal funds rate",
+      "head": "rate",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "start_char": 1117,
+        "head": "rate",
+        "syntactic_type": "NOMINAL",
+        "end_tok": 209,
+        "syntacticType": "NOMINAL",
+        "end_char": 1139,
+        "index": 206,
+        "start_tok": 206,
+        "id": "76437_206",
+        "type": "NP",
+        "value": "the federal funds rate",
+        "headTokenIndex": 209
+      }
+    },
+    {
+      "node_id": 11280,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "6%",
+      "head": "%",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "%",
+        "start_char": 1160,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 214,
+        "syntacticType": "NOMINAL",
+        "end_char": 1162,
+        "start_tok": 213,
+        "index": 213,
+        "id": "76437_213",
+        "type": "NP",
+        "value": "6%",
+        "headTokenIndex": 214
+      }
+    },
+    {
+      "node_id": 11274,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "Japan's financial system",
+      "head": "system",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "system",
+        "start_char": 987,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 183,
+        "syntacticType": "NOMINAL",
+        "end_char": 1011,
+        "index": 180,
+        "start_tok": 180,
+        "id": "76437_180",
+        "type": "NP",
+        "value": "Japan's financial system",
+        "headTokenIndex": 183
+      }
+    },
+    {
+      "node_id": 11270,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "stockholder worries",
+      "head": "worries",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "worries",
+        "start_char": 906,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 165,
+        "syntacticType": "NOMINAL",
+        "end_char": 925,
+        "index": 164,
+        "start_tok": 164,
+        "id": "76437_164",
+        "type": "NP",
+        "value": "stockholder worries",
+        "headTokenIndex": 165
+      }
+    },
+    {
+      "node_id": 11268,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "a $38 billion repurchase agreement",
+      "head": "agreement",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "agreement",
+        "start_char": 833,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 158,
+        "syntacticType": "NOMINAL",
+        "end_char": 867,
+        "index": 153,
+        "start_tok": 153,
+        "id": "76437_153",
+        "type": "NP",
+        "value": "a $38 billion repurchase agreement",
+        "headTokenIndex": 158
+      }
+    },
+    {
+      "node_id": 11269,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "mortgage-backed securities",
+      "head": "securities",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "securities",
+        "start_char": 871,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 161,
+        "syntacticType": "NOMINAL",
+        "end_char": 897,
+        "index": 160,
+        "start_tok": 160,
+        "id": "76437_160",
+        "type": "NP",
+        "value": "mortgage-backed securities",
+        "headTokenIndex": 161
+      }
+    },
+    {
+      "node_id": 11260,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "temporary reserves",
+      "head": "reserves",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "reserves",
+        "start_char": 649,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 120,
+        "syntacticType": "NOMINAL",
+        "end_char": 667,
+        "index": 119,
+        "start_tok": 119,
+        "id": "76437_119",
+        "type": "NP",
+        "value": "temporary reserves",
+        "headTokenIndex": 120
+      }
+    },
+    {
+      "node_id": 11264,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "its banks",
+      "head": "banks",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "banks",
+        "start_char": 758,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 138,
+        "syntacticType": "NOMINAL",
+        "end_char": 767,
+        "index": 137,
+        "start_tok": 137,
+        "id": "76437_137",
+        "type": "NP",
+        "value": "its banks",
+        "headTokenIndex": 138
+      }
+    },
+    {
+      "node_id": 11263,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "a record \u20ac83.6 billion addition",
+      "head": "addition",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "addition",
+        "start_char": 723,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 135,
+        "syntacticType": "NOMINAL",
+        "end_char": 754,
+        "start_tok": 130,
+        "index": 130,
+        "id": "76437_130",
+        "type": "NP",
+        "value": "a record \u20ac83.6 billion addition",
+        "headTokenIndex": 135
+      }
+    },
+    {
+      "node_id": 11265,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "its biggest cash infusion",
+      "head": "infusion",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "infusion",
+        "start_char": 769,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 143,
+        "syntacticType": "NOMINAL",
+        "end_char": 794,
+        "index": 140,
+        "start_tok": 140,
+        "id": "76437_140",
+        "type": "NP",
+        "value": "its biggest cash infusion",
+        "headTokenIndex": 143
+      }
+    },
+    {
+      "node_id": 11257,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "many financial firms",
+      "head": "firms",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "start_char": 525,
+        "head": "firms",
+        "syntactic_type": "NOMINAL",
+        "end_tok": 100,
+        "syntacticType": "NOMINAL",
+        "end_char": 545,
+        "index": 98,
+        "start_tok": 98,
+        "id": "76437_98",
+        "type": "NP",
+        "value": "many financial firms",
+        "headTokenIndex": 100
+      }
+    },
+    {
+      "node_id": 11256,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "liquidity",
+      "head": "liquidity",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "liquidity",
+        "start_char": 501,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 94,
+        "syntacticType": "NOMINAL",
+        "end_char": 510,
+        "index": 94,
+        "start_tok": 94,
+        "id": "76437_94",
+        "type": "NP",
+        "value": "liquidity",
+        "headTokenIndex": 94
+      }
+    },
+    {
+      "node_id": 11255,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "their banking systems",
+      "head": "systems",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "systems",
+        "start_char": 472,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 91,
+        "syntacticType": "NOMINAL",
+        "end_char": 493,
+        "index": 89,
+        "start_tok": 89,
+        "id": "76437_89",
+        "type": "NP",
+        "value": "their banking systems",
+        "headTokenIndex": 91
+      }
+    },
+    {
+      "node_id": 11412,
+      "labels": [
+        "Antecedent"
+      ],
+      "value": "Central banks across the world are",
+      "head": "are",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "are",
+        "uid": "antecedent_76437_de52cfa280fede518834",
+        "startIndex": 80,
+        "end_tok": 85,
+        "syntacticType": "NOMINAL",
+        "endIndex": 85,
+        "start_tok": 80,
+        "id": "Antecedent_76437_80_85",
+        "text": "Central banks across the world are",
+        "headTokenIndex": 85
+      }
+    },
+    {
+      "node_id": 11253,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "the world",
+      "head": "world",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "world",
+        "start_char": 437,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 84,
+        "syntacticType": "NOMINAL",
+        "end_char": 446,
+        "index": 83,
+        "start_tok": 83,
+        "id": "76437_83",
+        "type": "NP",
+        "value": "the world",
+        "headTokenIndex": 84
+      }
+    },
+    {
+      "node_id": 11258,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "subprime ties",
+      "head": "ties",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "ties",
+        "start_char": 551,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 103,
+        "syntacticType": "NOMINAL",
+        "end_char": 564,
+        "index": 102,
+        "start_tok": 102,
+        "id": "76437_102",
+        "type": "NP",
+        "value": "subprime ties",
+        "headTokenIndex": 103
+      }
+    },
+    {
+      "node_id": 11252,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "Central banks",
+      "head": "banks",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "banks",
+        "start_char": 416,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 81,
+        "syntacticType": "NOMINAL",
+        "end_char": 429,
+        "index": 80,
+        "start_tok": 80,
+        "id": "76437_80",
+        "type": "NP",
+        "value": "Central banks",
+        "headTokenIndex": 81
+      }
+    },
+    {
+      "node_id": 11254,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "funds",
+      "head": "funds",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "funds",
+        "start_char": 461,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 87,
+        "syntacticType": "NOMINAL",
+        "end_char": 466,
+        "start_tok": 87,
+        "index": 87,
+        "id": "76437_87",
+        "type": "NP",
+        "value": "funds",
+        "headTokenIndex": 87
+      }
+    },
+    {
+      "node_id": 11250,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "The UK's FTSE-100 index",
+      "head": "index",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "index",
+        "start_char": 306,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 62,
+        "syntacticType": "NOMINAL",
+        "end_char": 329,
+        "index": 58,
+        "start_tok": 58,
+        "id": "76437_58",
+        "type": "NP",
+        "value": "The UK's FTSE-100 index",
+        "headTokenIndex": 62
+      }
+    },
+    {
+      "node_id": 11410,
+      "labels": [
+        "CorefMention"
+      ],
+      "value": "the day after",
+      "head": "after",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "after",
+        "uid": "corefmention_76437_4b56399ed96807b1fbea",
+        "startIndex": 41,
+        "end_tok": 43,
+        "syntacticType": "NOMINAL",
+        "endIndex": 43,
+        "start_tok": 41,
+        "id": "CorefMention_76437_41_43",
+        "text": "the day after",
+        "headTokenIndex": 43
+      }
+    },
+    {
+      "node_id": 11411,
+      "labels": [
+        "CorefMention"
+      ],
+      "value": "the day down",
+      "head": "down",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "down",
+        "uid": "corefmention_76437_7836cbe09fdf79ecf9bd",
+        "startIndex": 51,
+        "end_tok": 53,
+        "syntacticType": "NOMINAL",
+        "endIndex": 53,
+        "start_tok": 51,
+        "id": "CorefMention_76437_51_53",
+        "text": "the day down",
+        "headTokenIndex": 53
+      }
+    },
+    {
+      "node_id": 11249,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "the day",
+      "head": "day",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "day",
+        "start_char": 276,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 52,
+        "syntacticType": "NOMINAL",
+        "end_char": 283,
+        "index": 51,
+        "start_tok": 51,
+        "id": "76437_51",
+        "type": "NP",
+        "value": "the day",
+        "headTokenIndex": 52
+      }
+    },
+    {
+      "node_id": 11248,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "the day",
+      "head": "day",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "day",
+        "start_char": 225,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 42,
+        "syntacticType": "NOMINAL",
+        "end_char": 232,
+        "index": 41,
+        "start_tok": 41,
+        "id": "76437_41",
+        "type": "NP",
+        "value": "the day",
+        "headTokenIndex": 42
+      }
+    },
+    {
+      "node_id": 11243,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "Global stock markets",
+      "head": "markets",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "markets",
+        "start_char": 56,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 14,
+        "syntacticType": "NOMINAL",
+        "end_char": 76,
+        "index": 12,
+        "start_tok": 12,
+        "id": "76437_12",
+        "type": "NP",
+        "value": "Global stock markets",
+        "headTokenIndex": 14
+      }
+    },
+    {
+      "node_id": 11245,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "the sub-prime mortgage crisis",
+      "head": "crisis",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "crisis",
+        "start_char": 122,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 27,
+        "syntacticType": "NOMINAL",
+        "end_char": 151,
+        "index": 24,
+        "start_tok": 24,
+        "id": "76437_24",
+        "type": "NP",
+        "value": "the sub-prime mortgage crisis",
+        "headTokenIndex": 27
+      }
+    },
+    {
+      "node_id": 11409,
+      "labels": [
+        "CorefMention"
+      ],
+      "value": "today,",
+      "head": "today",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "today",
+        "uid": "corefmention_76437_ba9733786775adfa1e78",
+        "startIndex": 16,
+        "end_tok": 17,
+        "syntacticType": "NOMINAL",
+        "endIndex": 17,
+        "start_tok": 16,
+        "id": "CorefMention_76437_16_17",
+        "text": "today,",
+        "headTokenIndex": 16
+      }
+    },
+    {
+      "node_id": 11244,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "a mass sell-off",
+      "head": "sell-off",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "sell-off",
+        "start_char": 92,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 21,
+        "syntacticType": "NOMINAL",
+        "end_char": 107,
+        "index": 19,
+        "start_tok": 19,
+        "id": "76437_19",
+        "type": "NP",
+        "value": "a mass sell-off",
+        "headTokenIndex": 21
+      }
+    },
+    {
+      "node_id": 11240,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "Markets",
+      "head": "Markets",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "Markets",
+        "start_char": 0,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 0,
+        "syntacticType": "NOMINAL",
+        "end_char": 7,
+        "index": 0,
+        "start_tok": 0,
+        "id": "76437_0",
+        "type": "NP",
+        "value": "Markets",
+        "headTokenIndex": 0
+      }
+    },
+    {
+      "node_id": 11241,
+      "labels": [
+        "NounChunk"
+      ],
+      "value": "credit crisis",
+      "head": "crisis",
+      "nominalSemanticHead": null,
+      "nominalSemanticHeadTokenIndex": null,
+      "nominalEventiveByWordNet": false,
+      "syntactic_type": "NOMINAL",
+      "token_id": null,
+      "props": {
+        "head": "crisis",
+        "start_char": 24,
+        "syntactic_type": "NOMINAL",
+        "end_tok": 5,
+        "syntacticType": "NOMINAL",
+        "end_char": 37,
+        "index": 4,
+        "start_tok": 4,
+        "id": "76437_4",
+        "type": "NP",
+        "value": "credit crisis",
+        "headTokenIndex": 5
+      }
+    }
+  ]
+}

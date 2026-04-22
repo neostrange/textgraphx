@@ -1,0 +1,13 @@
+import json
+
+def process():
+    with open("textgraphx/datastore/evaluation/eval_batch_baseline_examples.json") as f: 
+        d1 = json.load(f)
+    print("========== EVENT FALSE NEGATIVES (MISSING) ==========")
+    for report in d1.get("reports", [])[:1]:
+        fp_examples = report.get("strict", {}).get("event", {}).get("examples", {}).get("missing", [])
+        for x in fp_examples[:40]:
+            attrs = x.get('gold', {}).get('attrs', {})
+            print(f" - {attrs.get('pred', 'N/A')} (pos: {attrs.get('pos', 'N/A')} | tense: {attrs.get('tense', 'N/A')})")
+
+process()

@@ -1,0 +1,21 @@
+{
+  "doc_id": "dataset::/tmp/tmpd5_qaw3g",
+  "edge_counts": {},
+  "metadata": {
+    "documents_processed": 5,
+    "execution_id": "9d0dd4fe-7800-42c1-83fc-d6662c41a466",
+    "phase_duration_seconds": 2.0742416381835938e-05
+  },
+  "node_counts": {},
+  "phase": "refinement",
+  "phase_markers": [
+    "ingestion",
+    "refinement"
+  ],
+  "properties_snapshot": {
+    "assertions_passed": null,
+    "endpoint_violations": 0,
+    "provenance_violations": 0
+  },
+  "timestamp": "2026-04-08T02:54:13.077441+00:00"
+}

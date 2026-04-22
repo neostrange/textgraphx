@@ -1,0 +1,6 @@
+metric_type,overall_quality,phase_quality,conclusive,seed,fusion_enabled
+mention_layer_metrics,0.5675030238147,0.0,False,42,False
+edge_semantics_metrics,0.5675030238147,0.5857066093498119,True,42,False
+phase_assertion_metrics,0.5675030238147,0.9993114133241522,False,42,False
+semantic_category_metrics,0.5675030238147,0.4,False,42,False
+legacy_layer_metrics,0.5675030238147,0.8524970963995354,False,42,False

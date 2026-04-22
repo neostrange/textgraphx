@@ -1,0 +1,20 @@
+{
+  "doc_id": "dataset::/tmp/tmpa1arupir",
+  "edge_counts": {},
+  "metadata": {
+    "documents_processed": 5,
+    "execution_id": "5cf9cda2-864e-43c2-bac8-f0c72f4f805d",
+    "phase_duration_seconds": 2.09808349609375e-05
+  },
+  "node_counts": {},
+  "phase": "ingestion",
+  "phase_markers": [
+    "ingestion"
+  ],
+  "properties_snapshot": {
+    "assertions_passed": null,
+    "endpoint_violations": 0,
+    "provenance_violations": 0
+  },
+  "timestamp": "2026-04-06T06:49:26.471790+00:00"
+}

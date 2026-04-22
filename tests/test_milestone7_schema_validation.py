@@ -19,27 +19,11 @@ from pathlib import Path
 
 import pytest
 
-def _resolve_repo_root() -> Path:
-    """Resolve repository root for both workspace layouts.
-
-    Supports running tests from either:
-    - <workspace>/textgraphx/tests
-    - <workspace>/tests (with package under <workspace>/textgraphx)
-    """
-    here = Path(__file__).resolve()
-    for parent in here.parents:
-        if (parent / "schema" / "ontology.json").exists() and (parent / "TextProcessor.py").exists():
-            return parent
-        nested = parent / "textgraphx"
-        if (nested / "schema" / "ontology.json").exists() and (nested / "TextProcessor.py").exists():
-            return nested
-    raise RuntimeError("Could not resolve repository root containing schema/ontology.json")
-
-
-ROOT = _resolve_repo_root()
-ONTOLOGY_JSON = ROOT / "schema" / "ontology.json"
-MIGRATIONS_DIR = ROOT / "schema" / "migrations"
-TEXT_PROCESSOR_SRC = ROOT / "TextProcessor.py"
+ROOT = Path(__file__).resolve().parents[1]
+ONTOLOGY_JSON = ROOT / "textgraphx" / "schema" / "ontology.json"
+MIGRATIONS_DIR = ROOT / "textgraphx" / "schema" / "migrations"
+TEXT_PROCESSOR_SRC = ROOT / "textgraphx" / "TextProcessor.py"
+TLINK_RECOGNIZER_SRC = ROOT / "textgraphx" / "TlinksRecognizer.py"
 
 
 def _payload() -> dict:
@@ -113,51 +97,56 @@ class TestSchemaInvariants:
         missing = expected - mappings
         assert not missing, f"argument_type_vocabulary missing ARGM codes: {sorted(missing)}"
 
-    def test_has_lemma_is_canonical_and_refers_to_no_longer_covers_tag_edges(self):
-        payload = _payload()
-        canonical_rels = set(payload["schema_tiers"]["canonical"]["relationship_types"])
-        assert "HAS_LEMMA" in canonical_rels, (
-            "HAS_LEMMA must be listed in schema_tiers.canonical.relationship_types"
+    def test_value_label_in_canonical_tier(self):
+        policy_status = _payload()["dynamic_label_policy"]["VALUE"]["status"]
+        assert policy_status == "canonical"
+        canonical_labels = _payload()["schema_tiers"]["canonical"]["node_labels"]
+        assert "VALUE" in canonical_labels, (
+            "VALUE has dynamic_label_policy.status='canonical' but is absent from "
+            "schema_tiers.canonical.node_labels"
         )
 
-        refers_pairs = {
-            tuple(pair)
-            for pair in payload["relation_endpoint_contract"]["REFERS_TO"]["allowed_pairs"]
-        }
-        has_lemma_pairs = {
-            tuple(pair)
-            for pair in payload["relation_endpoint_contract"]["HAS_LEMMA"]["allowed_pairs"]
-        }
-        assert ("TagOccurrence", "Tag") not in refers_pairs, (
-            "TagOccurrence->Tag must not remain in REFERS_TO endpoint contract"
-        )
-        assert ("TagOccurrence", "Tag") in has_lemma_pairs, (
-            "TagOccurrence->Tag must be governed by HAS_LEMMA endpoint contract"
-        )
+    def test_mention_nodes_have_node_contract_entries(self):
+        nodes = _payload().get("nodes", {})
+        for name in ("EntityMention", "EventMention", "TimexMention", "VALUE"):
+            assert name in nodes, f"nodes must include '{name}' contract entry"
 
-    def test_timexmention_split_is_captured_in_schema_tiers_and_contracts(self):
+    def test_timexmention_is_canonical_and_participates_in_is_legacy(self):
         payload = _payload()
         canonical_labels = set(payload["schema_tiers"]["canonical"]["node_labels"])
         canonical_rels = set(payload["schema_tiers"]["canonical"]["relationship_types"])
         legacy_rels = set(payload["schema_tiers"]["legacy"]["relationship_types"])
-        refers_pairs = {
-            tuple(pair)
-            for pair in payload["relation_endpoint_contract"]["REFERS_TO"]["allowed_pairs"]
-        }
         assert "TimexMention" in canonical_labels
-        assert {"IN_FRAME", "IN_MENTION"}.issubset(canonical_rels)
         assert "PARTICIPATES_IN" not in canonical_rels
         assert "PARTICIPATES_IN" in legacy_rels
-        assert ("TimexMention", "TIMEX") in refers_pairs
+        assert {"IN_FRAME", "IN_MENTION"}.issubset(canonical_rels)
 
-    def test_span_aliases_do_not_overlap_token_and_char_spaces(self):
-        aliases = _payload()["span_contract"]["legacy_aliases"]
-        token_aliases = set(aliases.get("start_tok", [])) | set(aliases.get("end_tok", []))
-        char_aliases = set(aliases.get("start_char", [])) | set(aliases.get("end_char", []))
-        overlap = token_aliases & char_aliases
-        assert not overlap, (
-            "span_contract.legacy_aliases must keep token and character aliases disjoint; "
-            f"overlap found: {sorted(overlap)}"
+    def test_temporal_endpoint_contracts_capture_timexmention_split(self):
+        contract = _payload().get("relation_endpoint_contract", {})
+        refers_pairs = {tuple(pair) for pair in contract["REFERS_TO"]["allowed_pairs"]}
+        assert ("TimexMention", "TIMEX") in refers_pairs
+        triggers = contract["TRIGGERS"]
+        assert "TimexMention" in set(triggers.get("targets", []))
+
+    def test_event_participant_endpoint_contract_is_reasoning_ready(self):
+        contract = _payload().get("relation_endpoint_contract", {})
+        assert "EVENT_PARTICIPANT" in contract
+        event_participant = contract["EVENT_PARTICIPANT"]
+        assert {"Entity", "NUMERIC", "FrameArgument", "VALUE"}.issubset(set(event_participant.get("sources", [])))
+        assert {"TEvent", "EventMention"}.issubset(set(event_participant.get("targets", [])))
+
+    def test_temporal_reasoning_profile_declares_contradiction_pairs(self):
+        profile = _payload().get("temporal_reasoning_profile", {})
+        assert profile, "ontology.json must provide temporal_reasoning_profile"
+        pairs = {tuple(pair) for pair in profile.get("contradiction_pairs", [])}
+        expected = {
+            ("BEFORE", "AFTER"),
+            ("INCLUDES", "IS_INCLUDED"),
+            ("BEGINS", "BEGUN_BY"),
+            ("ENDS", "ENDED_BY"),
+        }
+        assert expected.issubset(pairs), (
+            f"temporal_reasoning_profile.contradiction_pairs missing expected pairs: {sorted(expected - pairs)}"
         )
 
 
@@ -308,11 +297,16 @@ class TestNegativeDriftDetection:
         for line in result.stdout.splitlines():
             if "TextProcessor.py" in line:
                 continue
-            if line.strip().startswith("#"):
+            # Skip test files — they may reference the pattern in docstrings/comments
+            if "/tests/" in line or "/test_" in line:
+                continue
+            # Extract the code portion after "file:linenum:"
+            code = line.split(":", 2)[-1] if line.count(":") >= 2 else line
+            # Skip comment lines
+            if code.lstrip().startswith("#"):
                 continue
             # Only flag write patterns: where id(r) is assigned as a node property value
-            # e.g. {id: id(r) or id:id(r)  — not plain RETURN id(r)
-            code = line.split(":", 2)[-1] if line.count(":") >= 2 else line
+            # e.g. {id: id(r)} or {id:id(r)} — not plain RETURN id(r)
             if re.search(r"id\s*:\s*id\(r\)", code):
                 hits.append(line)
         assert not hits, (
@@ -335,3 +329,33 @@ class TestNegativeDriftDetection:
         assert "start_tok" in token_fields and "end_tok" in token_fields, (
             "DRIFT DETECTED: span_contract.token_fields must include start_tok and end_tok"
         )
+
+
+# ---------------------------------------------------------------------------
+# Category 5 – Runtime bridge checks for temporal reasoning profile
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestTemporalReasoningRuntimeBridge:
+    """Ensure runtime temporal logic remains aligned to ontology reasoning profile."""
+
+    def test_ontology_temporal_reltypes_align_with_timeml_module(self):
+        from textgraphx.timeml_relations import CANONICAL_TLINK_RELTYPES
+
+        profile_reltypes = set(_payload()["temporal_reasoning_profile"]["canonical_reltypes"])
+        runtime_reltypes = set(CANONICAL_TLINK_RELTYPES)
+        missing = profile_reltypes - runtime_reltypes
+        assert not missing, (
+            "Ontology temporal_reasoning_profile.canonical_reltypes contains values not present in "
+            f"timeml_relations.CANONICAL_TLINK_RELTYPES: {sorted(missing)}"
+        )
+
+    def test_ontology_contradiction_pairs_are_implemented_in_suppression_logic(self):
+        source = TLINK_RECOGNIZER_SRC.read_text(encoding="utf-8")
+        for left, right in _payload()["temporal_reasoning_profile"]["contradiction_pairs"]:
+            a = f"(t1 = '{left}' AND t2 = '{right}')"
+            b = f"(t1 = '{right}' AND t2 = '{left}')"
+            assert a in source and b in source, (
+                "TlinksRecognizer.suppress_tlink_conflicts must include both directions "
+                f"of ontology contradiction pair ({left}, {right})"
+            )

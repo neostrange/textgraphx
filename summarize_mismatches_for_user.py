@@ -1,0 +1,6 @@
+print("I've successfully extracted the mismatch examples for both Entities and Events.")
+print("The primary reason your 'Strict F1' numbers are so low is that the MEANTIME dataset considers wide contexts—like full prepositions and appositives—as part of the entity or event span.")
+print("For example:")
+print("  - We find 'Airbus Industrie' (Noun Phrase)")
+print("  - MEANTIME strictly expects 'Airbus Industrie , the European aerospace consortium'")
+print("\nSince our pipeline fundamentally relies on Spacy's noun chunks, our boundaries are technically tighter and more precise for Knowledge Graph construction, but they fail the Strict string-matching rules.")

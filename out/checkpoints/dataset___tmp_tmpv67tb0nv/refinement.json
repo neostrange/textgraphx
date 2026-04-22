@@ -1,0 +1,21 @@
+{
+  "doc_id": "dataset::/tmp/tmpv67tb0nv",
+  "edge_counts": {},
+  "metadata": {
+    "documents_processed": 5,
+    "execution_id": "d64b0698-cb2a-4620-98fc-b698938a8af5",
+    "phase_duration_seconds": 4.458427429199219e-05
+  },
+  "node_counts": {},
+  "phase": "refinement",
+  "phase_markers": [
+    "ingestion",
+    "refinement"
+  ],
+  "properties_snapshot": {
+    "assertions_passed": null,
+    "endpoint_violations": 0,
+    "provenance_violations": 0
+  },
+  "timestamp": "2026-04-07T06:44:42.341183+00:00"
+}
