@@ -1,4 +1,8 @@
 import json
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+BASELINE_FILE = ROOT / "src" / "textgraphx" / "datastore" / "evaluation" / "baseline" / "eval_batch_baseline.json"
 
 def process(f1):
     with open(f1) as f: d1 = json.load(f)
@@ -37,4 +41,4 @@ def process(f1):
         f1_score = m1.get("f1", 0)
         print(f"[{node_type}] F1: {f1_score:.4f} (Recall: {m1.get('recall',0):.4f}, Precision: {m1.get('precision',0):.4f})")
 
-process("textgraphx/datastore/evaluation/eval_batch_baseline.json")
+process(str(BASELINE_FILE))

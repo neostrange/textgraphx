@@ -1,11 +1,19 @@
 import json
-import glob
 import os
+from pathlib import Path
 
-latest_file = max(glob.glob('textgraphx/datastore/evaluation/*/eval_report_strict.json'), key=os.path.getctime)
+ROOT = Path(__file__).resolve().parents[2]
+EVAL_DIR = ROOT / "src" / "textgraphx" / "datastore" / "evaluation"
+latest_file = EVAL_DIR / "latest" / "eval_report_strict.json"
+if not latest_file.exists():
+    legacy = sorted(EVAL_DIR.glob("cycle_*/eval_report_strict.json"), key=os.path.getctime)
+    if not legacy:
+        raise FileNotFoundError("No strict evaluation report found under latest/ or legacy cycle directories")
+    latest_file = legacy[-1]
+
 print("Reading from:", latest_file)
 
-with open(latest_file, 'r') as f:
+with latest_file.open('r') as f:
     report = json.load(f)
 
 def extract_spurious(obj, arr, kind):

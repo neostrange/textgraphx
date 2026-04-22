@@ -1,7 +1,11 @@
 import json
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+BASELINE_FILE = ROOT / "src" / "textgraphx" / "datastore" / "evaluation" / "baseline" / "eval_batch_baseline_examples.json"
 
 def process():
-    with open("textgraphx/datastore/evaluation/eval_batch_baseline_examples.json") as f: 
+    with BASELINE_FILE.open() as f:
         d1 = json.load(f)
     print("========== EVENT FALSE NEGATIVES (MISSING) ==========")
     for report in d1.get("reports", [])[:1]:

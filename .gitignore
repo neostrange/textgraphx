@@ -54,6 +54,15 @@ Thumbs.db
 /src/textgraphx/tools/nominals_*.json
 /src/textgraphx/out/
 
+# Evaluation artifact retention policy: keep only curated baseline/latest snapshots.
+/src/textgraphx/datastore/evaluation/**
+!/src/textgraphx/datastore/evaluation/
+!/src/textgraphx/datastore/evaluation/README.md
+!/src/textgraphx/datastore/evaluation/baseline/
+!/src/textgraphx/datastore/evaluation/baseline/**
+!/src/textgraphx/datastore/evaluation/latest/
+!/src/textgraphx/datastore/evaluation/latest/**
+
 # ── Patch files (applied; kept under version control in scripts/archive/) ───
 # Loose .patch files at repo root are artefacts, not deliverables.
 /*.patch

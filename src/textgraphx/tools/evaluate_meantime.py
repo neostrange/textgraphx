@@ -2,11 +2,11 @@
 
 Examples:
   python -m textgraphx.tools.evaluate_meantime \
-    --gold textgraphx/datastore/annotated/76437_Markets_dragged_down_by_credit_crisis.xml \
-    --pred-xml textgraphx/datastore/annotated/76437_Markets_dragged_down_by_credit_crisis.xml
+        --gold src/textgraphx/datastore/annotated/76437_Markets_dragged_down_by_credit_crisis.xml \
+        --pred-xml src/textgraphx/datastore/annotated/76437_Markets_dragged_down_by_credit_crisis.xml
 
   python -m textgraphx.tools.evaluate_meantime \
-    --gold textgraphx/datastore/annotated/76437_Markets_dragged_down_by_credit_crisis.xml \
+        --gold src/textgraphx/datastore/annotated/76437_Markets_dragged_down_by_credit_crisis.xml \
     --pred-neo4j --doc-id 76437
 """
 
@@ -38,7 +38,7 @@ from textgraphx.evaluation.meantime_evaluator import (
 
 
 def _default_output_paths() -> tuple[Path, Path, Path]:
-    base_dir = Path(__file__).resolve().parents[1] / "datastore" / "evaluation"
+    base_dir = Path(__file__).resolve().parents[1] / "datastore" / "evaluation" / "latest"
     return base_dir / "eval_report.json", base_dir / "eval_report.md", base_dir / "eval_report"
 
 
@@ -60,15 +60,15 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-examples", type=int, default=5, help="Maximum failure examples per bucket")
     parser.add_argument(
         "--out-json",
-        help="Optional path to write full JSON report (defaults to textgraphx/datastore/evaluation/eval_report.json)",
+        help="Optional path to write full JSON report (defaults to src/textgraphx/datastore/evaluation/latest/eval_report.json)",
     )
     parser.add_argument(
         "--out-markdown",
-        help="Optional path to write markdown executive report (defaults to textgraphx/datastore/evaluation/eval_report.md)",
+        help="Optional path to write markdown executive report (defaults to src/textgraphx/datastore/evaluation/latest/eval_report.md)",
     )
     parser.add_argument(
         "--export-csv-prefix",
-        help="Optional prefix for CSV export files (<prefix>_docs.csv and <prefix>_summary.csv); defaults to textgraphx/datastore/evaluation/eval_report",
+        help="Optional prefix for CSV export files (<prefix>_docs.csv and <prefix>_summary.csv); defaults to src/textgraphx/datastore/evaluation/latest/eval_report",
     )
     parser.add_argument("--overlap-threshold", type=float, default=0.5, help="Relaxed matching IoU threshold")
     parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output")

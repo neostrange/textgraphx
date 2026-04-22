@@ -26,5 +26,11 @@ infrastructure in `src/textgraphx/evaluation/`.
 ## Usage
 
 Most scripts expect a running Neo4j instance and evaluation JSON outputs under
-`textgraphx/datastore/evaluation/`. See the main `docs/` folder for evaluation workflow
+`src/textgraphx/datastore/evaluation/`. See the main `docs/` folder for evaluation workflow
 documentation.
+
+Retention policy (repo hygiene):
+
+- `src/textgraphx/datastore/evaluation/latest/` is the mutable latest snapshot location.
+- `src/textgraphx/datastore/evaluation/baseline/` stores curated baseline snapshots used for comparison.
+- Historical `cycle_*` runs should not be committed; archive externally when needed.

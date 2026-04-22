@@ -41,10 +41,13 @@ resolve_dir() {
 
 DATASET_DIR="$(resolve_dir "${1:-$ROOT_DIR/datastore/dataset}")"
 GOLD_DIR="$(resolve_dir "${2:-$ROOT_DIR/datastore/annotated}")"
-RUN_TAG="${3:-cycle_$(date -u +%Y%m%dT%H%M%SZ)}"
+RUN_TAG="${3:-latest}"
 OUT_DIR="$ROOT_DIR/datastore/evaluation/$RUN_TAG"
 
-if [[ -e "$OUT_DIR" ]] && [[ -n "$(find "$OUT_DIR" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]; then
+if [[ "$RUN_TAG" == "latest" ]]; then
+	mkdir -p "$OUT_DIR"
+	find "$OUT_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+elif [[ -e "$OUT_DIR" ]] && [[ -n "$(find "$OUT_DIR" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]; then
 	echo "[ERROR] Output dir already exists and is not empty: $OUT_DIR" >&2
 	echo "[ERROR] Provide a unique run tag as argument 3." >&2
 	exit 1
