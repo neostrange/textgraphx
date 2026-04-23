@@ -101,6 +101,18 @@ DIAGNOSTIC_QUERY_REGISTRY: Dict[str, DiagnosticQuery] = {
         description="Inventories TLINK anchor consistency flags and anchor-filter suppression counts.",
         expected_fields=["metric", "item_count"],
     ),
+    "tlink_reciprocal_cycle_signals": DiagnosticQuery(
+        name="tlink_reciprocal_cycle_signals",
+        query_pack_name="tlink_reciprocal_cycle_signals",
+        description="Detects reciprocal directional TLINK pairs that signal simple temporal cycles.",
+        expected_fields=["document_id", "rel_type", "source_label", "target_label", "cycle_count"],
+    ),
+    "temporal_anchor_connectivity_gaps": DiagnosticQuery(
+        name="temporal_anchor_connectivity_gaps",
+        query_pack_name="temporal_anchor_connectivity_gaps",
+        description="Finds documents with isolated temporal anchors or no unsuppressed TLINK connectivity.",
+        expected_fields=["document_id", "total_anchors", "connected_anchor_count", "isolated_anchor_count"],
+    ),
     "entity_state_coverage": DiagnosticQuery(
         name="entity_state_coverage",
         query_pack_name="entity_state_coverage",
@@ -305,12 +317,22 @@ def query_timexmention_contract_inventory(graph: Any) -> List[Dict[str, Any]]:
     return _execute_registered_query(graph, "timexmention_contract_inventory")
 
 
+def query_tlink_reciprocal_cycle_signals(graph: Any) -> List[Dict[str, Any]]:
+    """Return reciprocal directional TLINK pairs that signal simple cycle risks."""
+    return _execute_registered_query(graph, "tlink_reciprocal_cycle_signals")
+
+
+def query_temporal_anchor_connectivity_gaps(graph: Any) -> List[Dict[str, Any]]:
+    """Return documents whose temporal anchors have weak or missing TLINK connectivity."""
+    return _execute_registered_query(graph, "temporal_anchor_connectivity_gaps")
+
+
 def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
     """Collect runtime diagnostics in one payload.
 
     Includes phase duration metrics, bottleneck rankings, orphan-node inventory,
     edge distributions, endpoint contract violations, provenance contract gaps,
-    entity-state coverage/type stats, and TLINK consistency alerts.
+    entity-state coverage/type stats, and TLINK consistency/connectivity alerts.
     """
     phase_summary = query_phase_execution_summary(graph)
     assertion_violations = query_phase_assertion_violations(graph)
@@ -325,6 +347,8 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
     provenance_violations = _execute_registered_query(graph, "provenance_contract_violations")
     tlink_violations = _execute_registered_query(graph, "tlink_consistency_violations")
     tlink_anchor_inventory = _execute_registered_query(graph, "tlink_anchor_consistency_inventory")
+    tlink_reciprocal_cycle_signals = query_tlink_reciprocal_cycle_signals(graph)
+    temporal_anchor_connectivity_gaps = query_temporal_anchor_connectivity_gaps(graph)
     entity_state_coverage = query_entity_state_coverage(graph)
     entity_state_type_distribution = query_entity_state_type_distribution(graph)
     entity_specificity_coverage = query_entity_specificity_coverage(graph)
@@ -353,6 +377,15 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
         str(row.get("metric", "")): int(row.get("item_count", 0) or 0)
         for row in tlink_anchor_inventory
     }
+    total_tlink_reciprocal_cycles = sum(
+        int(row.get("cycle_count", 0) or 0) for row in tlink_reciprocal_cycle_signals
+    )
+    total_isolated_temporal_anchors = sum(
+        int(row.get("isolated_anchor_count", 0) or 0) for row in temporal_anchor_connectivity_gaps
+    )
+    documents_without_temporal_tlinks = sum(
+        1 for row in temporal_anchor_connectivity_gaps if int(row.get("connected_anchor_count", 0) or 0) == 0
+    )
     state_row = entity_state_coverage[0] if entity_state_coverage else {}
     total_entity_mentions_with_state = int(state_row.get("entity_mentions_with_state", 0) or 0)
     entity_state_coverage_ratio = float(state_row.get("coverage_ratio", 0.0) or 0.0)
@@ -408,6 +441,8 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
         "timexmention_contract_inventory": timexmention_contract_inventory,
         "tlink_consistency_violations": tlink_violations,
         "tlink_anchor_consistency_inventory": tlink_anchor_inventory,
+        "tlink_reciprocal_cycle_signals": tlink_reciprocal_cycle_signals,
+        "temporal_anchor_connectivity_gaps": temporal_anchor_connectivity_gaps,
         "totals": {
             "endpoint_violation_count": total_endpoint_violations,
             "referential_integrity_violation_count": total_referential_violations,
@@ -437,6 +472,10 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
             "tlink_anchor_endpoint_violation_count": tlink_anchor_counts.get("endpoint_violation_tlinks", 0),
             "tlink_anchor_filter_suppressed_count": tlink_anchor_counts.get("anchor_filter_suppressed_tlinks", 0),
             "tlink_missing_anchor_metadata_count": tlink_anchor_counts.get("missing_anchor_metadata_tlinks", 0),
+            "tlink_reciprocal_cycle_count": total_tlink_reciprocal_cycles,
+            "isolated_temporal_anchor_count": total_isolated_temporal_anchors,
+            "documents_with_temporal_connectivity_gaps_count": len(temporal_anchor_connectivity_gaps),
+            "documents_without_temporal_tlinks_count": documents_without_temporal_tlinks,
             "participation_in_frame_missing_count": participation_edge_counts.get("in_frame_missing", 0),
             "participation_in_mention_missing_count": participation_edge_counts.get("in_mention_missing", 0),
             "timexmention_missing_doc_id_count": timexmention_contract_counts.get("missing_doc_id", 0),
