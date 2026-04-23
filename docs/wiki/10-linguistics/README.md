@@ -6,14 +6,14 @@
 
 Linguistic-theory background for the phenomena TextGraphX models: syntax, lexical semantics, SRL, coreference, named entities and linking, and temporal semantics.
 
-## Pages (planned)
+## Pages
 
-- `syntax-and-dependencies.md`
-- `lexical-semantics-wordnet.md`
-- `semantic-role-labeling.md`
-- `coreference-and-discourse.md`
-- `named-entities-and-linking.md`
-- `temporal-semantics.md`
+- [`syntax-and-dependencies.md`](syntax-and-dependencies.md)
+- [`lexical-semantics-wordnet.md`](lexical-semantics-wordnet.md)
+- [`semantic-role-labeling.md`](semantic-role-labeling.md)
+- [`coreference-and-discourse.md`](coreference-and-discourse.md)
+- [`named-entities-and-linking.md`](named-entities-and-linking.md)
+- [`temporal-semantics.md`](temporal-semantics.md)
 
 ## See also
 
