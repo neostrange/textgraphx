@@ -1,0 +1,33 @@
+name: docs-guardrails
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'DOCUMENTATION.md'
+      - 'CONTRIBUTING.md'
+      - 'scripts/docs/**'
+      - '.github/scripts/verify_docs_hygiene.sh'
+      - '.github/workflows/docs-guardrails.yml'
+      - 'src/textgraphx/schema/ontology.json'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'DOCUMENTATION.md'
+      - 'CONTRIBUTING.md'
+      - 'scripts/docs/**'
+      - '.github/scripts/verify_docs_hygiene.sh'
+      - '.github/workflows/docs-guardrails.yml'
+      - 'src/textgraphx/schema/ontology.json'
+
+jobs:
+  docs-hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run docs hygiene checks
+        run: bash .github/scripts/verify_docs_hygiene.sh
