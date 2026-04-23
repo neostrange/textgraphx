@@ -8,6 +8,13 @@ import sys
 from pathlib import Path
 from typing import Iterable
 
+from textgraphx.kg_quality_evaluation import (
+    compare_reports,
+    generate_quality_report,
+    identify_regression,
+    load_quality_report,
+)
+
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -76,6 +83,16 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help="Export Markdown report.",
+    )
+    parser.add_argument(
+        "--baseline-report",
+        default=None,
+        help="Optional baseline JSON report to compare against the current run.",
+    )
+    parser.add_argument(
+        "--comparison-json",
+        default=None,
+        help="Optional path for writing a baseline-vs-current comparison JSON payload.",
     )
     return parser
 
@@ -155,6 +172,12 @@ def _build_operator_summary(summary: dict) -> str | None:
     )
 
 
+def _write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w") as fh:
+        json.dump(payload, fh, indent=2)
+
+
 def main(argv: Iterable[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(list(argv) if argv is not None else None)
@@ -191,40 +214,49 @@ def main(argv: Iterable[str] | None = None) -> int:
 
         suite = evaluator.evaluate(determinism_pass=_determinism_flag(args.determinism_pass))
 
+        report = generate_quality_report(
+            runtime_diagnostics=suite.runtime_diagnostics,
+            evaluation_suite=suite,
+            documents=len(dataset_paths),
+        )
+
         export_json, export_csv, export_md = _ensure_any_export_requested(args)
         if export_json:
-            evaluator.export_json(suite, output_dir / "kg_quality_report.json")
+            _write_json(output_dir / "kg_quality_report.json", report)
         if export_csv:
             evaluator.export_csv(suite, output_dir / "kg_quality_scores.csv")
         if export_md:
             evaluator.export_markdown(suite, output_dir / "kg_quality_report.md")
 
-        summary = {
-            "overall_quality": suite.overall_quality(),
-            "quality_tier": _quality_tier(suite.overall_quality()),
-            "conclusive": suite.conclusiveness()[0],
-            "reasons": suite.conclusiveness()[1],
-            "documents": len(dataset_paths),
-        }
-        diagnostics = suite.runtime_diagnostics or {}
-        totals = diagnostics.get("totals", {}) if isinstance(diagnostics, dict) else {}
-        if totals:
-            summary["entity_state_coverage_ratio"] = totals.get("entity_state_coverage_ratio", 0.0)
-            summary["entity_mentions_with_state_count"] = totals.get("entity_mentions_with_state_count", 0)
-            summary["entity_specificity_coverage_ratio"] = totals.get("entity_specificity_coverage_ratio", 0.0)
-            summary["mentions_with_ent_class_count"] = totals.get("mentions_with_ent_class_count", 0)
-            summary["event_external_ref_coverage_ratio"] = totals.get("event_external_ref_coverage_ratio", 0.0)
-            summary["event_nodes_with_external_ref_count"] = totals.get("event_nodes_with_external_ref_count", 0)
-            summary["glink_count"] = totals.get("glink_count", 0)
-            summary["tlink_anchor_inconsistent_count"] = totals.get("tlink_anchor_inconsistent_count", 0)
-            summary["tlink_anchor_self_link_count"] = totals.get("tlink_anchor_self_link_count", 0)
-            summary["tlink_anchor_endpoint_violation_count"] = totals.get("tlink_anchor_endpoint_violation_count", 0)
-            summary["tlink_anchor_filter_suppressed_count"] = totals.get("tlink_anchor_filter_suppressed_count", 0)
-            summary["tlink_missing_anchor_metadata_count"] = totals.get("tlink_missing_anchor_metadata_count", 0)
-        operator_line = _build_operator_summary(summary)
+        if args.baseline_report:
+            baseline_report = load_quality_report(args.baseline_report)
+            comparison = compare_reports(baseline_report, report)
+            regression, reasons = identify_regression(baseline_report, report)
+            report["comparison"] = comparison
+            report["regression_detected"] = regression
+            report["regression_reasons"] = reasons
+            comparison_path = Path(args.comparison_json) if args.comparison_json else output_dir / "kg_quality_comparison.json"
+            _write_json(
+                comparison_path,
+                {
+                    "comparison": comparison,
+                    "regression_detected": regression,
+                    "regression_reasons": reasons,
+                },
+            )
+            print(
+                "KG quality comparison: "
+                f"baseline={comparison['baseline_quality']:.4f} "
+                f"current={comparison['current_quality']:.4f} "
+                f"delta={comparison['overall_quality_delta']:+.4f} "
+                f"regression={'yes' if regression else 'no'}",
+                file=sys.stderr,
+            )
+
+        operator_line = _build_operator_summary(report)
         if operator_line:
             print(operator_line, file=sys.stderr)
-        print(json.dumps(summary, indent=2))
+        print(json.dumps(report, indent=2))
     finally:
         close_fn = getattr(graph, "close", None)
         if callable(close_fn):
