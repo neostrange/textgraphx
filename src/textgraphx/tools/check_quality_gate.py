@@ -21,49 +21,29 @@ Usage (in CI):
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
+from textgraphx.kg_quality_evaluation import (
+    compare_reports,
+    load_quality_report,
+    overall_quality_from_report,
+    runtime_total_from_report,
+)
+
 
 def _load_report(path: Path) -> dict:
-    with path.open() as fh:
-        return json.load(fh)
+    return load_quality_report(path)
 
 
 def _overall_quality(report: dict) -> float:
-    """Extract overall_quality from either a summary dict or a full report object."""
-    if "overall_quality" in report:
-        return float(report["overall_quality"])
-    # FullStackEvaluator JSON shape: {"suite": {...}, ...} or list of phase reports
-    # Attempt nested lookup for known harness export shapes.
-    for key in ("suite", "report", "result"):
-        if key in report and isinstance(report[key], dict):
-            v = report[key].get("overall_quality")
-            if v is not None:
-                return float(v)
-    raise KeyError(
-        "Cannot locate 'overall_quality' in report. "
-        "Run evaluate_kg_quality with --json to produce a compatible report."
-    )
+    """Extract overall_quality from supported report shapes."""
+    return overall_quality_from_report(report)
 
 
 def _runtime_total(report: dict, key: str, default: int = 0) -> int:
     """Extract a runtime diagnostics total from supported report shapes."""
-    if key in report:
-        try:
-            return int(report[key])
-        except (TypeError, ValueError):
-            return default
-    diagnostics = report.get("runtime_diagnostics", {})
-    if isinstance(diagnostics, dict):
-        totals = diagnostics.get("totals", {})
-        if isinstance(totals, dict):
-            try:
-                return int(totals.get(key, default))
-            except (TypeError, ValueError):
-                return default
-    return default
+    return runtime_total_from_report(report, key, default)
 
 
 def main(argv=None) -> int:
@@ -197,6 +177,7 @@ def main(argv=None) -> int:
     try:
         baseline_report = _load_report(baseline_path)
         current_report = _load_report(current_path)
+        comparison = compare_reports(baseline_report, current_report, tolerance=args.tolerance)
         baseline_quality = _overall_quality(baseline_report)
         current_quality = _overall_quality(current_report)
     except (KeyError, ValueError) as exc:
@@ -286,7 +267,7 @@ def main(argv=None) -> int:
     )
 
     if args.verbose:
-        delta = current_quality - baseline_quality
+        delta = comparison["overall_quality_delta"]
         sign = "+" if delta >= 0 else ""
         print(f"[quality-gate] delta={sign}{delta:.4f}")
         if args.max_tlink_anchor_inconsistent_increase is not None:

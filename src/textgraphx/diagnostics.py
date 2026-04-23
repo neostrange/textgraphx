@@ -35,6 +35,30 @@ DIAGNOSTIC_QUERY_REGISTRY: Dict[str, DiagnosticQuery] = {
         description="Summarizes failed phase assertions by phase and assertion label.",
         expected_fields=["phase", "assertion", "violation_count"],
     ),
+    "orphaned_nodes_detection": DiagnosticQuery(
+        name="orphaned_nodes_detection",
+        query_pack_name="orphaned_nodes_detection",
+        description="Counts nodes with no incident relationships, grouped by primary label.",
+        expected_fields=["label", "orphan_count"],
+    ),
+    "pipeline_bottleneck_analysis": DiagnosticQuery(
+        name="pipeline_bottleneck_analysis",
+        query_pack_name="pipeline_bottleneck_analysis",
+        description="Ranks phase runs by average duration to spot slow pipeline stages.",
+        expected_fields=["phase", "execution_count", "avg_duration_seconds", "max_duration_seconds"],
+    ),
+    "edge_type_distribution": DiagnosticQuery(
+        name="edge_type_distribution",
+        query_pack_name="edge_type_distribution",
+        description="Distribution of graph relationships by edge type.",
+        expected_fields=["rel_type", "rel_count"],
+    ),
+    "entity_density": DiagnosticQuery(
+        name="entity_density",
+        query_pack_name="entity_density",
+        description="Per-document density snapshot for entity, event, and timex mentions.",
+        expected_fields=["document_id", "entity_mentions", "event_mentions", "timex_mentions"],
+    ),
     "endpoint_contract_violations": DiagnosticQuery(
         name="endpoint_contract_violations",
         query_pack_name="endpoint_contract_violations",
@@ -182,6 +206,26 @@ def query_phase_assertion_violations(graph: Any) -> List[Dict[str, Any]]:
     return _execute_registered_query(graph, "phase_assertion_violations")
 
 
+def query_orphaned_nodes_detection(graph: Any) -> List[Dict[str, Any]]:
+    """Return orphaned node counts grouped by primary label."""
+    return _execute_registered_query(graph, "orphaned_nodes_detection")
+
+
+def query_pipeline_bottleneck_analysis(graph: Any) -> List[Dict[str, Any]]:
+    """Return phase runtime rankings by average and max duration."""
+    return _execute_registered_query(graph, "pipeline_bottleneck_analysis")
+
+
+def query_edge_type_distribution(graph: Any) -> List[Dict[str, Any]]:
+    """Return relationship counts grouped by rel_type."""
+    return _execute_registered_query(graph, "edge_type_distribution")
+
+
+def query_entity_density(graph: Any) -> List[Dict[str, Any]]:
+    """Return per-document entity/event/timex mention density snapshots."""
+    return _execute_registered_query(graph, "entity_density")
+
+
 def query_endpoint_contract_violations(graph: Any) -> List[Dict[str, Any]]:
     """Return endpoint contract violation counts grouped by edge type."""
     return _execute_registered_query(graph, "endpoint_contract_violations")
@@ -255,12 +299,16 @@ def query_timexmention_contract_inventory(graph: Any) -> List[Dict[str, Any]]:
 def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
     """Collect runtime diagnostics in one payload.
 
-    Includes phase duration metrics, assertion violations, endpoint contract
-    violations, provenance contract gaps, entity-state coverage/type stats,
-    and TLINK consistency alerts.
+    Includes phase duration metrics, bottleneck rankings, orphan-node inventory,
+    edge distributions, endpoint contract violations, provenance contract gaps,
+    entity-state coverage/type stats, and TLINK consistency alerts.
     """
     phase_summary = query_phase_execution_summary(graph)
     assertion_violations = query_phase_assertion_violations(graph)
+    orphaned_nodes = query_orphaned_nodes_detection(graph)
+    bottleneck_analysis = query_pipeline_bottleneck_analysis(graph)
+    edge_type_distribution = query_edge_type_distribution(graph)
+    entity_density = query_entity_density(graph)
     endpoint_violations = query_endpoint_contract_violations(graph)
     referential_violations = query_referential_integrity_violations(graph)
     identity_violations = query_identity_contract_violations(graph)
@@ -278,6 +326,7 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
     glink_relation_inventory = query_glink_relation_inventory(graph)
     participation_edge_inventory = query_participation_edge_migration_inventory(graph)
     timexmention_contract_inventory = query_timexmention_contract_inventory(graph)
+    total_orphaned_nodes = sum(int(row.get("orphan_count", 0) or 0) for row in orphaned_nodes)
 
     total_endpoint_violations = sum(int(row.get("violation_count", 0) or 0) for row in endpoint_violations)
     total_referential_violations = sum(int(row.get("violation_count", 0) or 0) for row in referential_violations)
@@ -329,6 +378,10 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
         "diagnostics": get_registered_diagnostics(),
         "phase_execution_summary": phase_summary,
         "phase_assertion_violations": assertion_violations,
+        "orphaned_nodes_detection": orphaned_nodes,
+        "pipeline_bottleneck_analysis": bottleneck_analysis,
+        "edge_type_distribution": edge_type_distribution,
+        "entity_density": entity_density,
         "endpoint_contract_violations": endpoint_violations,
         "referential_integrity_violations": referential_violations,
         "identity_contract_violations": identity_violations,
@@ -355,6 +408,7 @@ def get_runtime_metrics(graph: Any) -> Dict[str, Any]:
             "canonical_value_node_count": numeric_value_transition_counts.get("canonical_value_nodes", 0),
             "namedentity_value_tagged_history_count": numeric_value_transition_counts.get("namedentity_value_tagged_history", 0),
             "assertion_violation_count": total_assertion_violations,
+            "orphaned_node_count": total_orphaned_nodes,
             "provenance_violation_count": total_provenance_violations,
             "entity_mentions_with_state_count": total_entity_mentions_with_state,
             "entity_state_coverage_ratio": entity_state_coverage_ratio,

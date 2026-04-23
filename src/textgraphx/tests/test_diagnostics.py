@@ -7,6 +7,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from textgraphx.diagnostics import (
+    query_edge_type_distribution,
+    query_entity_density,
     query_factuality_alignment_violations,
     query_factuality_attribution_violations,
     query_factuality_coverage,
@@ -21,8 +23,10 @@ from textgraphx.diagnostics import (
     query_event_external_ref_coverage,
     query_glink_relation_inventory,
     query_numeric_value_transition_inventory,
+    query_orphaned_nodes_detection,
     query_phase_assertion_violations,
     query_phase_execution_summary,
+    query_pipeline_bottleneck_analysis,
     query_referential_integrity_violations,
 )
 
@@ -34,6 +38,10 @@ def test_registered_diagnostics_contains_expected_queries():
     names = list_diagnostic_queries()
     assert "phase_execution_summary" in names
     assert "phase_assertion_violations" in names
+    assert "orphaned_nodes_detection" in names
+    assert "pipeline_bottleneck_analysis" in names
+    assert "edge_type_distribution" in names
+    assert "entity_density" in names
     assert "endpoint_contract_violations" in names
     assert "referential_integrity_violations" in names
     assert "identity_contract_violations" in names
@@ -76,6 +84,42 @@ def test_query_phase_assertion_violations_runs_query_pack_entry():
     ]
     rows = query_phase_assertion_violations(graph)
     assert rows[0]["violation_count"] == 1
+
+
+def test_query_orphaned_nodes_detection_runs_query_pack_entry():
+    graph = MagicMock()
+    graph.run.return_value.data.return_value = [
+        {"label": "TIMEX", "orphan_count": 2}
+    ]
+    rows = query_orphaned_nodes_detection(graph)
+    assert rows[0]["label"] == "TIMEX"
+
+
+def test_query_pipeline_bottleneck_analysis_runs_query_pack_entry():
+    graph = MagicMock()
+    graph.run.return_value.data.return_value = [
+        {"phase": "temporal", "execution_count": 2, "avg_duration_seconds": 1.8, "max_duration_seconds": 2.1}
+    ]
+    rows = query_pipeline_bottleneck_analysis(graph)
+    assert rows[0]["avg_duration_seconds"] == 1.8
+
+
+def test_query_edge_type_distribution_runs_query_pack_entry():
+    graph = MagicMock()
+    graph.run.return_value.data.return_value = [
+        {"rel_type": "TLINK", "rel_count": 12}
+    ]
+    rows = query_edge_type_distribution(graph)
+    assert rows[0]["rel_type"] == "TLINK"
+
+
+def test_query_entity_density_runs_query_pack_entry():
+    graph = MagicMock()
+    graph.run.return_value.data.return_value = [
+        {"document_id": 101, "entity_mentions": 7, "event_mentions": 3, "timex_mentions": 2}
+    ]
+    rows = query_entity_density(graph)
+    assert rows[0]["entity_mentions"] == 7
 
 
 def test_query_endpoint_contract_violations_runs_query_pack_entry():
@@ -190,6 +234,10 @@ def test_get_runtime_metrics_aggregates_totals_from_queries():
     graph.run.return_value.data.side_effect = [
         [{"phase": "temporal", "execution_count": 1, "documents_processed": 5, "duration_seconds": 1.1}],
         [{"phase": "temporal", "assertion": "x", "violation_count": 3}],
+        [{"label": "TIMEX", "orphan_count": 2}],
+        [{"phase": "temporal", "execution_count": 1, "avg_duration_seconds": 1.1, "max_duration_seconds": 1.1}],
+        [{"rel_type": "TLINK", "rel_count": 11}],
+        [{"document_id": 42, "entity_mentions": 10, "event_mentions": 4, "timex_mentions": 2}],
         [{"rel_type": "TLINK", "violation_count": 2}],
         [{"contract": "EventMention_REFERS_TO_TEvent", "violation_count": 1}],
         [{"identity_rule": "NamedEntity_token_identity_missing", "violation_count": 2}],
@@ -231,6 +279,7 @@ def test_get_runtime_metrics_aggregates_totals_from_queries():
     payload = get_runtime_metrics(graph)
     totals = payload["totals"]
     assert totals["assertion_violation_count"] == 3
+    assert totals["orphaned_node_count"] == 2
     assert totals["endpoint_violation_count"] == 2
     assert totals["referential_integrity_violation_count"] == 1
     assert totals["identity_contract_violation_count"] == 2
@@ -263,3 +312,6 @@ def test_get_runtime_metrics_aggregates_totals_from_queries():
     assert totals["timexmention_missing_span_coordinates_count"] == 2
     assert totals["timexmention_broken_refers_to_count"] == 3
     assert totals["dct_timexmention_count"] == 0
+    assert payload["pipeline_bottleneck_analysis"][0]["phase"] == "temporal"
+    assert payload["edge_type_distribution"][0]["rel_type"] == "TLINK"
+    assert payload["entity_density"][0]["document_id"] == 42
