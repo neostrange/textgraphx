@@ -33,12 +33,6 @@ Tests are organized in the `tests/` directory:
   - `TestExecutionRecord` - Data structure tests
   - `TestExecutionStatistics` - Statistics calculation tests
 
-- **test_ui.py** - Tests for the Streamlit UI application
-  - `TestStreamlitApp` - UI component tests
-  - `TestOrchestrationIntegration` - Integration tests
-  - `TestErrorHandling` - Error handling tests
-  - `TestDataClasses` - Data structure tests
-
 ## Running Specific Tests
 
 ### Run a specific test file
@@ -75,7 +69,6 @@ Tests are marked with the following markers for easier organization:
 - `@pytest.mark.unit` - Unit tests
 - `@pytest.mark.integration` - Integration tests
 - `@pytest.mark.slow` - Slow-running tests
-- `@pytest.mark.ui` - UI tests
 - `@pytest.mark.orchestration` - Orchestration tests
 
 ## Writing New Tests
@@ -146,11 +139,9 @@ start htmlcov/index.html
 
 ## Known Issues and Limitations
 
-1. **Streamlit Testing**: The Streamlit UI tests use mocking since Streamlit's testing framework is still evolving. For more complete UI testing, consider using tools like Selenium.
+1. **External Dependencies**: Some orchestration phase execution paths are placeholder-safe and avoid hard dependency on external NLP services during unit runs.
 
-2. **External Dependencies**: The orchestrator's phase execution functions are placeholders that don't call external NLP processes, avoiding dependency on spaCy models and ctypes.
-
-3. **File System**: Tests use temporary directories provided by pytest to avoid side effects.
+2. **File System**: Tests use temporary directories provided by pytest to avoid side effects.
 
 ## Continuous Integration
 

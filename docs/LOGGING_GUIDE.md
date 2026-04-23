@@ -24,7 +24,7 @@ export TEXTGRAPHX_LOG_LEVEL=DEBUG
 # Run the pipeline
 cd "$(git rev-parse --show-toplevel)"
 source .venv310/bin/activate
-streamlit run textgraphx/app.py
+./run.sh
 ```
 
 ### View Logs
@@ -96,7 +96,7 @@ textgraphx
 │   ├── phase_wrappers.TemporalPhase
 │   ├── phase_wrappers.EventEnrichmentPhase
 │   └── phase_wrappers.TlinksRecognizer
-├── app (Streamlit UI)
+├── run_pipeline (CLI entrypoint)
 ├── GraphBasedNLP (actual ingestion component)
 ├── RefinementPhase (actual refinement component)
 ├── TextProcessor (utility processor)

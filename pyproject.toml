@@ -20,7 +20,6 @@ dependencies = [
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
     "apscheduler>=3.10.0",
-    "streamlit>=1.35",
 ]
 
 [project.optional-dependencies]
@@ -59,7 +58,6 @@ markers = [
     "regression: Regression tests that capture existing behaviour",
     "scenario: Scenario tests covering end-to-end orchestration behavior",
     "slow: Tests that take a long time to run",
-    "ui: Tests for the Streamlit UI",
     "orchestration: Tests for the orchestration modules",
 ]
 

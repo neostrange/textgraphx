@@ -19,5 +19,4 @@ markers =
     regression: Regression tests that capture existing behaviour
     scenario: Scenario tests covering end-to-end orchestration behavior
     slow: Tests that take a long time to run
-    ui: Tests for the Streamlit UI
     orchestration: Tests for the orchestration modules

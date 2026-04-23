@@ -30,25 +30,6 @@ Phase Details:
 ======================================================================
 ```
 
-## Using the Streamlit UI
-
-For an interactive web-based experience with live progress visualization:
-
-```bash
-# Activate environment and run UI
-source .venv310/bin/activate
-export PYTHONPATH=/path/to/textgraphx:$PYTHONPATH
-streamlit run app.py
-```
-
-**Features:**
-- Configure dataset directory and spaCy model
-- Upload files directly through web interface
-- Select individual phases to run
-- See live progress bar and phase execution
-- View detailed metrics dashboard with timings
-- Document count and completion tracking
-
 ## Diagnostic Mode
 
 This checks for:
@@ -249,19 +230,6 @@ Enhanced error messages provide:
 - Partial results shown on failure
 - Clear error messages with diagnostics hint
 
-### Streamlit UI (`app.py`)
-Interactive dashboard with:
-- Live progress bar
-- Phase execution status tracking
-- Detailed metrics dashboard
-  - Total duration
-  - Phases completed / total
-  - Documents processed
-  - Success/failure status
-- Phase timing breakdown table
-- File upload functionality
-- Dataset and model configuration
-
 ### Files
 
 - `run.sh` - Bash wrapper (environment setup + execution)
@@ -269,7 +237,6 @@ Interactive dashboard with:
 - `health_check.py` - Pre-flight validation module
 - `execution_summary.py` - Performance metrics and reporting
 - `PipelineOrchestrator.py` - Core pipeline logic with error context
-- `app.py` - Streamlit web UI
 - `RUNNING_PIPELINE.md` - This guide
 
 ## Files

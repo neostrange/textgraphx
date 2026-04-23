@@ -1,9 +1,0 @@
-[client]
-showErrorDetails = true
-
-[server]
-fileWatcherType = "none"
-headless = true
-
-[logger]
-level = "info"

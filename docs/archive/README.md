@@ -8,10 +8,7 @@ Use these files for historical context, not as canonical operating guidance.
 
 - BACKLOG_ITEMS_4_9_AUDIT_REPORT.md
 - EVALUATION_IMPROVEMENT_LOG.md
-- LOGGING_IMPLEMENTATION.md
 - PHASE1_MENTION_LAYER_IMPLEMENTATION.md
-- READY_TO_RUN.md
-- REAL_PIPELINE_FIX.md
 
 ## Canonical Replacements
 

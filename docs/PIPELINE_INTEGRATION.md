@@ -5,7 +5,7 @@
 The orchestration layer now **integrates the actual Text-to-Knowledge Graph pipeline components** instead of stubs. Each phase calls the real implementation:
 
 ```
-Streamlit UI (app.py)
+CLI / automation entrypoints (run.sh, run_pipeline.py)
         ↓
 PipelineOrchestrator (orchestration/orchestrator.py)
         ↓
@@ -129,19 +129,19 @@ result = graph.run('MATCH (e:Entity) RETURN e').data()
 
 ## How to Run the Full Pipeline
 
-### Via Streamlit UI (Recommended)
+### Via CLI (Recommended)
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
-./.venv/bin/streamlit run textgraphx/app.py
+source .venv310/bin/activate
+./run.sh --dataset src/textgraphx/datastore/dataset
 ```
 
 Then:
-1. Upload XML/TXT files to dataset directory
-2. Select all 5 phases
-3. Click "Run Pipeline"
-4. Monitor progress in real-time
-5. View execution summary with actual processing times
+1. Place XML/TXT files in the dataset directory
+2. Run all 5 phases in canonical order
+3. Monitor logs and phase timing output in real-time
+4. Review the execution summary after completion
 
 ### Via Orchestrator (Programmatic)
 

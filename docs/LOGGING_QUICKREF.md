@@ -7,11 +7,11 @@
 export TEXTGRAPHX_LOG_LEVEL=DEBUG
 ```
 
-### 2. Run Streamlit
+### 2. Run Pipeline
 ```bash
 cd "$(git rev-parse --show-toplevel)"
 source .venv310/bin/activate
-streamlit run textgraphx/app.py
+./run.sh
 ```
 
 ### 3. Watch Logs in Real-Time
@@ -264,37 +264,29 @@ progress.finish()
 
 ---
 
-## Real-World Example
+## Real-World Example (CLI)
 
 ```bash
 # Run with maximum verbosity
 export TEXTGRAPHX_LOG_LEVEL=DEBUG
 export TEXTGRAPHX_LOG_JSON=0
 
-# Launch UI
-./.venv310/bin/streamlit run textgraphx/app.py
+# Run pipeline
+./run.sh --dataset src/textgraphx/datastore/dataset
 
 # In another terminal, watch logs
 tail -f ~/.textgraphx_logs/orchestrator.log
-
-# Upload files and run pipeline in UI...
 
 # You'll see output like:
 ```
 
 ```
-2026-04-03 15:30:42 [INFO    ] [textgraphx.app] Saving uploaded files to /dataset
-2026-04-03 15:30:43 [DEBUG   ] [textgraphx.app] Saved: doc1.xml (2561 bytes)
-2026-04-03 15:30:43 [DEBUG   ] [textgraphx.app] Saved: doc2.xml (3142 bytes)
-2026-04-03 15:30:43 [INFO    ] [textgraphx.app] Successfully saved 2 files
-2026-04-03 15:30:44 [INFO    ] [textgraphx.app] Running pipeline with phases: [ingestion, refinement]
+2026-04-03 15:30:44 [INFO    ] [textgraphx.orchestration.orchestrator] Execution ID: 550e8400...
+2026-04-03 15:30:44 [INFO    ] [textgraphx.orchestration.orchestrator] Phases to execute: ingestion, refinement
 
 ============================================================
 ▶ PIPELINE EXECUTION - 2 phases
 ============================================================
-
-2026-04-03 15:30:44 [INFO    ] [textgraphx.orchestration] Execution ID: 550e8400...
-2026-04-03 15:30:44 [INFO    ] [textgraphx.orchestration] Phases to execute: ingestion, refinement
 
   ⟶ Phase 1/2: INGESTION...
 2026-04-03 15:30:44 [INFO    ] [textgraphx.phase_wrappers] Initialized GraphBasedNLPWrapper
