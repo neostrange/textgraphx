@@ -1,4 +1,9 @@
 <!-- last_reviewed: YYYY-MM-DD | owner: <team-or-handle> | status: draft|active|stale | review_interval_days: 90 -->
+<!--
+  NOTE: This is a template. The example relative links below assume a page
+  located at `docs/wiki/<section>/<page>.md`. Copy this file into a section
+  folder and adjust paths as needed. Docs-hygiene checks skip this file.
+-->
 
 # <Page Title>
 
