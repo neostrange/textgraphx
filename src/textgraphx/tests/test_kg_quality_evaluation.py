@@ -73,6 +73,10 @@ def _sample_runtime_diagnostics():
             "tlink_anchor_endpoint_violation_count": 1,
             "tlink_anchor_filter_suppressed_count": 2,
             "tlink_missing_anchor_metadata_count": 1,
+            "tlink_reciprocal_cycle_count": 2,
+            "isolated_temporal_anchor_count": 3,
+            "documents_with_temporal_connectivity_gaps_count": 1,
+            "documents_without_temporal_tlinks_count": 1,
         },
     }
 
@@ -93,7 +97,11 @@ def test_compute_metrics_extracts_counts_and_scores():
     assert semantic["semantic_compliance_score"] < semantic["coverage_score"]
 
     assert temporal["tlink_conflict_count"] == 2
-    assert temporal["temporal_issue_count"] == 7
+    assert temporal["tlink_reciprocal_cycle_count"] == 2
+    assert temporal["isolated_temporal_anchor_count"] == 3
+    assert temporal["documents_with_temporal_connectivity_gaps_count"] == 1
+    assert temporal["documents_without_temporal_tlinks_count"] == 1
+    assert temporal["temporal_issue_count"] == 14
     assert temporal["temporal_consistency_score"] < 1.0
 
 
@@ -113,7 +121,7 @@ def test_generate_quality_report_uses_suite_and_emits_recommendations():
     assert report["glink_count"] == 3
     assert report["warnings"]
     assert any("Temporal consistency issues" in warning for warning in report["warnings"])
-    assert any("TLINK conflicts" in rec for rec in report["recommendations"])
+    assert any("reciprocal cycles" in rec for rec in report["recommendations"])
 
 
 def test_compare_reports_and_identify_regression_surface_deltas():
