@@ -215,6 +215,14 @@ def compute_temporal_metrics(
     tlink_anchor_endpoint_violation_count = _safe_int(totals.get("tlink_anchor_endpoint_violation_count"))
     tlink_anchor_filter_suppressed_count = _safe_int(totals.get("tlink_anchor_filter_suppressed_count"))
     tlink_missing_anchor_metadata_count = _safe_int(totals.get("tlink_missing_anchor_metadata_count"))
+    tlink_reciprocal_cycle_count = _safe_int(totals.get("tlink_reciprocal_cycle_count"))
+    isolated_temporal_anchor_count = _safe_int(totals.get("isolated_temporal_anchor_count"))
+    documents_with_temporal_connectivity_gaps_count = _safe_int(
+        totals.get("documents_with_temporal_connectivity_gaps_count")
+    )
+    documents_without_temporal_tlinks_count = _safe_int(
+        totals.get("documents_without_temporal_tlinks_count")
+    )
 
     temporal_issue_count = (
         tlink_conflict_count
@@ -223,6 +231,10 @@ def compute_temporal_metrics(
         + tlink_anchor_endpoint_violation_count
         + tlink_anchor_filter_suppressed_count
         + tlink_missing_anchor_metadata_count
+        + tlink_reciprocal_cycle_count
+        + isolated_temporal_anchor_count
+        + documents_with_temporal_connectivity_gaps_count
+        + documents_without_temporal_tlinks_count
     )
     temporal_consistency_score = _penalized_score(1.0, temporal_issue_count, 40.0)
 
@@ -233,6 +245,10 @@ def compute_temporal_metrics(
         "tlink_anchor_endpoint_violation_count": tlink_anchor_endpoint_violation_count,
         "tlink_anchor_filter_suppressed_count": tlink_anchor_filter_suppressed_count,
         "tlink_missing_anchor_metadata_count": tlink_missing_anchor_metadata_count,
+        "tlink_reciprocal_cycle_count": tlink_reciprocal_cycle_count,
+        "isolated_temporal_anchor_count": isolated_temporal_anchor_count,
+        "documents_with_temporal_connectivity_gaps_count": documents_with_temporal_connectivity_gaps_count,
+        "documents_without_temporal_tlinks_count": documents_without_temporal_tlinks_count,
         "temporal_issue_count": temporal_issue_count,
         "temporal_consistency_score": temporal_consistency_score,
     }
@@ -306,7 +322,7 @@ def _build_warnings_and_recommendations(
     if _safe_int(temporal_metrics.get("temporal_issue_count")) > 0:
         warnings.append("Temporal consistency issues were detected in TLINK diagnostics.")
         recommendations.append(
-            "Investigate TLINK conflicts, anchor inconsistencies, and missing anchor metadata before shipping temporal features."
+            "Investigate TLINK conflicts, anchor inconsistencies, reciprocal cycles, and temporal connectivity gaps before shipping temporal features."
         )
 
     if not warnings:
