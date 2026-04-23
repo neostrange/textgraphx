@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from unittest.mock import MagicMock
+from textgraphx.queries.query_pack import load_query
 
 import pytest
 
@@ -173,6 +174,12 @@ def test_query_entity_state_type_distribution_runs_query_pack_entry():
     ]
     rows = query_entity_state_type_distribution(graph)
     assert rows[0]["entity_state_type"] == "ATTRIBUTE"
+
+
+def test_entity_state_type_distribution_query_avoids_nullif_for_neo4j_compatibility():
+    query = load_query("entity_state_type_distribution")
+    assert "nullif" not in query.lower()
+    assert "case" in query.lower()
 
 
 def test_query_entity_specificity_coverage_runs_query_pack_entry():
