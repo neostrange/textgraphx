@@ -13,11 +13,21 @@ try:
 except ImportError:  # pragma: no cover - support script-style execution
     from time_utils import utc_iso_now
 
+try:
+    from textgraphx.execution_history import ExecutionHistory, ExecutionRecord
+    from textgraphx.execution_summary import ExecutionSummary
+except ImportError:  # pragma: no cover - support script-style execution
+    from execution_history import ExecutionHistory, ExecutionRecord
+    from execution_summary import ExecutionSummary
+
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
-from execution_history import ExecutionHistory, ExecutionRecord
-from execution_summary import ExecutionSummary
-from textgraphx.diagnostics import get_runtime_metrics
+from textgraphx.diagnostics import (
+    get_registered_diagnostics,
+    get_runtime_metrics,
+    list_diagnostic_queries,
+    run_registered_diagnostic,
+)
 from textgraphx.neo4j_client import make_graph_from_config
 from textgraphx.orchestration.orchestrator import PipelineOrchestrator
 
@@ -195,14 +205,47 @@ async def get_statistics():
 
 
 @app.get("/diagnostics/runtime", tags=["Analytics"])
-async def get_runtime_diagnostics():
+async def get_runtime_diagnostics(totals_only: bool = False):
     """Return runtime diagnostics aggregated from registered query pack entries."""
     graph = make_graph_from_config()
     close_fn = getattr(graph, "close", None)
     try:
-        return get_runtime_metrics(graph)
+        payload = get_runtime_metrics(graph)
+        if totals_only and isinstance(payload, dict):
+            return payload.get("totals", {})
+        return payload
     except Exception as e:
         logger.error(f"Failed to compute runtime diagnostics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if callable(close_fn):
+            close_fn()
+
+
+@app.get("/diagnostics/queries", tags=["Analytics"])
+async def list_runtime_diagnostic_queries():
+    """List registered runtime diagnostics queries and their expected output fields."""
+    return get_registered_diagnostics()
+
+
+@app.get("/diagnostics/query/{query_name}", tags=["Analytics"])
+async def get_runtime_diagnostic_query(query_name: str):
+    """Run one registered runtime diagnostics query by stable name."""
+    if query_name not in list_diagnostic_queries():
+        raise HTTPException(status_code=404, detail=f"Unknown diagnostics query: {query_name}")
+
+    graph = make_graph_from_config()
+    close_fn = getattr(graph, "close", None)
+    try:
+        return {
+            "query_name": query_name,
+            "rows": run_registered_diagnostic(graph, query_name),
+        }
+    except KeyError as e:
+        logger.error(f"Unknown diagnostics query requested: {e}")
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to execute diagnostics query '{query_name}': {e}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if callable(close_fn):
