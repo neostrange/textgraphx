@@ -6,12 +6,12 @@
 
 Open research direction for the project: hypotheses under active investigation, related-work context, and a systematic comparison against the origin paper.
 
-## Pages (planned)
+## Pages
 
-- `open-questions.md`
-- `hypotheses-and-experiments.md`
-- `related-work.md`
-- `paper-vs-current.md` — per-contribution "origin paper (Hur et al. 2024) vs current system", enumerating concrete extensions.
+- [`open-questions.md`](open-questions.md)
+- [`hypotheses-and-experiments.md`](hypotheses-and-experiments.md)
+- [`related-work.md`](related-work.md)
+- [`paper-vs-current.md`](paper-vs-current.md) — per-contribution "origin paper (Hur et al. 2024) vs current system", enumerating concrete extensions.
 
 ## See also
 
