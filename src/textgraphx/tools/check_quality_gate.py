@@ -11,6 +11,8 @@ Usage (in CI):
       --current  out/evaluation/kg_quality_report.json \\
     --tolerance 0.02 \\
     --max-tlink-anchor-inconsistent-increase 0 \\
+        --max-tlink-reciprocal-cycle-increase 0 \
+        --max-documents-with-temporal-connectivity-gaps-increase 0 \
         --max-tlink-missing-anchor-metadata 0 \\
         --max-participation-in-frame-missing-increase 0 \\
         --max-participation-in-mention-missing-increase 0 \\
@@ -90,6 +92,42 @@ def main(argv=None) -> int:
         help=(
             "Optional absolute cap for tlink_missing_anchor_metadata_count in the current report. "
             "Example: 0 requires complete anchor metadata coverage."
+        ),
+    )
+    parser.add_argument(
+        "--max-tlink-reciprocal-cycle-increase",
+        type=int,
+        default=None,
+        help=(
+            "Optional cap on how much tlink_reciprocal_cycle_count may increase "
+            "relative to baseline. Example: 0 means no increase allowed."
+        ),
+    )
+    parser.add_argument(
+        "--max-isolated-temporal-anchor-increase",
+        type=int,
+        default=None,
+        help=(
+            "Optional cap on how much isolated_temporal_anchor_count may increase "
+            "relative to baseline. Example: 0 means no increase allowed."
+        ),
+    )
+    parser.add_argument(
+        "--max-documents-with-temporal-connectivity-gaps-increase",
+        type=int,
+        default=None,
+        help=(
+            "Optional cap on how much documents_with_temporal_connectivity_gaps_count may increase "
+            "relative to baseline. Example: 0 means no increase allowed."
+        ),
+    )
+    parser.add_argument(
+        "--max-documents-without-temporal-tlinks-increase",
+        type=int,
+        default=None,
+        help=(
+            "Optional cap on how much documents_without_temporal_tlinks_count may increase "
+            "relative to baseline. Example: 0 means no increase allowed."
         ),
     )
     parser.add_argument(
@@ -205,6 +243,38 @@ def main(argv=None) -> int:
         if not missing_ok:
             gate_reasons.append("tlink_missing_anchor_metadata")
 
+    if args.max_tlink_reciprocal_cycle_increase is not None:
+        base_cycles = _runtime_total(baseline_report, "tlink_reciprocal_cycle_count", 0)
+        curr_cycles = _runtime_total(current_report, "tlink_reciprocal_cycle_count", 0)
+        increase = curr_cycles - base_cycles
+        cycle_ok = increase <= int(args.max_tlink_reciprocal_cycle_increase)
+        if not cycle_ok:
+            gate_reasons.append("tlink_reciprocal_cycle_increase")
+
+    if args.max_isolated_temporal_anchor_increase is not None:
+        base_isolated = _runtime_total(baseline_report, "isolated_temporal_anchor_count", 0)
+        curr_isolated = _runtime_total(current_report, "isolated_temporal_anchor_count", 0)
+        increase = curr_isolated - base_isolated
+        isolated_ok = increase <= int(args.max_isolated_temporal_anchor_increase)
+        if not isolated_ok:
+            gate_reasons.append("isolated_temporal_anchor_increase")
+
+    if args.max_documents_with_temporal_connectivity_gaps_increase is not None:
+        base_docs = _runtime_total(baseline_report, "documents_with_temporal_connectivity_gaps_count", 0)
+        curr_docs = _runtime_total(current_report, "documents_with_temporal_connectivity_gaps_count", 0)
+        increase = curr_docs - base_docs
+        docs_ok = increase <= int(args.max_documents_with_temporal_connectivity_gaps_increase)
+        if not docs_ok:
+            gate_reasons.append("documents_with_temporal_connectivity_gaps_increase")
+
+    if args.max_documents_without_temporal_tlinks_increase is not None:
+        base_docs = _runtime_total(baseline_report, "documents_without_temporal_tlinks_count", 0)
+        curr_docs = _runtime_total(current_report, "documents_without_temporal_tlinks_count", 0)
+        increase = curr_docs - base_docs
+        docs_ok = increase <= int(args.max_documents_without_temporal_tlinks_increase)
+        if not docs_ok:
+            gate_reasons.append("documents_without_temporal_tlinks_increase")
+
     if args.max_participation_in_frame_missing_increase is not None:
         base_missing = _runtime_total(baseline_report, "participation_in_frame_missing_count", 0)
         curr_missing = _runtime_total(current_report, "participation_in_frame_missing_count", 0)
@@ -284,6 +354,42 @@ def main(argv=None) -> int:
             print(
                 "[quality-gate] tlink_missing_anchor_metadata_count "
                 f"current={curr_missing} max_allowed={int(args.max_tlink_missing_anchor_metadata)}"
+            )
+        if args.max_tlink_reciprocal_cycle_increase is not None:
+            base_cycles = _runtime_total(baseline_report, "tlink_reciprocal_cycle_count", 0)
+            curr_cycles = _runtime_total(current_report, "tlink_reciprocal_cycle_count", 0)
+            print(
+                "[quality-gate] tlink_reciprocal_cycle_count "
+                f"baseline={base_cycles} current={curr_cycles} "
+                f"increase={curr_cycles - base_cycles} "
+                f"max_increase={int(args.max_tlink_reciprocal_cycle_increase)}"
+            )
+        if args.max_isolated_temporal_anchor_increase is not None:
+            base_isolated = _runtime_total(baseline_report, "isolated_temporal_anchor_count", 0)
+            curr_isolated = _runtime_total(current_report, "isolated_temporal_anchor_count", 0)
+            print(
+                "[quality-gate] isolated_temporal_anchor_count "
+                f"baseline={base_isolated} current={curr_isolated} "
+                f"increase={curr_isolated - base_isolated} "
+                f"max_increase={int(args.max_isolated_temporal_anchor_increase)}"
+            )
+        if args.max_documents_with_temporal_connectivity_gaps_increase is not None:
+            base_docs = _runtime_total(baseline_report, "documents_with_temporal_connectivity_gaps_count", 0)
+            curr_docs = _runtime_total(current_report, "documents_with_temporal_connectivity_gaps_count", 0)
+            print(
+                "[quality-gate] documents_with_temporal_connectivity_gaps_count "
+                f"baseline={base_docs} current={curr_docs} "
+                f"increase={curr_docs - base_docs} "
+                f"max_increase={int(args.max_documents_with_temporal_connectivity_gaps_increase)}"
+            )
+        if args.max_documents_without_temporal_tlinks_increase is not None:
+            base_docs = _runtime_total(baseline_report, "documents_without_temporal_tlinks_count", 0)
+            curr_docs = _runtime_total(current_report, "documents_without_temporal_tlinks_count", 0)
+            print(
+                "[quality-gate] documents_without_temporal_tlinks_count "
+                f"baseline={base_docs} current={curr_docs} "
+                f"increase={curr_docs - base_docs} "
+                f"max_increase={int(args.max_documents_without_temporal_tlinks_increase)}"
             )
         if args.max_participation_in_frame_missing_increase is not None:
             base_missing = _runtime_total(baseline_report, "participation_in_frame_missing_count", 0)
