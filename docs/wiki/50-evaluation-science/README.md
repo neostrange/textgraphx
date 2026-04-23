@@ -6,12 +6,12 @@
 
 Concepts and metrics of evaluation — what quality means, what the metrics actually measure, and where the system's known limits are. The operational strategy lives in [../55-evaluation-strategy/README.md](../55-evaluation-strategy/README.md).
 
-## Pages (planned)
+## Pages
 
-- `what-quality-means.md`
-- `meantime-bridge.md` — see also [../../MILESTONE8_BRIDGE_VALIDATOR.md](../../MILESTONE8_BRIDGE_VALIDATOR.md)
-- `metrics-catalog.md`
-- `known-limitations.md`
+- [`what-quality-means.md`](what-quality-means.md)
+- [`meantime-bridge.md`](meantime-bridge.md) — see also [../../MILESTONE8_BRIDGE_VALIDATOR.md](../../MILESTONE8_BRIDGE_VALIDATOR.md)
+- [`metrics-catalog.md`](metrics-catalog.md)
+- [`known-limitations.md`](known-limitations.md)
 
 ## See also
 

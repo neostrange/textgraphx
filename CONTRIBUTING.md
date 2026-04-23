@@ -1,3 +1,5 @@
+<!-- last_reviewed: 2026-04-23 | owner: core | status: draft | review_interval_days: 90 -->
+
 # Contributing Guide
 
 ## Repository Layout

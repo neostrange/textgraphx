@@ -11,15 +11,15 @@ The operational four-tier evaluation strategy:
 3. **Cross-phase / bridge tier (M8)** — MEANTIME bridge + consistency validator.
 4. **Regression tier (M9–M10)** — baseline snapshots and CI quality gating.
 
-## Pages (planned)
+## Pages
 
-- `strategy-overview.md`
-- `metrics-catalog.md`
-- `evaluation-run-modes.md`
-- `baseline-and-regression.md`
-- `self-certifying-reports.md`
-- `known-error-modes.md`
-- `how-to-add-an-evaluator.md`
+- [`strategy-overview.md`](strategy-overview.md)
+- [`metrics-catalog.md`](metrics-catalog.md)
+- [`evaluation-run-modes.md`](evaluation-run-modes.md)
+- [`baseline-and-regression.md`](baseline-and-regression.md)
+- [`self-certifying-reports.md`](self-certifying-reports.md)
+- [`known-error-modes.md`](known-error-modes.md)
+- [`how-to-add-an-evaluator.md`](how-to-add-an-evaluator.md)
 
 ## See also
 
