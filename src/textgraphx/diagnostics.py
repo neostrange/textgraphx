@@ -196,6 +196,15 @@ def _execute_registered_query(
     return graph.run(query, params or {}).data()
 
 
+def run_registered_diagnostic(
+    graph: Any,
+    query_name: str,
+    params: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
+    """Run a registered diagnostic query by stable name."""
+    return _execute_registered_query(graph, query_name, params=params)
+
+
 def query_phase_execution_summary(graph: Any) -> List[Dict[str, Any]]:
     """Return phase-level execution_time/duration and volume metrics."""
     return _execute_registered_query(graph, "phase_execution_summary")
