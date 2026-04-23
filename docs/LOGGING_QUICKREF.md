@@ -1,5 +1,7 @@
 # Logging Quick Reference
 
+> Canonical reference: [LOGGING_GUIDE.md](LOGGING_GUIDE.md). This page is the short-form cheatsheet; any conflicts are resolved in favor of the guide.
+
 ## TL;DR - Just Want Detailed Logs?
 
 ### 1. Enable Debug Logging
