@@ -29,6 +29,8 @@ from textgraphx.diagnostics import (
     query_phase_execution_summary,
     query_pipeline_bottleneck_analysis,
     query_referential_integrity_violations,
+    query_temporal_anchor_connectivity_gaps,
+    query_tlink_reciprocal_cycle_signals,
 )
 
 
@@ -58,6 +60,8 @@ def test_registered_diagnostics_contains_expected_queries():
     assert "glink_relation_inventory" in names
     assert "tlink_consistency_violations" in names
     assert "tlink_anchor_consistency_inventory" in names
+    assert "tlink_reciprocal_cycle_signals" in names
+    assert "temporal_anchor_connectivity_gaps" in names
     assert "timexmention_contract_inventory" in names
 
 
@@ -236,6 +240,35 @@ def test_query_glink_relation_inventory_runs_query_pack_entry():
     assert rows[0]["glink_count"] == 2
 
 
+def test_query_tlink_reciprocal_cycle_signals_runs_query_pack_entry():
+    graph = MagicMock()
+    graph.run.return_value.data.return_value = [
+        {
+            "document_id": 42,
+            "rel_type": "BEFORE",
+            "source_label": "TEvent",
+            "target_label": "TEvent",
+            "cycle_count": 1,
+        }
+    ]
+    rows = query_tlink_reciprocal_cycle_signals(graph)
+    assert rows[0]["cycle_count"] == 1
+
+
+def test_query_temporal_anchor_connectivity_gaps_runs_query_pack_entry():
+    graph = MagicMock()
+    graph.run.return_value.data.return_value = [
+        {
+            "document_id": 42,
+            "total_anchors": 5,
+            "connected_anchor_count": 3,
+            "isolated_anchor_count": 2,
+        }
+    ]
+    rows = query_temporal_anchor_connectivity_gaps(graph)
+    assert rows[0]["isolated_anchor_count"] == 2
+
+
 def test_get_runtime_metrics_aggregates_totals_from_queries():
     graph = MagicMock()
     graph.run.return_value.data.side_effect = [
@@ -262,6 +295,29 @@ def test_get_runtime_metrics_aggregates_totals_from_queries():
             {"metric": "endpoint_violation_tlinks", "item_count": 1},
             {"metric": "anchor_filter_suppressed_tlinks", "item_count": 2},
             {"metric": "missing_anchor_metadata_tlinks", "item_count": 3},
+        ],
+        [
+            {
+                "document_id": 42,
+                "rel_type": "BEFORE",
+                "source_label": "TEvent",
+                "target_label": "TEvent",
+                "cycle_count": 2,
+            }
+        ],
+        [
+            {
+                "document_id": 42,
+                "total_anchors": 5,
+                "connected_anchor_count": 3,
+                "isolated_anchor_count": 2,
+            },
+            {
+                "document_id": 77,
+                "total_anchors": 2,
+                "connected_anchor_count": 0,
+                "isolated_anchor_count": 2,
+            },
         ],
         [{"total_entity_mentions": 10, "entity_mentions_with_state": 4, "coverage_ratio": 0.4}],
         [{"entity_state_type": "ATTRIBUTE", "mention_count": 3}, {"entity_state_type": "STATE", "mention_count": 1}],
@@ -313,6 +369,10 @@ def test_get_runtime_metrics_aggregates_totals_from_queries():
     assert totals["tlink_anchor_endpoint_violation_count"] == 1
     assert totals["tlink_anchor_filter_suppressed_count"] == 2
     assert totals["tlink_missing_anchor_metadata_count"] == 3
+    assert totals["tlink_reciprocal_cycle_count"] == 2
+    assert totals["isolated_temporal_anchor_count"] == 4
+    assert totals["documents_with_temporal_connectivity_gaps_count"] == 2
+    assert totals["documents_without_temporal_tlinks_count"] == 1
     assert totals["participation_in_frame_missing_count"] == 8
     assert totals["participation_in_mention_missing_count"] == 9
     assert totals["timexmention_missing_doc_id_count"] == 1
@@ -322,3 +382,5 @@ def test_get_runtime_metrics_aggregates_totals_from_queries():
     assert payload["pipeline_bottleneck_analysis"][0]["phase"] == "temporal"
     assert payload["edge_type_distribution"][0]["rel_type"] == "TLINK"
     assert payload["entity_density"][0]["document_id"] == 42
+    assert payload["tlink_reciprocal_cycle_signals"][0]["rel_type"] == "BEFORE"
+    assert payload["temporal_anchor_connectivity_gaps"][0]["document_id"] == 42
