@@ -5,7 +5,7 @@
 
 **Gateway** · **Wiki Home** · **Ontology & Schema** · Schema Summary
 
-Living table of labels, relationships, schema tiers, and reasoning contracts, rendered from [`ontology.json`](../../../src/textgraphx/schema/ontology.json). The authoritative narrative is in [`../../schema.md`](../../schema.md) (and, once published, `schema-semantics.md` in this folder).
+Living table of labels, relationships, schema tiers, and reasoning contracts, rendered from [`ontology.json`](../../../src/textgraphx/schema/ontology.json). The authoritative narrative is in [`schema-semantics.md`](schema-semantics.md) and [`../../schema.md`](../../schema.md).
 
 Regenerate with: `python scripts/docs/generate_schema_summary.py`.
 

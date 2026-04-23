@@ -6,9 +6,12 @@
 
 Pipeline theory and per-stage reference. Each stage page links to its owner module, helper modules, key Cypher queries, migrations, phase assertions, and evaluator.
 
-## Pages (planned)
+## Pages
 
-- `pipeline-theory.md` — the staged-pipeline paradigm and why it fits event-centric KG construction.
+- [`pipeline-theory.md`](pipeline-theory.md) — the staged-pipeline paradigm and why it fits event-centric KG construction.
+
+## Pages (planned — PR-4)
+
 - `stage-ingestion.md` — [src/textgraphx/GraphBasedNLP.py](../../../src/textgraphx/GraphBasedNLP.py)
 - `stage-refinement.md` — [src/textgraphx/RefinementPhase.py](../../../src/textgraphx/RefinementPhase.py)
 - `stage-temporal.md` — [src/textgraphx/TemporalPhase.py](../../../src/textgraphx/TemporalPhase.py)

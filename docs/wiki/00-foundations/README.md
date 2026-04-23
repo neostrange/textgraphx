@@ -6,13 +6,13 @@
 
 Pages in this section establish the conceptual ground: what TextGraphX is, why it exists, and the vocabulary used throughout the rest of the encyclopedia.
 
-## Pages (planned)
+## Pages
 
-- `theme-and-rationale.md` — mission statement and design values.
-- `research-objectives.md` — research questions the system is built to investigate.
-- `glossary.md` — term definitions reused across the wiki.
-- `concept-map.md` — diagrammatic overview of phases, layers, and contracts.
-- `origin-paper.md` — framing against Hur et al. (2024) as **origin, not specification**; current extensions catalogued.
+- [`theme-and-rationale.md`](theme-and-rationale.md) — mission statement and design values.
+- [`research-objectives.md`](research-objectives.md) — research questions the system is built to investigate.
+- [`glossary.md`](glossary.md) — term definitions reused across the wiki.
+- [`concept-map.md`](concept-map.md) — diagrammatic overview of phases, layers, and contracts.
+- [`origin-paper.md`](origin-paper.md) — framing against Hur et al. (2024) as **origin, not specification**; current extensions catalogued.
 
 ## See also
 

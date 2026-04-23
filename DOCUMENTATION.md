@@ -4,7 +4,7 @@
 
 Dense, link-only entry point. If you are not sure where to go, start here.
 
-> **Origin note.** TextGraphX originated from Hur et al. (2024), *"Unifying context with labeled property graph: A pipeline-based system for comprehensive text representation in NLP"* (Expert Systems with Applications 239:122269, DOI [10.1016/j.eswa.2023.122269](https://doi.org/10.1016/j.eswa.2023.122269)). The current system substantially extends and supersedes that proposal. The paper is treated as origin/motivation, not as a specification. A dedicated "then vs now" page lands at `docs/wiki/00-foundations/origin-paper.md` in PR-3.
+> **Origin note.** TextGraphX originated from Hur et al. (2024), *"Unifying context with labeled property graph: A pipeline-based system for comprehensive text representation in NLP"* (Expert Systems with Applications 239:122269, DOI [10.1016/j.eswa.2023.122269](https://doi.org/10.1016/j.eswa.2023.122269)). The current system substantially extends and supersedes that proposal. The paper is treated as origin/motivation, not as a specification. See [docs/wiki/00-foundations/origin-paper.md](docs/wiki/00-foundations/origin-paper.md) for the "then vs now" breakdown.
 
 ## Reading paths
 

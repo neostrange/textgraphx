@@ -45,8 +45,8 @@ def build_markdown(data: dict) -> str:
     lines.append(
         "Living table of labels, relationships, schema tiers, and reasoning "
         "contracts, rendered from [`ontology.json`](../../../src/textgraphx/schema/ontology.json). "
-        "The authoritative narrative is in [`../../schema.md`](../../schema.md) "
-        "(and, once published, `schema-semantics.md` in this folder)."
+        "The authoritative narrative is in [`schema-semantics.md`](schema-semantics.md) "
+        "and [`../../schema.md`](../../schema.md)."
     )
     lines.append("")
     lines.append("Regenerate with: `python scripts/docs/generate_schema_summary.py`.")
