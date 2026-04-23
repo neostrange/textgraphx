@@ -211,6 +211,108 @@ def test_gate_fails_on_tlink_missing_anchor_metadata_cap(tmp_path):
     assert rc == 1
 
 
+def test_gate_fails_on_tlink_reciprocal_cycle_increase(tmp_path):
+    baseline = tmp_path / "baseline.json"
+    current = tmp_path / "current.json"
+    baseline.write_text(
+        json.dumps(
+            {
+                "overall_quality": 0.90,
+                "runtime_diagnostics": {
+                    "totals": {
+                        "tlink_reciprocal_cycle_count": 1,
+                    }
+                },
+            }
+        )
+    )
+    current.write_text(
+        json.dumps(
+            {
+                "overall_quality": 0.90,
+                "runtime_diagnostics": {
+                    "totals": {
+                        "tlink_reciprocal_cycle_count": 3,
+                    }
+                },
+            }
+        )
+    )
+
+    rc = main(
+        [
+            "--baseline",
+            str(baseline),
+            "--current",
+            str(current),
+            "--max-tlink-reciprocal-cycle-increase",
+            "0",
+        ]
+    )
+    assert rc == 1
+
+
+def test_gate_fails_on_isolated_temporal_anchor_increase(tmp_path):
+    baseline = tmp_path / "baseline.json"
+    current = tmp_path / "current.json"
+    baseline.write_text(json.dumps({"overall_quality": 0.80, "isolated_temporal_anchor_count": 2}))
+    current.write_text(json.dumps({"overall_quality": 0.80, "isolated_temporal_anchor_count": 4}))
+
+    rc = main(
+        [
+            "--baseline",
+            str(baseline),
+            "--current",
+            str(current),
+            "--max-isolated-temporal-anchor-increase",
+            "1",
+        ]
+    )
+    assert rc == 1
+
+
+def test_gate_fails_on_temporal_connectivity_gap_document_increase(tmp_path):
+    baseline = tmp_path / "baseline.json"
+    current = tmp_path / "current.json"
+    baseline.write_text(
+        json.dumps({"overall_quality": 0.80, "documents_with_temporal_connectivity_gaps_count": 1})
+    )
+    current.write_text(
+        json.dumps({"overall_quality": 0.80, "documents_with_temporal_connectivity_gaps_count": 3})
+    )
+
+    rc = main(
+        [
+            "--baseline",
+            str(baseline),
+            "--current",
+            str(current),
+            "--max-documents-with-temporal-connectivity-gaps-increase",
+            "0",
+        ]
+    )
+    assert rc == 1
+
+
+def test_gate_passes_when_documents_without_temporal_tlinks_increase_within_limit(tmp_path):
+    baseline = tmp_path / "baseline.json"
+    current = tmp_path / "current.json"
+    baseline.write_text(json.dumps({"overall_quality": 0.80, "documents_without_temporal_tlinks_count": 2}))
+    current.write_text(json.dumps({"overall_quality": 0.80, "documents_without_temporal_tlinks_count": 3}))
+
+    rc = main(
+        [
+            "--baseline",
+            str(baseline),
+            "--current",
+            str(current),
+            "--max-documents-without-temporal-tlinks-increase",
+            "1",
+        ]
+    )
+    assert rc == 0
+
+
 def test_gate_fails_on_participation_in_frame_missing_increase(tmp_path):
     baseline = tmp_path / "baseline.json"
     current = tmp_path / "current.json"
