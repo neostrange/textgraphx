@@ -447,7 +447,7 @@ class GraphBasedNLP(GraphDBBase):
 if __name__ == '__main__':
     # Ensure logging is configured for CLI runs so users see console logs by default
     try:
-        from textgraphx.logging_config import configure_logging
+        from textgraphx.infrastructure.logging_config import configure_logging
         configure_logging()
     except Exception:
         # If logging configuration fails, continue with the default logging setup

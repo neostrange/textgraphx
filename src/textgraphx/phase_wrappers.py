@@ -15,7 +15,7 @@ from urllib.parse import unquote
 
 import requests
 
-from textgraphx.logging_utils import (
+from textgraphx.infrastructure.logging_utils import (
     get_logger, log_section, log_subsection, timer_log, ProgressLogger
 )
 

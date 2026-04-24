@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from .db_interface import ExecutionHistory, ExecutionStatus
 from .checkpoint import CheckpointManager
 from textgraphx.config import get_config
-from textgraphx.logging_utils import (
+from textgraphx.infrastructure.logging_utils import (
     get_logger, log_section, log_subsection, ProgressLogger
 )
 from textgraphx.neo4j_client import make_graph_from_config
