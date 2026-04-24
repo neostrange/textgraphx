@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from .db_interface import ExecutionHistory, ExecutionStatus
-from textgraphx.checkpoint import CheckpointManager
+from .checkpoint import CheckpointManager
 from textgraphx.config import get_config
 from textgraphx.logging_utils import (
     get_logger, log_section, log_subsection, ProgressLogger

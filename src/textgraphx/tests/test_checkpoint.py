@@ -5,9 +5,14 @@ from pathlib import Path
 import pytest
 
 from textgraphx.checkpoint import CheckpointManager
+from textgraphx.orchestration.checkpoint import CheckpointManager as CanonicalCheckpointManager
 
 
 pytestmark = [pytest.mark.unit]
+
+
+def test_root_checkpoint_wrapper_reexports_canonical_manager():
+    assert CheckpointManager is CanonicalCheckpointManager
 
 
 def test_save_and_load_checkpoint(tmp_path):

@@ -14,8 +14,8 @@ except ImportError:  # pragma: no cover - support script-style execution
     from time_utils import utc_iso_now
 
 try:
-    from textgraphx.execution_history import ExecutionHistory, ExecutionRecord
-    from textgraphx.execution_summary import ExecutionSummary
+    from textgraphx.orchestration.runtime_history import ExecutionHistory, ExecutionRecord
+    from textgraphx.orchestration.runtime_summary import ExecutionSummary
 except ImportError:  # pragma: no cover - support script-style execution
     from execution_history import ExecutionHistory, ExecutionRecord
     from execution_summary import ExecutionSummary
