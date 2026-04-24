@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from textgraphx.neo4j_client import make_graph_from_config
+from textgraphx.database.client import make_graph_from_config
 
 
 DEFAULT_OUTPUT = "tools/nominals_76437.json"

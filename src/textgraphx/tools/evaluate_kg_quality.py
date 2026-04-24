@@ -311,8 +311,8 @@ def main(argv: Iterable[str] | None = None) -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
     repo_root = _repo_root()
 
-    from textgraphx.config import get_config
-    from textgraphx.neo4j_client import make_graph_from_config
+    from textgraphx.infrastructure.config import get_config
+    from textgraphx.database.client import make_graph_from_config
     from textgraphx.evaluation.fullstack_harness import FullStackEvaluator
 
     cfg = get_config()

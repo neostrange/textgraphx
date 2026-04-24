@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from textgraphx.performance_profiler import (
+from textgraphx.infrastructure.performance_profiler import (
     QueryMetrics, PhaseMetrics, PhaseProfiler, get_profiler
 )
 

@@ -16,13 +16,13 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from textgraphx.phase_assertions import (
+from textgraphx.pipeline.runtime.phase_assertions import (
     PhaseAssertions,
     PhaseThresholds,
     AssertionResult,
     record_phase_run,
 )
-from textgraphx.run_report import RunReport, DocumentStatus
+from textgraphx.evaluation.reports import RunReport, DocumentStatus
 
 
 # ---------------------------------------------------------------------------
@@ -224,20 +224,20 @@ class TestRefinementRunMarkerContract:
     """Keep RefinementRun marker timestamp semantics stable."""
 
     def test_refinement_marker_uses_timezone_aware_utc_timestamp(self):
-        source = (Path(__file__).parent.parent / "RefinementPhase.py").read_text()
+        source = (Path(__file__).parent.parent / "pipeline/phases/refinement.py").read_text()
 
         assert "MERGE (r:RefinementRun {id: $id})" in source
         assert "run_id = utc_iso_now()" in source
         assert '"id": run_id, "ts": run_id' in source
 
     def test_quantified_entity_rule_merges_entity_and_relationship_separately(self):
-        source = (Path(__file__).parent.parent / "RefinementPhase.py").read_text()
+        source = (Path(__file__).parent.parent / "pipeline/phases/refinement.py").read_text()
 
         assert "merge (e:Entity {id: entity_id, type: 'NOMINAL'})" in source
         assert "merge (fa)-[:REFERS_TO]->(e)" in source
 
     def test_quantified_entity_rule_marks_partitive_metadata(self):
-        source = (Path(__file__).parent.parent / "RefinementPhase.py").read_text()
+        source = (Path(__file__).parent.parent / "pipeline/phases/refinement.py").read_text()
 
         assert "THEN 'PARTITIVE'" in source
         assert "ELSE 'QUANTIFIED'" in source
@@ -246,18 +246,18 @@ class TestRefinementRunMarkerContract:
         assert "e.partitiveObject = pobj.text" in source
 
     def test_quantified_entity_rule_only_deletes_numeric_namedentity_links(self):
-        source = (Path(__file__).parent.parent / "RefinementPhase.py").read_text()
+        source = (Path(__file__).parent.parent / "pipeline/phases/refinement.py").read_text()
 
         assert "where ne.type in ['CARDINAL', 'QUANTITY', 'PERCENT', 'MONEY', 'ORDINAL']" in source
 
     def test_nominal_entity_id_generation_is_deterministic(self):
-        source = (Path(__file__).parent.parent / "RefinementPhase.py").read_text()
+        source = (Path(__file__).parent.parent / "pipeline/phases/refinement.py").read_text()
 
         assert "'nominal_' + doc_part + '_' + toString(start_tok) + '_' + toString(end_tok) AS entity_id" in source
         assert "e.provenance_rule_id = 'refinement.link_frameArgument_to_new_entity'" in source
 
     def test_nominal_mentions_materialization_contains_required_metadata(self):
-        source = (Path(__file__).parent.parent / "RefinementPhase.py").read_text()
+        source = (Path(__file__).parent.parent / "pipeline/phases/refinement.py").read_text()
 
         assert "def materialize_nominal_mentions_from_frame_arguments(self):" in source
         assert "def materialize_nominal_mentions_from_noun_chunks(self):" in source
@@ -270,7 +270,7 @@ class TestRefinementRunMarkerContract:
         assert "AND NOT chunk_text_lc IN ['yesterday', 'today', 'tomorrow']" in source
 
     def test_nominal_semantic_profile_annotation_is_additive(self):
-        source = (Path(__file__).parent.parent / "RefinementPhase.py").read_text()
+        source = (Path(__file__).parent.parent / "pipeline/phases/refinement.py").read_text()
 
         assert "def resolve_nominal_semantic_heads(self):" in source
         assert '"resolve_nominal_semantic_heads",' in source
@@ -290,7 +290,7 @@ class TestRefinementRunMarkerContract:
         assert "e.nominalEvalProfile = coalesce(e.nominalEvalProfile, eval_profile)" in source
 
     def test_named_entity_head_assignment_skips_prepopulated_heads(self):
-        source = (Path(__file__).parent.parent / "RefinementPhase.py").read_text()
+        source = (Path(__file__).parent.parent / "pipeline/phases/refinement.py").read_text()
 
         assert "and f.headTokenIndex is null" in source
         assert "and c.headTokenIndex is null" in source
@@ -327,7 +327,7 @@ def test_wordnet_token_enricher_persists_lexname_metadata():
 
 @pytest.mark.regression
 def test_refinement_wrapper_executes_nominal_mentions_family():
-    source = (Path(__file__).parent.parent / "phase_wrappers.py").read_text()
+    source = (Path(__file__).parent.parent / "pipeline/runtime/phase_wrappers.py").read_text()
 
     assert 'refiner.run_rule_family("numeric_value")' in source
     assert 'refiner.run_rule_family("nominal_mentions")' in source

@@ -8,7 +8,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from textgraphx.time_utils import utc_iso_now, utc_timestamp_now
+from textgraphx.reasoning.temporal.time import utc_iso_now, utc_timestamp_now
 
 
 @pytest.mark.unit

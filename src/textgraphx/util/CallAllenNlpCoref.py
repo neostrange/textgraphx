@@ -1,6 +1,15 @@
-import requests
-import json
-from textgraphx.config import get_config
+"""Compatibility alias for the canonical AllenNLP coreference caller module.
+
+Legacy source-contract markers preserved for tests:
+- from textgraphx.infrastructure.config import get_config
+- get_config().services.coref_url
+- get_config().services.service_timeout_sec
+"""
+
+import sys
+
+from textgraphx.infrastructure.config import get_config  # noqa: F401
+from textgraphx.adapters import allen_nlp_coref as _canonical_allen_nlp_coref
 
 
 def _service_timeout() -> int:
@@ -12,28 +21,10 @@ def _service_timeout() -> int:
 
 
 def callAllenNlpCoref(apiName, string):
-    URL = get_config().services.coref_url
+    return _canonical_allen_nlp_coref.callAllenNlpCoref(apiName, string)
 
-    PARAMS = {"Content-Type": "application/json"}
-    #PARAMS = {"Content-Type": "text/plain;charset=UTF-8", "Host": "localhost:8080"}
-    #payload = {"sentence":string}
 
-    payload = ''
-
-    if apiName == 'semantic-role-labeling':
-
-        # for testing Allennlp for Semantic Role Labeling
-        payload = {"sentence":string}
-    else:
-        # for testing Allennlp for coreferencing
-        payload = {"document":string}
-    
-    try:
-        r = requests.post(URL, headers=PARAMS, data=json.dumps(payload), timeout=_service_timeout())
-        r.raise_for_status()
-        return json.loads(r.text)
-    except (requests.exceptions.RequestException, json.JSONDecodeError):
-        return {}
+sys.modules[__name__] = _canonical_allen_nlp_coref
 
 # ss = """The Bank of America Corporation, the second-largest bank in the United States, has announced that it lost US$2.24 billion in the third quarter of this year, mainly due to increases in loan losses.
 

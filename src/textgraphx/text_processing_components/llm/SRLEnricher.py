@@ -1,5 +1,5 @@
 import requests
-from textgraphx.TextProcessor import Neo4jRepository  # Import the Neo4jRepository class
+from textgraphx.pipeline.ingestion.text_processor import Neo4jRepository  # Import the Neo4jRepository class
 from textgraphx.util.GraphDbBase import GraphDBBase  # Import the GraphDBBase class
 import logging
 
@@ -144,7 +144,7 @@ class SRLEnricher(GraphDBBase):
         return enriched_output
 
 def main():
-    from textgraphx.config import get_config
+    from textgraphx.infrastructure.config import get_config
     llm_api = get_config().services.llm_url
     enricher = SRLEnricher(argv=[], llm_api=llm_api)
     

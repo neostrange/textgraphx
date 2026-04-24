@@ -1,6 +1,6 @@
 import requests
 import time
-from textgraphx.TextProcessor import Neo4jRepository  # Import the Neo4jRepository class
+from textgraphx.pipeline.ingestion.text_processor import Neo4jRepository  # Import the Neo4jRepository class
 from textgraphx.utils.id_utils import make_ne_id, make_ne_token_id, make_ne_uid
 import logging
 

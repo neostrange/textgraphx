@@ -16,7 +16,7 @@ import sys
 import traceback
 from typing import Dict
 
-from textgraphx.neo4j_client import make_graph_from_config
+from textgraphx.database.client import make_graph_from_config
 
 
 DEFAULT_OUTPUT = "audit_output.json"

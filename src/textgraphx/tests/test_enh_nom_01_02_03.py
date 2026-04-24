@@ -62,7 +62,7 @@ def _stub_heavy_deps() -> None:
 _stub_heavy_deps()
 
 ROOT = Path(__file__).resolve().parents[2]
-REFINEMENT_SRC = ROOT / "textgraphx" / "RefinementPhase.py"
+REFINEMENT_SRC = ROOT / "textgraphx" / "pipeline/phases/refinement.py"
 WORDNET_ENRICHER_SRC = ROOT / "textgraphx" / "text_processing_components" / "WordnetTokenEnricher.py"
 
 
@@ -488,7 +488,7 @@ class TestEnhNomRuleOrderAndPhaseAssertions:
         assert fam.index("materialize_nominal_mentions_from_noun_chunks") < fam.index("resolve_nominal_semantic_heads")
 
     def test_phase_assertions_include_nominal_semantic_head_check(self):
-        from textgraphx.phase_assertions import PhaseAssertions
+        from textgraphx.pipeline.runtime.phase_assertions import PhaseAssertions
         graph = MagicMock()
         graph.run.return_value.data.return_value = [{"c": 5}]
         result = PhaseAssertions(graph).after_refinement()

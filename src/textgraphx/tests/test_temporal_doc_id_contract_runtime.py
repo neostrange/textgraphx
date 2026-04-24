@@ -37,7 +37,7 @@ def _load_temporal_phase_class():
         sys.modules["spacy"] = fake_spacy
         sys.modules["spacy.tokens"] = fake_tokens
 
-    module = importlib.import_module("textgraphx.TemporalPhase")
+    module = importlib.import_module("textgraphx.pipeline.temporal.extraction")
     return module.TemporalPhase
 
 

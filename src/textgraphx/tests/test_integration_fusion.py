@@ -9,8 +9,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 def _neo4j_available() -> bool:
     try:
-        from textgraphx.health_check import check_neo4j_connection
-        from textgraphx.config import get_config
+        from textgraphx.infrastructure.health_check import check_neo4j_connection
+        from textgraphx.infrastructure.config import get_config
 
         cfg = get_config()
         ok, _ = check_neo4j_connection(
@@ -31,7 +31,7 @@ neo4j_required = pytest.mark.skipif(
 
 @pytest.fixture(scope="module")
 def graph():
-    from textgraphx.neo4j_client import make_graph_from_config
+    from textgraphx.database.client import make_graph_from_config
 
     return make_graph_from_config()
 
@@ -40,13 +40,13 @@ def graph():
 @pytest.mark.integration
 class TestFusionIntegration:
     def test_cross_sentence_fusion_executes(self, graph):
-        from textgraphx.fusion import fuse_entities_cross_sentence
+        from textgraphx.reasoning.fusion import fuse_entities_cross_sentence
 
         count = fuse_entities_cross_sentence(graph)
         assert count >= 0
 
     def test_cross_document_fusion_executes(self, graph):
-        from textgraphx.fusion import fuse_entities_cross_document
+        from textgraphx.reasoning.fusion import fuse_entities_cross_document
 
         count = fuse_entities_cross_document(graph)
         assert count >= 0

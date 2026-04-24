@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 @pytest.mark.unit
 def test_dbpedia_spotlight_resolution_accepts_aligned_annotation():
-    from textgraphx.phase_wrappers import DBpediaEnrichmentPhaseWrapper
+    from textgraphx.pipeline.runtime.phase_wrappers import DBpediaEnrichmentPhaseWrapper
 
     wrapper = DBpediaEnrichmentPhaseWrapper()
     row = {
@@ -51,7 +51,7 @@ def test_dbpedia_spotlight_resolution_accepts_aligned_annotation():
 
 @pytest.mark.unit
 def test_dbpedia_spotlight_resolution_rejects_type_mismatch():
-    from textgraphx.phase_wrappers import DBpediaEnrichmentPhaseWrapper
+    from textgraphx.pipeline.runtime.phase_wrappers import DBpediaEnrichmentPhaseWrapper
 
     wrapper = DBpediaEnrichmentPhaseWrapper()
     row = {
@@ -145,7 +145,7 @@ class _FakeResponse:
 
 @pytest.mark.unit
 def test_dbpedia_enrichment_wrapper_uses_spotlight_document_annotation(monkeypatch):
-    from textgraphx.phase_wrappers import DBpediaEnrichmentPhaseWrapper
+    from textgraphx.pipeline.runtime.phase_wrappers import DBpediaEnrichmentPhaseWrapper
 
     fake_cfg = SimpleNamespace(
         features=SimpleNamespace(enable_dbpedia_enrichment=True),
@@ -161,11 +161,11 @@ def test_dbpedia_enrichment_wrapper_uses_spotlight_document_annotation(monkeypat
     )
     fake_graph = _FakeGraph()
 
-    fake_phase_assertions = types.ModuleType("textgraphx.phase_assertions")
+    fake_phase_assertions = types.ModuleType("textgraphx.pipeline.runtime.phase_assertions")
     fake_phase_assertions.record_phase_run = lambda *args, **kwargs: None
-    monkeypatch.setitem(sys.modules, "textgraphx.phase_assertions", fake_phase_assertions)
-    monkeypatch.setattr("textgraphx.config.get_config", lambda: fake_cfg)
-    monkeypatch.setattr("textgraphx.neo4j_client.make_graph_from_config", lambda: fake_graph)
+    monkeypatch.setitem(sys.modules, "textgraphx.pipeline.runtime.phase_assertions", fake_phase_assertions)
+    monkeypatch.setattr("textgraphx.infrastructure.config.get_config", lambda: fake_cfg)
+    monkeypatch.setattr("textgraphx.database.client.make_graph_from_config", lambda: fake_graph)
 
     def fake_requests_post(url, data=None, headers=None, timeout=None):
         assert url == "https://api.dbpedia-spotlight.org/en/annotate"
@@ -199,8 +199,8 @@ def test_dbpedia_enrichment_wrapper_uses_spotlight_document_annotation(monkeypat
             }
         )
 
-    monkeypatch.setattr("textgraphx.phase_wrappers.requests.post", fake_requests_post)
-    monkeypatch.setattr("textgraphx.phase_wrappers.requests.get", fake_requests_get)
+    monkeypatch.setattr("textgraphx.pipeline.runtime.phase_wrappers.requests.post", fake_requests_post)
+    monkeypatch.setattr("textgraphx.pipeline.runtime.phase_wrappers.requests.get", fake_requests_get)
 
     wrapper = DBpediaEnrichmentPhaseWrapper()
     result = wrapper.execute()

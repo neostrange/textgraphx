@@ -57,7 +57,7 @@ def _make_mock_graph():
 # ---------------------------------------------------------------------------
 
 def _load_tlinks_class():
-    with patch("textgraphx.neo4j_client.make_graph_from_config", return_value=MagicMock()):
+    with patch("textgraphx.database.client.make_graph_from_config", return_value=MagicMock()):
         from textgraphx.TlinksRecognizer import TlinksRecognizer
     return TlinksRecognizer
 
@@ -80,10 +80,10 @@ def _load_eep_class():
             for k, v in attrs.items():
                 setattr(m, k, v)
             sys.modules[mod_name] = m
-    with patch("textgraphx.neo4j_client.make_graph_from_config", return_value=MagicMock()):
+    with patch("textgraphx.database.client.make_graph_from_config", return_value=MagicMock()):
         import importlib
-        if "textgraphx.EventEnrichmentPhase" in sys.modules:
-            eep_mod = sys.modules["textgraphx.EventEnrichmentPhase"]
+        if "textgraphx.pipeline.phases.event_enrichment" in sys.modules:
+            eep_mod = sys.modules["textgraphx.pipeline.phases.event_enrichment"]
         else:
             import textgraphx.EventEnrichmentPhase as eep_mod
     return eep_mod.EventEnrichmentPhase
@@ -98,7 +98,7 @@ class TestFusionRelationshipContract:
     """fusion.py queries must use canonical relationship names."""
 
     def _captured_query(self, func_name: str) -> str:
-        import textgraphx.fusion as fusion_mod
+        import textgraphx.reasoning.fusion as fusion_mod
         mock_graph = _make_mock_graph()
         getattr(fusion_mod, func_name)(mock_graph)
         assert mock_graph.run.called, "fusion function did not call graph.run"
@@ -143,7 +143,7 @@ class TestEventEnrichmentNonCoreParticipants:
     """add_non_core_participants_to_event must not contain a ARGM-TMP CASE branch
     that is unreachable due to the WHERE filter that already excludes ARGM-TMP."""
 
-    EEP_SRC = ROOT / "textgraphx" / "EventEnrichmentPhase.py"
+    EEP_SRC = ROOT / "textgraphx" / "pipeline" / "phases" / "event_enrichment.py"
 
     def _source(self) -> str:
         return self.EEP_SRC.read_text(encoding="utf-8")

@@ -2,7 +2,7 @@
 
 import pytest
 
-from textgraphx.merge_utils import resolve_attribute_conflict
+from textgraphx.reasoning.merge_utils import resolve_attribute_conflict
 from textgraphx.reasoning.merge_utils import resolve_attribute_conflict as canonical_resolve_attribute_conflict
 
 

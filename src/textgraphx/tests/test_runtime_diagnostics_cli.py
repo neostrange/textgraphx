@@ -42,7 +42,7 @@ def test_query_mode_executes_single_registered_query(monkeypatch, capsys):
     )
     monkeypatch.setitem(
         sys.modules,
-        "textgraphx.neo4j_client",
+        "textgraphx.database.client",
         SimpleNamespace(make_graph_from_config=lambda: _FakeGraph()),
     )
 
@@ -65,7 +65,7 @@ def test_totals_only_mode_emits_only_totals(monkeypatch, capsys):
     )
     monkeypatch.setitem(
         sys.modules,
-        "textgraphx.neo4j_client",
+        "textgraphx.database.client",
         SimpleNamespace(make_graph_from_config=lambda: _FakeGraph()),
     )
 

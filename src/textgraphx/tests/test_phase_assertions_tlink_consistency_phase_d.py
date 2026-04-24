@@ -7,7 +7,7 @@ import pytest
 
 @pytest.mark.unit
 def test_after_tlinks_exposes_consistency_violation_label():
-    from textgraphx.phase_assertions import PhaseAssertions
+    from textgraphx.pipeline.runtime.phase_assertions import PhaseAssertions
 
     graph = MagicMock()
     graph.run.return_value.data.return_value = [{"c": 0}]
@@ -19,7 +19,7 @@ def test_after_tlinks_exposes_consistency_violation_label():
 
 @pytest.mark.unit
 def test_after_tlinks_fails_when_consistency_violations_exceed_threshold():
-    from textgraphx.phase_assertions import PhaseAssertions, PhaseThresholds
+    from textgraphx.pipeline.runtime.phase_assertions import PhaseAssertions, PhaseThresholds
 
     graph = MagicMock()
     graph.run.return_value.data.return_value = [{"c": 1}]

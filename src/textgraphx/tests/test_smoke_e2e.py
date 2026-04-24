@@ -21,8 +21,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 def _neo4j_available() -> bool:
     """Return True only if a Neo4j connection can be established."""
     try:
-        from textgraphx.health_check import check_neo4j_connection
-        from textgraphx.config import get_config
+        from textgraphx.infrastructure.health_check import check_neo4j_connection
+        from textgraphx.infrastructure.config import get_config
 
         cfg = get_config()
         ok, _ = check_neo4j_connection(
@@ -50,7 +50,7 @@ neo4j_required = pytest.mark.skipif(
 )
 
 DATASET_DIR = str(
-    Path(__file__).parent.parent / "textgraphx" / "datastore" / "dataset"
+    Path(__file__).parent.parent / "datastore" / "dataset"
 )
 SMOKE_DOCUMENT = (
     Path(DATASET_DIR)
@@ -82,7 +82,7 @@ def test_ingestion_creates_graph_nodes():
         pytest.skip(f"Smoke-test document not found: {SMOKE_DOCUMENT}")
 
     from textgraphx.orchestration.orchestrator import PipelineOrchestrator
-    from textgraphx.config import get_config
+    from textgraphx.infrastructure.config import get_config
     from neo4j import GraphDatabase
 
     cfg = get_config()

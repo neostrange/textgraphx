@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from textgraphx.provenance import stamp_inferred_relationships
+from textgraphx.reasoning.provenance import stamp_inferred_relationships
 from textgraphx.reasoning.provenance import stamp_inferred_relationships as canonical_stamp_inferred_relationships
 
 
@@ -84,7 +84,7 @@ def test_stamp_inferred_relationships_rejects_invalid_controls():
 
 @pytest.mark.regression
 def test_validate_inferred_relationship_provenance_contract():
-    from textgraphx.provenance import validate_inferred_relationship_provenance
+    from textgraphx.reasoning.provenance import validate_inferred_relationship_provenance
 
     graph = MagicMock()
     graph.run.return_value.data.return_value = [{"c": 4}]

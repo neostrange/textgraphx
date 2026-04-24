@@ -21,7 +21,7 @@ import os
 import sys
 from typing import Any, Dict, List
 
-from textgraphx.neo4j_client import make_graph_from_config
+from textgraphx.database.client import make_graph_from_config
 
 LOGGER = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

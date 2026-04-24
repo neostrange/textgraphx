@@ -8,7 +8,7 @@ from textgraphx.database.client import (
     make_bolt_driver_from_config as canonical_make_bolt_driver_from_config,
     make_graph_from_config as canonical_make_graph_from_config,
 )
-from textgraphx.neo4j_client import (
+from textgraphx.database.client import (
     BoltGraphCompat,
     get_config_section,
     make_bolt_driver_from_config,

@@ -1,4 +1,4 @@
-from textgraphx.text_normalization import normalize_naf_raw_text
+from textgraphx.pipeline.ingestion.text_normalization import normalize_naf_raw_text
 
 
 def test_preserve_mode_keeps_line_breaks():

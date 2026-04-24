@@ -136,7 +136,7 @@ def _compute_delta(before: dict[str, Any], after: dict[str, Any]) -> dict[str, A
 
 
 def _run_refinement(rule_family: str | None) -> None:
-    from textgraphx.RefinementPhase import RefinementPhase
+    from textgraphx.pipeline.phases.refinement import RefinementPhase
 
     rp = RefinementPhase(argv=[])
     try:
@@ -169,7 +169,7 @@ def _parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = _parser().parse_args()
 
-    from textgraphx.neo4j_client import make_graph_from_config
+    from textgraphx.database.client import make_graph_from_config
 
     graph = make_graph_from_config()
     try:

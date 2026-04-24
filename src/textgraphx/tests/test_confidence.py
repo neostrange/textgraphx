@@ -2,7 +2,7 @@
 
 import pytest
 
-from textgraphx.confidence import calibrate_confidence, compute_evidence_weighted_confidence
+from textgraphx.reasoning.confidence import calibrate_confidence, compute_evidence_weighted_confidence
 from textgraphx.reasoning.confidence import calibrate_confidence as canonical_calibrate_confidence
 
 

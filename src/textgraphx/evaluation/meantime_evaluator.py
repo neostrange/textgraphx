@@ -1081,6 +1081,12 @@ def _canonicalize_event_attrs(row: Dict[str, Any]) -> Tuple[Tuple[str, str], ...
     polarity = str(row.get("polarity") or "").strip().upper() or "POS"
     time = str(row.get("time") or "").strip().upper() or "NON_FUTURE"
 
+    # MEANTIME convention: INFINITIVE-tense events are projected to
+    # certainty=POSSIBLE / time=FUTURE regardless of the raw stored values.
+    if tense == "INFINITIVE":
+        certainty = "POSSIBLE"
+        time = "FUTURE"
+
     attrs_map: Dict[str, str] = {}
     if pos:
         attrs_map["pos"] = pos

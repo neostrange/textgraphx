@@ -118,10 +118,10 @@ def test_main_exports_all_formats_by_default(tmp_path, monkeypatch, capsys):
     def _fake_get_config():
         return fake_cfg
 
-    monkeypatch.setitem(__import__("sys").modules, "textgraphx.config", argparse.Namespace(get_config=_fake_get_config))
+    monkeypatch.setitem(__import__("sys").modules, "textgraphx.infrastructure.config", argparse.Namespace(get_config=_fake_get_config))
     monkeypatch.setitem(
         __import__("sys").modules,
-        "textgraphx.neo4j_client",
+        "textgraphx.database.client",
         argparse.Namespace(make_graph_from_config=lambda: _FakeGraph()),
     )
     monkeypatch.setitem(
@@ -270,10 +270,10 @@ def test_main_supports_optional_baseline_comparison(tmp_path, monkeypatch, capsy
     def _fake_get_config():
         return fake_cfg
 
-    monkeypatch.setitem(__import__("sys").modules, "textgraphx.config", argparse.Namespace(get_config=_fake_get_config))
+    monkeypatch.setitem(__import__("sys").modules, "textgraphx.infrastructure.config", argparse.Namespace(get_config=_fake_get_config))
     monkeypatch.setitem(
         __import__("sys").modules,
-        "textgraphx.neo4j_client",
+        "textgraphx.database.client",
         argparse.Namespace(make_graph_from_config=lambda: _FakeGraph()),
     )
     monkeypatch.setitem(
@@ -408,10 +408,10 @@ def test_main_loads_existing_baseline_before_overwriting_output_report(tmp_path,
     def _fake_get_config():
         return fake_cfg
 
-    monkeypatch.setitem(__import__("sys").modules, "textgraphx.config", argparse.Namespace(get_config=_fake_get_config))
+    monkeypatch.setitem(__import__("sys").modules, "textgraphx.infrastructure.config", argparse.Namespace(get_config=_fake_get_config))
     monkeypatch.setitem(
         __import__("sys").modules,
-        "textgraphx.neo4j_client",
+        "textgraphx.database.client",
         argparse.Namespace(make_graph_from_config=lambda: _FakeGraph()),
     )
     monkeypatch.setitem(

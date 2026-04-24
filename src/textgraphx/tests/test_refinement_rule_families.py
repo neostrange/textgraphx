@@ -13,7 +13,7 @@ spacy = pytest.importorskip("spacy", reason="spaCy required for RefinementPhase 
 @pytest.mark.unit
 class TestRefinementRuleFamilies:
     def _make_phase(self):
-        with patch("textgraphx.neo4j_client.make_graph_from_config") as mg:
+        with patch("textgraphx.database.client.make_graph_from_config") as mg:
             graph = MagicMock()
             graph.run.return_value.data.return_value = []
             mg.return_value = graph
@@ -62,7 +62,7 @@ class TestRefinementRuleFamilies:
 
 @pytest.mark.regression
 def test_rule_family_sequence_stable():
-    with patch("textgraphx.neo4j_client.make_graph_from_config") as mg:
+    with patch("textgraphx.database.client.make_graph_from_config") as mg:
         graph = MagicMock()
         graph.run.return_value.data.return_value = []
         mg.return_value = graph
@@ -85,7 +85,7 @@ def test_rule_family_sequence_stable():
 def test_numeric_and_value_taggers_are_noop_when_flag_disabled():
     """tag_numeric_entities / tag_value_entities return "" without writing labels
     when features.fill_numeric_labels is False (the safe default)."""
-    with patch("textgraphx.neo4j_client.make_graph_from_config") as mg:
+    with patch("textgraphx.database.client.make_graph_from_config") as mg:
         graph = MagicMock()
         graph.run.return_value.data.return_value = []
         mg.return_value = graph
@@ -98,7 +98,7 @@ def test_numeric_and_value_taggers_are_noop_when_flag_disabled():
     mock_cfg = MagicMock()
     mock_cfg.features = mock_flags
 
-    with patch("textgraphx.RefinementPhase.get_config", return_value=mock_cfg):
+    with patch("textgraphx.pipeline.phases.refinement.get_config", return_value=mock_cfg):
         import warnings
         with warnings.catch_warnings():
             warnings.simplefilter("error")  # any warning becomes an error
@@ -112,7 +112,7 @@ def test_numeric_and_value_taggers_are_noop_when_flag_disabled():
 def test_numeric_and_value_taggers_emit_deprecation_warnings_when_flag_enabled():
     """tag_numeric_entities / tag_value_entities emit DeprecationWarning when
     features.fill_numeric_labels=True (opt-in legacy mode)."""
-    with patch("textgraphx.neo4j_client.make_graph_from_config") as mg:
+    with patch("textgraphx.database.client.make_graph_from_config") as mg:
         graph = MagicMock()
         graph.run.return_value.data.side_effect = [
             [{"tagged": 2}],
@@ -128,7 +128,7 @@ def test_numeric_and_value_taggers_emit_deprecation_warnings_when_flag_enabled()
     mock_cfg = MagicMock()
     mock_cfg.features = mock_flags
 
-    with patch("textgraphx.RefinementPhase.get_config", return_value=mock_cfg):
+    with patch("textgraphx.pipeline.phases.refinement.get_config", return_value=mock_cfg):
         with pytest.deprecated_call(match="tag_numeric_entities"):
             rp.tag_numeric_entities()
 

@@ -14,6 +14,7 @@ import pytest
 from unittest.mock import MagicMock, call, patch
 
 import sys
+import types
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -37,6 +38,19 @@ enricher_deps = pytest.mark.skipif(
 # ---------------------------------------------------------------------------
 
 
+def _install_event_enrichment_import_stubs():
+    for mod_name, attrs in (
+        ("textgraphx.util.SemanticRoleLabeler", {"SemanticRoleLabel": MagicMock()}),
+        ("textgraphx.util.EntityFishingLinker", {"EntityFishing": MagicMock()}),
+        ("textgraphx.util.RestCaller", {"callAllenNlpApi": MagicMock()}),
+        ("textgraphx.util.GraphDbBase", {"GraphDBBase": MagicMock()}),
+    ):
+        module = types.ModuleType(mod_name)
+        for key, value in attrs.items():
+            setattr(module, key, value)
+        sys.modules[mod_name] = module
+
+
 def _make_enricher(run_side_effects=None):
     """Build an EventEnrichmentPhase with a mocked graph.
 
@@ -52,9 +66,13 @@ def _make_enricher(run_side_effects=None):
             for v in run_side_effects
         ]
 
+    _install_event_enrichment_import_stubs()
+    sys.modules.pop("textgraphx.pipeline.phases.event_enrichment", None)
+    sys.modules.pop("textgraphx.pipeline.phases.event_enrichment", None)
+
     # Patch at the neo4j_client source so the constructor gets the mock,
     # regardless of whether the module is already in sys.modules.
-    with patch("textgraphx.neo4j_client.make_graph_from_config", return_value=graph):
+    with patch("textgraphx.database.client.make_graph_from_config", return_value=graph):
         from textgraphx.EventEnrichmentPhase import EventEnrichmentPhase
         enricher = EventEnrichmentPhase(argv=[])
 

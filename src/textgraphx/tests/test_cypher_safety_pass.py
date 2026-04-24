@@ -20,13 +20,13 @@ from pathlib import Path
 import pytest
 
 # Path constants
-REPO_ROOT = Path(__file__).parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 PKG_ROOT = REPO_ROOT / "textgraphx"
 
-EVENT_ENRICHMENT_SRC = PKG_ROOT / "EventEnrichmentPhase.py"
-TEMPORAL_SRC = PKG_ROOT / "TemporalPhase.py"
-REFINEMENT_SRC = PKG_ROOT / "RefinementPhase.py"
-TLINKS_SRC = PKG_ROOT / "TlinksRecognizer.py"
+EVENT_ENRICHMENT_SRC = PKG_ROOT / "pipeline" / "phases" / "event_enrichment.py"
+TEMPORAL_SRC = PKG_ROOT / "pipeline/phases/temporal.py"
+REFINEMENT_SRC = PKG_ROOT / "pipeline/phases/refinement.py"
+TLINKS_SRC = PKG_ROOT / "pipeline/phases/tlinks_recognizer.py"
 
 
 def _read(path: Path) -> str:

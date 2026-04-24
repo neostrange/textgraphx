@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from textgraphx.checkpoint import CheckpointManager
+from textgraphx.orchestration.checkpoint import CheckpointManager
 from textgraphx.orchestration.checkpoint import CheckpointManager as CanonicalCheckpointManager
 
 

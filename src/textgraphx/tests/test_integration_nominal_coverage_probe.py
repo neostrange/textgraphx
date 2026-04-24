@@ -7,8 +7,8 @@ import pytest
 
 def _neo4j_available() -> bool:
     try:
-        from textgraphx.health_check import check_neo4j_connection
-        from textgraphx.config import get_config
+        from textgraphx.infrastructure.health_check import check_neo4j_connection
+        from textgraphx.infrastructure.config import get_config
 
         cfg = get_config()
         ok, _ = check_neo4j_connection(
@@ -44,7 +44,7 @@ refinement_deps = pytest.mark.skipif(
 
 @pytest.fixture
 def graph():
-    from textgraphx.neo4j_client import make_graph_from_config
+    from textgraphx.database.client import make_graph_from_config
 
     g = make_graph_from_config()
     try:

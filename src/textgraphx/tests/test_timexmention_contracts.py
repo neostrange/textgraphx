@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-TLINKS_SRC = ROOT / "textgraphx" / "TlinksRecognizer.py"
+TLINKS_SRC = ROOT / "textgraphx" / "pipeline/phases/tlinks_recognizer.py"
 MEANTIME_SRC = ROOT / "textgraphx" / "evaluation" / "meantime_evaluator.py"
 
 
@@ -11,7 +11,7 @@ def test_tlinks_case_queries_resolve_timexmention_to_canonical_timex():
 
     assert "tm:TimexMention OR tm:TIMEX" in src
     assert "OPTIONAL MATCH (tm)-[:REFERS_TO]->(t_ref:TIMEX)" in src
-    assert "coalesce(t_ref, CASE WHEN tm:TIMEX THEN tm ELSE NULL END) AS t" in src
+    assert "coalesce(t_ref, CASE WHEN tm:TIMEX OR tm:Timex3 THEN tm ELSE NULL END) AS t" in src
 
 
 def test_meantime_projection_prefers_timexmention_spans():

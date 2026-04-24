@@ -8,7 +8,7 @@ for mention nodes matching those spans and prints `value`, `head`, `nominalSeman
 from __future__ import annotations
 
 import json
-from textgraphx.neo4j_client import make_graph_from_config
+from textgraphx.database.client import make_graph_from_config
 from textgraphx.evaluation.meantime_evaluator import build_document_from_neo4j, _mention_attrs_map
 
 

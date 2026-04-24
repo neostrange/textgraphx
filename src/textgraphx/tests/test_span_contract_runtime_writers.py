@@ -1,13 +1,23 @@
 """Runtime contract tests for span fields in non-temporal writers."""
 
-from types import SimpleNamespace
+import sys
+import types
+from unittest.mock import MagicMock
 
-from textgraphx.text_processing_components.SRLProcessor import SRLProcessor
-from textgraphx.text_processing_components.EntityExtractor import EntityExtractor
-from textgraphx.text_processing_components.EntityProcessor import EntityProcessor
-from textgraphx.text_processing_components.CoreferenceResolver import CoreferenceResolver
-from textgraphx.text_processing_components.NounChunkProcessor import NounChunkProcessor
-from textgraphx.RefinementPhase import RefinementPhase
+import pytest
+
+try:
+    import spacy
+    from textgraphx.text_processing_components.SRLProcessor import SRLProcessor
+    from textgraphx.text_processing_components.EntityExtractor import EntityExtractor
+    from textgraphx.text_processing_components.EntityProcessor import EntityProcessor
+    from textgraphx.text_processing_components.CoreferenceResolver import CoreferenceResolver
+    from textgraphx.text_processing_components.NounChunkProcessor import NounChunkProcessor
+    from textgraphx.RefinementPhase import RefinementPhase
+except ImportError:
+    pytest.skip("spaCy not available, skipping module", allow_module_level=True)
+
+
 from textgraphx.utils.id_utils import make_coref_uid, make_entity_mention_uid, make_ne_uid
 
 

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Dict, List, Set
 
 
-REPO_ROOT = Path(__file__).parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 TEXTGRAPHX_DIR = REPO_ROOT / "textgraphx"
 
 
@@ -29,7 +29,7 @@ class TestCheckpointResumeImplementation:
     def setup(self):
         """Load checkpoint/orchestrator code."""
         checkpoint_candidates = [
-            TEXTGRAPHX_DIR / "checkpoint.py",
+            TEXTGRAPHX_DIR / "orchestration" / "checkpoint.py",
             TEXTGRAPHX_DIR / "execution_history.py",
             TEXTGRAPHX_DIR / "PipelineOrchestrator.py",
         ]
@@ -117,8 +117,8 @@ class TestTextProcessorDecompositionImplementation:
     @pytest.fixture(autouse=True)
     def setup(self):
         """Load TextProcessor code."""
-        self.text_processor_path = TEXTGRAPHX_DIR / "TextProcessor.py"
-        assert self.text_processor_path.exists(), "TextProcessor.py not found"
+        self.text_processor_path = TEXTGRAPHX_DIR / "pipeline" / "ingestion" / "text_processor.py"
+        assert self.text_processor_path.exists(), "canonical TextProcessor source not found"
         self.text_processor_code = self.text_processor_path.read_text()
 
     def test_text_processor_has_stage_services(self):
@@ -185,7 +185,7 @@ class TestRefinementRuleCatalogImplementation:
     @pytest.fixture(autouse=True)
     def setup(self):
         """Load RefinementPhase code."""
-        self.refinement_path = TEXTGRAPHX_DIR / "RefinementPhase.py"
+        self.refinement_path = TEXTGRAPHX_DIR / "pipeline/phases/refinement.py"
         assert self.refinement_path.exists(), "RefinementPhase.py not found"
         self.refinement_code = self.refinement_path.read_text()
 

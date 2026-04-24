@@ -14,7 +14,7 @@ Test coverage:
 """
 
 import pytest
-from textgraphx.neo4j_client import make_graph_from_config
+from textgraphx.database.client import make_graph_from_config
 import logging
 
 logger = logging.getLogger(__name__)

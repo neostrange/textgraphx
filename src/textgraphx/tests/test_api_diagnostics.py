@@ -92,11 +92,11 @@ def _load_api_module(monkeypatch):
     )
     monkeypatch.setitem(
         sys.modules,
-        "textgraphx.neo4j_client",
+        "textgraphx.database.client",
         SimpleNamespace(make_graph_from_config=lambda: _FakeGraph()),
     )
-    sys.modules.pop("textgraphx.api", None)
-    module = importlib.import_module("textgraphx.api")
+    sys.modules.pop("textgraphx.infrastructure.api", None)
+    module = importlib.import_module("textgraphx.infrastructure.api")
     return importlib.reload(module)
 
 

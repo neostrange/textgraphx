@@ -8,7 +8,7 @@ from textgraphx.queries.query_pack import load_query
 import pytest
 
 from textgraphx.evaluation.diagnostics import get_runtime_metrics as canonical_get_runtime_metrics
-from textgraphx.diagnostics import (
+from textgraphx.evaluation.diagnostics import (
     query_edge_type_distribution,
     query_entity_density,
     query_factuality_alignment_violations,

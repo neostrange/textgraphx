@@ -2,7 +2,7 @@
 
 import pytest
 
-from textgraphx.cypher_optimizer import (
+from textgraphx.database.cypher_optimizer import (
     CypherOptimizer,
     CypherPatternOptimizer,
     QueryPerformanceContract,

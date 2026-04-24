@@ -101,7 +101,7 @@ def test_evaluate_batch_neo4j_mode_includes_projection_determinism(tmp_path, mon
             return None
 
     monkeypatch.setattr(
-        "textgraphx.neo4j_client.make_graph_from_config",
+        "textgraphx.database.client.make_graph_from_config",
         lambda: _DummyGraph(),
     )
 

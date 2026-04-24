@@ -1,0 +1,1 @@
+"""Schema assets and related shared definitions."""

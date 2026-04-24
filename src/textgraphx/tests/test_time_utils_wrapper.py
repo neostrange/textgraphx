@@ -1,6 +1,6 @@
 """Compatibility tests for the moved time utils helpers."""
 
-import textgraphx.time_utils as legacy_time_utils
+import textgraphx.reasoning.temporal.time as legacy_time_utils
 from textgraphx.reasoning.temporal import time as canonical_time_utils
 
 

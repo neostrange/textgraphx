@@ -12,7 +12,7 @@ import argparse
 import math
 from typing import Dict, List, Optional, Tuple
 
-from textgraphx import neo4j_client
+from textgraphx.database import client as neo4j_client
 import logging
 
 # module logger

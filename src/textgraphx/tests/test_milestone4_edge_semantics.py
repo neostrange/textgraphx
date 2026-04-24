@@ -150,7 +150,7 @@ def _load_srl_class():
     sys.modules["spacy.matcher"].DependencyMatcher = MagicMock()
     sys.modules["spacy.language"].Language = MagicMock()
 
-    with patch("textgraphx.neo4j_client.make_graph_from_config", return_value=MagicMock()):
+    with patch("textgraphx.database.client.make_graph_from_config", return_value=MagicMock()):
         from textgraphx.text_processing_components.SRLProcessor import SRLProcessor
     return SRLProcessor
 
@@ -163,7 +163,7 @@ def _load_srl_class():
 class TestEventEnrichmentWriterDualEmit:
     """EventEnrichmentPhase writers must emit both legacy and canonical edge types."""
 
-    EEP_SRC = ROOT / "textgraphx" / "EventEnrichmentPhase.py"
+    EEP_SRC = ROOT / "textgraphx" / "pipeline" / "phases" / "event_enrichment.py"
 
     def _src(self) -> str:
         return self.EEP_SRC.read_text(encoding="utf-8")
@@ -265,7 +265,7 @@ class TestSRLProcessorWriterDualEmit:
 class TestTlinksRecognizerReaderDualAware:
     """TlinksRecognizer should read canonical event description edges with legacy fallback."""
 
-    TLINKS_SRC = ROOT / "textgraphx" / "TlinksRecognizer.py"
+    TLINKS_SRC = ROOT / "textgraphx" / "pipeline/phases/tlinks_recognizer.py"
 
     def _src(self) -> str:
         return self.TLINKS_SRC.read_text(encoding="utf-8")

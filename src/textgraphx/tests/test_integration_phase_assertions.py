@@ -24,8 +24,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 def _neo4j_available() -> bool:
     try:
-        from textgraphx.health_check import check_neo4j_connection
-        from textgraphx.config import get_config
+        from textgraphx.infrastructure.health_check import check_neo4j_connection
+        from textgraphx.infrastructure.config import get_config
         cfg = get_config()
         ok, _ = check_neo4j_connection(
             uri=cfg.neo4j.uri,
@@ -66,7 +66,7 @@ event_enrichment_deps = pytest.mark.skipif(
 @pytest.fixture(scope="module")
 def graph():
     """Return a real Neo4j graph connection for the test session."""
-    from textgraphx.neo4j_client import make_graph_from_config
+    from textgraphx.database.client import make_graph_from_config
     return make_graph_from_config()
 
 
@@ -100,7 +100,7 @@ def _stub_event_enrichment_imports():
         ("textgraphx.util.EntityFishingLinker", {"EntityFishing": MagicMock()}),
         ("textgraphx.util.RestCaller", {"callAllenNlpApi": MagicMock()}),
         ("textgraphx.util.GraphDbBase", {"GraphDBBase": MagicMock()}),
-        ("textgraphx.TextProcessor", {"TextProcessor": MagicMock()}),
+        ("textgraphx.pipeline.ingestion.text_processor", {"TextProcessor": MagicMock()}),
     ):
         if mod_name not in sys.modules:
             module = types.ModuleType(mod_name)
@@ -113,7 +113,7 @@ def _load_temporal_phase_class():
     _stub_spacy_imports()
     import importlib
 
-    module = importlib.import_module("textgraphx.TemporalPhase")
+    module = importlib.import_module("textgraphx.pipeline.temporal.extraction")
     return module.TemporalPhase
 
 
@@ -121,7 +121,7 @@ def _load_event_enrichment_class():
     _stub_event_enrichment_imports()
     import importlib
 
-    module = importlib.import_module("textgraphx.EventEnrichmentPhase")
+    module = importlib.import_module("textgraphx.pipeline.phases.event_enrichment")
     return module.EventEnrichmentPhase
 
 
@@ -149,7 +149,7 @@ def _cleanup_seeded_subgraph(graph, *, doc_id=None, prefix=None):
 @pytest.mark.integration
 class TestPhaseAssertionsIntegration:
     def test_after_ingestion_returns_assertion_result(self, graph):
-        from textgraphx.phase_assertions import PhaseAssertions
+        from textgraphx.pipeline.runtime.phase_assertions import PhaseAssertions
         pa = PhaseAssertions(graph)
         result = pa.after_ingestion()
         assert result is not None
@@ -157,7 +157,7 @@ class TestPhaseAssertionsIntegration:
         assert isinstance(result.passed, bool)
 
     def test_all_ingestion_checks_have_actual_values(self, graph):
-        from textgraphx.phase_assertions import PhaseAssertions
+        from textgraphx.pipeline.runtime.phase_assertions import PhaseAssertions
         pa = PhaseAssertions(graph)
         result = pa.after_ingestion()
         for check in result.checks:
@@ -165,13 +165,13 @@ class TestPhaseAssertionsIntegration:
             assert check["actual"] >= 0
 
     def test_after_refinement_runs_without_error(self, graph):
-        from textgraphx.phase_assertions import PhaseAssertions
+        from textgraphx.pipeline.runtime.phase_assertions import PhaseAssertions
         pa = PhaseAssertions(graph)
         result = pa.after_refinement()
         assert result.phase == "refinement"
 
     def test_after_refinement_reports_nominal_semantic_head_check(self, graph):
-        from textgraphx.phase_assertions import PhaseAssertions
+        from textgraphx.pipeline.runtime.phase_assertions import PhaseAssertions
 
         pa = PhaseAssertions(graph)
         result = pa.after_refinement()
@@ -184,19 +184,19 @@ class TestPhaseAssertionsIntegration:
         assert check["actual"] >= 0
 
     def test_after_temporal_runs_without_error(self, graph):
-        from textgraphx.phase_assertions import PhaseAssertions
+        from textgraphx.pipeline.runtime.phase_assertions import PhaseAssertions
         pa = PhaseAssertions(graph)
         result = pa.after_temporal()
         assert result.phase == "temporal"
 
     def test_after_event_enrichment_runs_without_error(self, graph):
-        from textgraphx.phase_assertions import PhaseAssertions
+        from textgraphx.pipeline.runtime.phase_assertions import PhaseAssertions
         pa = PhaseAssertions(graph)
         result = pa.after_event_enrichment()
         assert result.phase == "event_enrichment"
 
     def test_after_tlinks_runs_without_error(self, graph):
-        from textgraphx.phase_assertions import PhaseAssertions
+        from textgraphx.pipeline.runtime.phase_assertions import PhaseAssertions
         pa = PhaseAssertions(graph)
         result = pa.after_tlinks()
         assert result.phase == "tlinks"
@@ -211,7 +211,7 @@ class TestPhaseAssertionsIntegration:
 @pytest.mark.integration
 class TestRecordPhaseRunIntegration:
     def test_creates_phase_run_node(self, graph):
-        from textgraphx.phase_assertions import record_phase_run
+        from textgraphx.pipeline.runtime.phase_assertions import record_phase_run
 
         record_phase_run(
             graph,
@@ -225,7 +225,7 @@ class TestRecordPhaseRunIntegration:
         assert rows[0]["c"] >= 1
 
     def test_phase_run_node_has_expected_properties(self, graph):
-        from textgraphx.phase_assertions import record_phase_run
+        from textgraphx.pipeline.runtime.phase_assertions import record_phase_run
 
         record_phase_run(
             graph,
@@ -247,7 +247,7 @@ class TestRecordPhaseRunIntegration:
         """Calling record_phase_run multiple times creates separate audit nodes
         (different timestamps), not duplicate overwritten nodes.
         """
-        from textgraphx.phase_assertions import record_phase_run
+        from textgraphx.pipeline.runtime.phase_assertions import record_phase_run
         import time
 
         record_phase_run(graph, "idempotency_test", duration_seconds=0.1)
@@ -275,8 +275,12 @@ class TestEventEnrichmentIntegration:
         """link_frameArgument_to_event must return an integer link count."""
         from unittest.mock import patch
 
+        _stub_event_enrichment_imports()
+        sys.modules.pop("textgraphx.pipeline.phases.event_enrichment", None)
+        sys.modules.pop("textgraphx.pipeline.phases.event_enrichment", None)
+
         # Patch at the source module where the constructor resolves it.
-        with patch("textgraphx.neo4j_client.make_graph_from_config", return_value=graph):
+        with patch("textgraphx.database.client.make_graph_from_config", return_value=graph):
             from textgraphx.EventEnrichmentPhase import EventEnrichmentPhase
             enricher = EventEnrichmentPhase(argv=[])
             enricher.graph = graph
@@ -289,7 +293,11 @@ class TestEventEnrichmentIntegration:
         """Running link_frameArgument_to_event twice must not increase match count."""
         from unittest.mock import patch
 
-        with patch("textgraphx.neo4j_client.make_graph_from_config", return_value=graph):
+        _stub_event_enrichment_imports()
+        sys.modules.pop("textgraphx.pipeline.phases.event_enrichment", None)
+        sys.modules.pop("textgraphx.pipeline.phases.event_enrichment", None)
+
+        with patch("textgraphx.database.client.make_graph_from_config", return_value=graph):
             from textgraphx.EventEnrichmentPhase import EventEnrichmentPhase
             enricher = EventEnrichmentPhase(argv=[])
             enricher.graph = graph
@@ -318,7 +326,7 @@ class TestOrchestratorRunReportIntegration:
         from textgraphx.orchestration.orchestrator import PipelineOrchestrator
 
         dataset_dir = str(
-            Path(__file__).parent.parent / "textgraphx" / "datastore" / "dataset"
+            Path(__file__).parent.parent / "datastore" / "dataset"
         )
         orchestrator = PipelineOrchestrator(
             directory=dataset_dir, model_name="en_core_web_sm"
@@ -581,7 +589,7 @@ class TestSeededSchemaMaterializationIntegration:
             _cleanup_seeded_subgraph(graph, doc_id=doc_id, prefix=prefix)
 
     def test_after_event_enrichment_accepts_seeded_canonical_edges(self, graph):
-        from textgraphx.phase_assertions import PhaseAssertions, PhaseThresholds
+        from textgraphx.pipeline.runtime.phase_assertions import PhaseAssertions, PhaseThresholds
 
         doc_id = 910004
         prefix = f"itg_assert_{uuid4().hex[:8]}"

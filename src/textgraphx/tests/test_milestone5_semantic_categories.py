@@ -16,7 +16,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 ONTOLOGY_JSON = ROOT / "textgraphx" / "schema" / "ontology.json"
-EEP_SRC = ROOT / "textgraphx" / "EventEnrichmentPhase.py"
+EEP_SRC = ROOT / "textgraphx" / "pipeline" / "phases" / "event_enrichment.py"
 
 
 def _payload() -> dict:

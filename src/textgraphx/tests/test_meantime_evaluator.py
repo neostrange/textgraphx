@@ -74,7 +74,7 @@ def test_relaxed_span_matching_can_recover_boundary_drift():
 
 def test_end_to_end_self_comparison_on_real_sample_is_perfect():
     root = Path(__file__).resolve().parent.parent
-    sample = root / "textgraphx" / "datastore" / "annotated" / "76437_Markets_dragged_down_by_credit_crisis.xml"
+    sample = root / "datastore" / "annotated" / "76437_Markets_dragged_down_by_credit_crisis.xml"
 
     gold_doc = parse_meantime_xml(str(sample))
     pred_doc = parse_meantime_xml(str(sample))

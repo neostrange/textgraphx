@@ -13,8 +13,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 def _neo4j_available() -> bool:
     try:
-        from textgraphx.health_check import check_neo4j_connection
-        from textgraphx.config import get_config
+        from textgraphx.infrastructure.health_check import check_neo4j_connection
+        from textgraphx.infrastructure.config import get_config
 
         cfg = get_config()
         ok, _ = check_neo4j_connection(
@@ -52,7 +52,7 @@ pipeline_deps = pytest.mark.skipif(
 def test_review_run_materializes_temporal_event_layers():
     from textgraphx.orchestration.orchestrator import PipelineOrchestrator
 
-    dataset_dir = str(Path(__file__).parent.parent / "textgraphx" / "datastore" / "dataset")
+    dataset_dir = str(Path(__file__).parent.parent / "datastore" / "dataset")
     orchestrator = PipelineOrchestrator(directory=dataset_dir, model_name="en_core_web_sm")
 
     prep = orchestrator.run_for_review()

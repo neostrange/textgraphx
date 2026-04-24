@@ -14,7 +14,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from textgraphx.evaluation.reports import RunReport as CanonicalRunReport
-from textgraphx.run_report import DocumentStatus, PhaseSummary, RunReport
+from textgraphx.evaluation.reports import DocumentStatus, PhaseSummary, RunReport
 
 
 # ---------------------------------------------------------------------------
