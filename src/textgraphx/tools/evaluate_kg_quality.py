@@ -178,6 +178,50 @@ def _build_operator_summary(summary: dict) -> str | None:
     )
 
 
+def _format_delta(value: float) -> str:
+    rounded = round(float(value), 4)
+    if rounded.is_integer():
+        return f"{int(rounded):+d}"
+    return f"{rounded:+.4f}"
+
+
+def _build_temporal_comparison_summary(comparison: dict) -> str | None:
+    """Build concise temporal regression-driver summary for stderr output."""
+    if not isinstance(comparison, dict):
+        return None
+
+    temporal_score_delta = comparison.get("section_deltas", {}).get("temporal")
+    temporal_details = comparison.get("temporal_delta_details", {})
+    if temporal_score_delta is None or not isinstance(temporal_details, dict):
+        return None
+
+    top_drivers = []
+    driver_label_map = {
+        "tlink_conflict_count": "conflicts",
+        "tlink_anchor_inconsistent_count": "anchor_inconsistent",
+        "tlink_anchor_self_link_count": "self_links",
+        "tlink_anchor_endpoint_violation_count": "endpoint_violations",
+        "tlink_anchor_filter_suppressed_count": "anchor_suppressed",
+        "tlink_missing_anchor_metadata_count": "missing_anchor_metadata",
+    }
+    for key, label in driver_label_map.items():
+        delta = float(temporal_details.get(key, 0.0) or 0.0)
+        if delta > 0:
+            top_drivers.append((delta, label))
+    top_drivers.sort(key=lambda item: (-item[0], item[1]))
+
+    return (
+        "KG temporal comparison: "
+        f"temporal_score_delta={_format_delta(float(temporal_score_delta or 0.0))} "
+        f"issue_delta={_format_delta(float(temporal_details.get('temporal_issue_count', 0.0) or 0.0))} "
+        f"reciprocal_cycles={_format_delta(float(temporal_details.get('tlink_reciprocal_cycle_count', 0.0) or 0.0))} "
+        f"isolated_anchors={_format_delta(float(temporal_details.get('isolated_temporal_anchor_count', 0.0) or 0.0))} "
+        f"connectivity_gap_docs={_format_delta(float(temporal_details.get('documents_with_temporal_connectivity_gaps_count', 0.0) or 0.0))} "
+        f"docs_without_temporal_tlinks={_format_delta(float(temporal_details.get('documents_without_temporal_tlinks_count', 0.0) or 0.0))} "
+        f"top_drivers={','.join(f'{label}:{_format_delta(delta)}' for delta, label in top_drivers[:3]) or 'none'}"
+    )
+
+
 def _write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w") as fh:
@@ -258,6 +302,9 @@ def main(argv: Iterable[str] | None = None) -> int:
                 f"regression={'yes' if regression else 'no'}",
                 file=sys.stderr,
             )
+            temporal_comparison_line = _build_temporal_comparison_summary(comparison)
+            if temporal_comparison_line:
+                print(temporal_comparison_line, file=sys.stderr)
 
         operator_line = _build_operator_summary(report)
         if operator_line:
