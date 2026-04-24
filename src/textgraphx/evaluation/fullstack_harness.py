@@ -26,10 +26,10 @@ from textgraphx.evaluation.integration import StandardizedEvaluationRunner
 from textgraphx.evaluation.legacy_layer_evaluator import create_legacy_layer_report
 from textgraphx.evaluation.mention_layer_evaluator import create_mention_layer_report
 from textgraphx.evaluation.phase_assertion_evaluator import create_phase_assertion_report
+from textgraphx.evaluation.diagnostics import get_runtime_metrics
 from textgraphx.evaluation.report_validity import RunMetadata
 from textgraphx.evaluation.semantic_category_evaluator import create_semantic_category_report
 from textgraphx.evaluation.unified_metrics import UnifiedMetricReport
-from textgraphx.diagnostics import get_runtime_metrics
 
 
 @dataclass

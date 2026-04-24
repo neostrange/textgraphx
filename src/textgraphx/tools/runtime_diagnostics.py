@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 from typing import Iterable
 
-from textgraphx.diagnostics import (
+from textgraphx.evaluation.diagnostics import (
     get_registered_diagnostics,
     get_runtime_metrics,
     list_diagnostic_queries,

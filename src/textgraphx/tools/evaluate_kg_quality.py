@@ -9,13 +9,13 @@ import sys
 from pathlib import Path
 from typing import Iterable
 
-from textgraphx.evaluation.report_validity import RunMetadata, compute_config_hash, compute_dataset_hash
-from textgraphx.kg_quality_evaluation import (
+from textgraphx.evaluation.quality import (
     compare_reports,
     generate_quality_report,
     identify_regression,
     load_quality_report,
 )
+from textgraphx.evaluation.report_validity import RunMetadata, compute_config_hash, compute_dataset_hash
 from textgraphx.time_utils import utc_iso_now
 
 

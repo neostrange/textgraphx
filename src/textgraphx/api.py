@@ -22,7 +22,7 @@ except ImportError:  # pragma: no cover - support script-style execution
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
-from textgraphx.diagnostics import (
+from textgraphx.evaluation.diagnostics import (
     get_registered_diagnostics,
     get_runtime_metrics,
     list_diagnostic_queries,
