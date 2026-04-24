@@ -605,7 +605,7 @@ class RefinementPhaseWrapper:
                 cross_document_links = 0
                 coref_identity_links = 0
                 with log_subsection(self.logger, "Cross-sentence/cross-document fusion"):
-                    from textgraphx.fusion import (
+                    from textgraphx.reasoning.fusion import (
                         fuse_entities_cross_sentence,
                         fuse_entities_cross_document,
                         propagate_coreference_identity_cross_document,

@@ -23,6 +23,11 @@ from textgraphx.reasoning.contracts import (
     relation_endpoint_contract,
     temporal_reasoning_profile,
 )
+from textgraphx.reasoning.fusion import (
+    fuse_entities_cross_document,
+    fuse_entities_cross_sentence,
+    propagate_coreference_identity_cross_document,
+)
 from textgraphx.reasoning.merge_utils import resolve_attribute_conflict
 from textgraphx.reasoning.provenance import (
     stamp_inferred_relationships,
@@ -41,9 +46,12 @@ __all__ = [
     "compute_evidence_weighted_confidence",
     "count_endpoint_violations",
     "decide_conflict",
+    "fuse_entities_cross_document",
+    "fuse_entities_cross_sentence",
     "load_ontology_contract",
     "normalize_evidence_source",
     "normalize_event_attr",
+    "propagate_coreference_identity_cross_document",
     "relation_endpoint_contract",
     "resolve_attribute_conflict",
     "resolve_authority_tier",

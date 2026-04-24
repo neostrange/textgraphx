@@ -5,7 +5,16 @@ from unittest.mock import MagicMock
 import sys
 from pathlib import Path
 
+from textgraphx.fusion import fuse_entities_cross_sentence
+from textgraphx.reasoning.fusion import (
+    fuse_entities_cross_sentence as canonical_fuse_entities_cross_sentence,
+)
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+
+def test_root_fusion_wrapper_reexports_canonical_cross_sentence_helper():
+    assert fuse_entities_cross_sentence is canonical_fuse_entities_cross_sentence
 
 
 @pytest.mark.unit
