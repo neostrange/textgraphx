@@ -4,11 +4,17 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from textgraphx.provenance import stamp_inferred_relationships
+from textgraphx.reasoning.provenance import stamp_inferred_relationships as canonical_stamp_inferred_relationships
+
+
+@pytest.mark.unit
+def test_root_provenance_wrapper_reexports_canonical_stamper():
+    assert stamp_inferred_relationships is canonical_stamp_inferred_relationships
+
 
 @pytest.mark.unit
 def test_stamp_inferred_relationships_sets_authority_defaults():
-    from textgraphx.provenance import stamp_inferred_relationships
-
     graph = MagicMock()
     graph.run.return_value.data.return_value = [{"c": 1}]
 
@@ -29,8 +35,6 @@ def test_stamp_inferred_relationships_sets_authority_defaults():
 
 @pytest.mark.unit
 def test_stamp_inferred_relationships_allows_explicit_metadata():
-    from textgraphx.provenance import stamp_inferred_relationships
-
     graph = MagicMock()
     graph.run.return_value.data.return_value = [{"c": 2}]
 
@@ -55,8 +59,6 @@ def test_stamp_inferred_relationships_allows_explicit_metadata():
 
 @pytest.mark.unit
 def test_stamp_inferred_relationships_rejects_invalid_controls():
-    from textgraphx.provenance import stamp_inferred_relationships
-
     graph = MagicMock()
 
     with pytest.raises(ValueError):

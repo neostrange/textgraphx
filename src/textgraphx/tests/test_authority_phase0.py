@@ -2,11 +2,17 @@
 
 import pytest
 
+from textgraphx.authority import resolve_authority_tier
+from textgraphx.reasoning.authority import resolve_authority_tier as canonical_resolve_authority_tier
+
+
+@pytest.mark.unit
+def test_root_authority_wrapper_reexports_canonical_resolve_authority_tier():
+    assert resolve_authority_tier is canonical_resolve_authority_tier
+
 
 @pytest.mark.unit
 def test_resolve_authority_tier_defaults_by_source():
-    from textgraphx.authority import resolve_authority_tier
-
     assert resolve_authority_tier("allen_nlp_srl") == "primary"
     assert resolve_authority_tier("event_enrichment") == "secondary"
     assert resolve_authority_tier("spacy_support") == "support"

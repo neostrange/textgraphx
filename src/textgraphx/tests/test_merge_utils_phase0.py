@@ -2,11 +2,17 @@
 
 import pytest
 
+from textgraphx.merge_utils import resolve_attribute_conflict
+from textgraphx.reasoning.merge_utils import resolve_attribute_conflict as canonical_resolve_attribute_conflict
+
+
+@pytest.mark.unit
+def test_root_merge_utils_wrapper_reexports_canonical_resolver():
+    assert resolve_attribute_conflict is canonical_resolve_attribute_conflict
+
 
 @pytest.mark.unit
 def test_resolve_attribute_conflict_prefers_primary_even_with_lower_confidence():
-    from textgraphx.merge_utils import resolve_attribute_conflict
-
     resolved = resolve_attribute_conflict(
         "PAST",
         "PRESENT",
@@ -25,8 +31,6 @@ def test_resolve_attribute_conflict_prefers_primary_even_with_lower_confidence()
 
 @pytest.mark.unit
 def test_resolve_attribute_conflict_inserts_when_existing_missing():
-    from textgraphx.merge_utils import resolve_attribute_conflict
-
     resolved = resolve_attribute_conflict(
         None,
         "FUTURE",
@@ -43,8 +47,6 @@ def test_resolve_attribute_conflict_inserts_when_existing_missing():
 
 @pytest.mark.unit
 def test_resolve_attribute_conflict_overwrite_replaces_when_incoming_wins():
-    from textgraphx.merge_utils import resolve_attribute_conflict
-
     resolved = resolve_attribute_conflict(
         "POSSIBLE",
         "CERTAIN",
@@ -64,8 +66,6 @@ def test_resolve_attribute_conflict_overwrite_replaces_when_incoming_wins():
 
 @pytest.mark.unit
 def test_resolve_attribute_conflict_rejects_empty_source():
-    from textgraphx.merge_utils import resolve_attribute_conflict
-
     with pytest.raises(ValueError):
         resolve_attribute_conflict(
             "X",

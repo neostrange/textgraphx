@@ -31,12 +31,12 @@ import logging
 
 from textgraphx.neo4j_client import make_graph_from_config
 from textgraphx.config import get_config
-from textgraphx.merge_utils import resolve_attribute_conflict
-from textgraphx.reasoning_contracts import (
+from textgraphx.reasoning.contracts import (
     canonical_event_attribute_vocabulary,
     count_endpoint_violations,
     normalize_event_attr,
 )
+from textgraphx.reasoning.merge_utils import resolve_attribute_conflict
 
 logger = logging.getLogger(__name__)
 

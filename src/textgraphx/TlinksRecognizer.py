@@ -18,8 +18,8 @@ if __package__ is None and __name__ == '__main__':
         sys.path.insert(0, repo_root)
 
 from textgraphx.neo4j_client import make_graph_from_config
+from textgraphx.reasoning.contracts import count_endpoint_violations
 from textgraphx.timeml_relations import CANONICAL_TLINK_RELTYPES
-from textgraphx.reasoning_contracts import count_endpoint_violations
 from textgraphx.temporal_constraints import solve_tlink_constraints
 import xml.etree.ElementTree as ET
 import requests

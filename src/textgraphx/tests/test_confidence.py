@@ -3,6 +3,11 @@
 import pytest
 
 from textgraphx.confidence import calibrate_confidence, compute_evidence_weighted_confidence
+from textgraphx.reasoning.confidence import calibrate_confidence as canonical_calibrate_confidence
+
+
+def test_root_confidence_wrapper_reexports_canonical_calibration():
+    assert calibrate_confidence is canonical_calibrate_confidence
 
 
 @pytest.mark.unit
