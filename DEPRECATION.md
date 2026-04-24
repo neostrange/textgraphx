@@ -117,16 +117,12 @@ backward-compatibility shims and are scheduled for **removal in v2.0.0**.
 | `textgraphx.EventEnrichmentPhase` | `textgraphx.pipeline.phases.event_enrichment` | yes |
 | `textgraphx.TemporalPhase` | `textgraphx.pipeline.phases.temporal` | yes |
 | `textgraphx.TlinksRecognizer` | `textgraphx.pipeline.phases.tlinks_recognizer` | yes |
-| `textgraphx.GraphBasedNLP` | `textgraphx.pipeline.ingestion.graph_based_nlp` | not yet (in-tree callers remain) |
-| `textgraphx.RefinementPhase` | `textgraphx.pipeline.phases.refinement` | not yet (in-tree callers remain) |
-| `textgraphx.TextProcessor` | `textgraphx.pipeline.ingestion.text_processor` | not yet (in-tree callers remain) |
+| `textgraphx.GraphBasedNLP` | `textgraphx.pipeline.ingestion.graph_based_nlp` | yes |
+| `textgraphx.RefinementPhase` | `textgraphx.pipeline.phases.refinement` | yes |
+| `textgraphx.TextProcessor` | `textgraphx.pipeline.ingestion.text_processor` | yes |
 
-The three silent shims will be upgraded to emit `DeprecationWarning` once all
-in-tree callers have been migrated to the canonical paths.  Tracking item:
-migrate `pipeline/runtime/phase_wrappers.py`, `infrastructure/graphbased_api.py`,
-`tools/nominal_coverage_probe.py`, `text_processing_components/EntityExtractor.py`,
-`text_processing_components/EntityProcessor.py`, and the
-`text_processing_components/llm/*` SRL modules.
+All in-tree callers have been migrated to the canonical paths; only legacy
+external callers should encounter these warnings.
 
 ### Already-removed shims (history)
 
@@ -147,8 +143,8 @@ paths (`infrastructure.config`, `database.client`,
 
 | Milestone | Action |
 |-----------|--------|
-| **v1.0.0** (current) | Deprecated methods emit `DeprecationWarning` at runtime; module-level shims documented (3 of 6 emit warnings) |
-| **v1.x** (next minor) | Deprecation warnings upgraded to `FutureWarning` in CI; any new caller in `main` will fail CI; remaining 3 silent shims upgraded to `DeprecationWarning` after in-tree caller migration |
+| **v1.0.0** (current) | Deprecated methods and all 6 module-level shims emit `DeprecationWarning` at runtime |
+| **v1.x** (next minor) | Deprecation warnings upgraded to `FutureWarning` in CI; any new caller in `main` will fail CI |
 | **v2.0.0** | Deprecated methods removed; module-level shims removed; `temporal_legacy_compat.py` deleted |
 
 The v2.0.0 target date is coordinated with the resolution of all outstanding

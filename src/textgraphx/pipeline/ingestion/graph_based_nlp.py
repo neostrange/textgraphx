@@ -15,7 +15,7 @@ from textgraphx.util.EntityFishingLinker import EntityFishing
 from spacy.tokens import Doc, Token, Span
 from textgraphx.util.RestCaller import callAllenNlpApi
 from textgraphx.util.GraphDbBase import GraphDBBase
-from textgraphx.TextProcessor import TextProcessor
+from textgraphx.pipeline.ingestion.text_processor import TextProcessor
 import xml.etree.ElementTree as ET
 if not hasattr(spacy, "__path__"):
     try:

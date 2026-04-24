@@ -21,7 +21,7 @@ Contract and side-effects:
 from textgraphx.utils.id_utils import make_ne_id, make_ne_token_id, make_ne_uid
 import logging
 import time
-from textgraphx.TextProcessor import filter_spans as textgraphx_TextProcessor_filter_spans
+from textgraphx.pipeline.ingestion.text_processor import filter_spans as textgraphx_TextProcessor_filter_spans
 
 # module logger
 logger = logging.getLogger(__name__)

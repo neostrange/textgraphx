@@ -404,7 +404,7 @@ class GraphBasedNLPWrapper:
         with log_section(self.logger, "INGESTION PHASE - GraphBasedNLP"):
             try:
                 with log_subsection(self.logger, "Importing GraphBasedNLP"):
-                    from textgraphx.GraphBasedNLP import GraphBasedNLP
+                    from textgraphx.pipeline.ingestion.graph_based_nlp import GraphBasedNLP
                     import importlib
                     import inspect
 
@@ -542,7 +542,7 @@ class RefinementPhaseWrapper:
         with log_section(self.logger, "REFINEMENT PHASE - Entity/Relation Cleaning"):
             try:
                 with log_subsection(self.logger, "Importing RefinementPhase"):
-                    from textgraphx.RefinementPhase import RefinementPhase
+                    from textgraphx.pipeline.phases.refinement import RefinementPhase
                     self.logger.debug("RefinementPhase imported successfully")
                 
                 with log_subsection(self.logger, "Initializing RefinementPhase"):

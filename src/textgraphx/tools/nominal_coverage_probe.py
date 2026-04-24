@@ -136,7 +136,7 @@ def _compute_delta(before: dict[str, Any], after: dict[str, Any]) -> dict[str, A
 
 
 def _run_refinement(rule_family: str | None) -> None:
-    from textgraphx.RefinementPhase import RefinementPhase
+    from textgraphx.pipeline.phases.refinement import RefinementPhase
 
     rp = RefinementPhase(argv=[])
     try:

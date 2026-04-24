@@ -1,5 +1,5 @@
 import requests
-from textgraphx.TextProcessor import Neo4jRepository  # Import the Neo4jRepository class
+from textgraphx.pipeline.ingestion.text_processor import Neo4jRepository  # Import the Neo4jRepository class
 from textgraphx.util.GraphDbBase import GraphDBBase  # Import the GraphDBBase class
 import logging
 

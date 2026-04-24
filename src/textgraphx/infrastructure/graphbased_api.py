@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from textgraphx.GraphBasedNLP import GraphBasedNLP
+from textgraphx.pipeline.ingestion.graph_based_nlp import GraphBasedNLP
 
 
 app = FastAPI()
