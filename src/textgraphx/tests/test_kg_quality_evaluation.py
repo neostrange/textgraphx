@@ -139,14 +139,26 @@ def test_compare_reports_and_identify_regression_surface_deltas():
         "phase_quality_scores": {"mention_layer": 0.90, "edge_semantics": 0.86},
         "structural_metrics": {"structural_health_score": 0.95},
         "semantic_metrics": {"semantic_compliance_score": 0.84},
-        "temporal_metrics": {"temporal_consistency_score": 0.86},
+        "temporal_metrics": {
+            "temporal_consistency_score": 0.86,
+            "tlink_reciprocal_cycle_count": 1,
+            "documents_with_temporal_connectivity_gaps_count": 0,
+            "documents_without_temporal_tlinks_count": 0,
+            "temporal_issue_count": 3,
+        },
     }
     current = {
         "overall_quality": 0.81,
         "phase_quality_scores": {"mention_layer": 0.83, "edge_semantics": 0.84},
         "structural_metrics": {"structural_health_score": 0.94},
         "semantic_metrics": {"semantic_compliance_score": 0.79},
-        "temporal_metrics": {"temporal_consistency_score": 0.70},
+        "temporal_metrics": {
+            "temporal_consistency_score": 0.70,
+            "tlink_reciprocal_cycle_count": 4,
+            "documents_with_temporal_connectivity_gaps_count": 2,
+            "documents_without_temporal_tlinks_count": 1,
+            "temporal_issue_count": 10,
+        },
     }
 
     comparison = compare_reports(baseline, current, tolerance=0.01)
@@ -156,6 +168,10 @@ def test_compare_reports_and_identify_regression_surface_deltas():
     assert comparison["overall_quality_delta"] == pytest.approx(-0.07)
     assert comparison["regressed_sections"] == ["semantic", "temporal"]
     assert comparison["phase_deltas"]["mention_layer"] == pytest.approx(-0.07)
+    assert comparison["temporal_delta_details"]["tlink_reciprocal_cycle_count"] == pytest.approx(3.0)
+    assert comparison["temporal_delta_details"]["documents_with_temporal_connectivity_gaps_count"] == pytest.approx(2.0)
+    assert comparison["temporal_delta_details"]["documents_without_temporal_tlinks_count"] == pytest.approx(1.0)
+    assert comparison["temporal_delta_details"]["temporal_issue_count"] == pytest.approx(7.0)
     assert is_regression is True
     assert any("Overall quality regressed" in reason for reason in reasons)
     assert any("Phase 'mention_layer' regressed" in reason for reason in reasons)

@@ -183,7 +183,13 @@ def test_main_supports_optional_baseline_comparison(tmp_path, monkeypatch, capsy
                 "overall_quality": 0.90,
                 "structural_metrics": {"structural_health_score": 0.95},
                 "semantic_metrics": {"semantic_compliance_score": 0.91},
-                "temporal_metrics": {"temporal_consistency_score": 0.92},
+                "temporal_metrics": {
+                    "temporal_consistency_score": 0.92,
+                    "tlink_reciprocal_cycle_count": 1,
+                    "documents_with_temporal_connectivity_gaps_count": 0,
+                    "documents_without_temporal_tlinks_count": 0,
+                    "temporal_issue_count": 3,
+                },
                 "phase_quality_scores": {"mention_layer": 0.91},
             }
         ),
@@ -283,5 +289,7 @@ def test_main_supports_optional_baseline_comparison(tmp_path, monkeypatch, capsy
     captured = capsys.readouterr()
     summary = json.loads(captured.out)
     assert summary["comparison"]["is_regression"] is True
+    assert summary["comparison"]["temporal_delta_details"]["tlink_reciprocal_cycle_count"] == pytest.approx(0.0)
+    assert "temporal_delta_details" in json.loads((out_dir / "kg_quality_comparison.json").read_text(encoding="utf-8"))["comparison"]
     assert summary["regression_detected"] is True
     assert "KG quality comparison:" in captured.err

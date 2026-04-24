@@ -480,6 +480,27 @@ def compare_reports(
         for phase in phase_names
     }
 
+    baseline_temporal_metrics = baseline_report.get("temporal_metrics", {}) if isinstance(baseline_report, Mapping) else {}
+    current_temporal_metrics = current_report.get("temporal_metrics", {}) if isinstance(current_report, Mapping) else {}
+    temporal_delta_fields = (
+        "tlink_conflict_count",
+        "tlink_anchor_inconsistent_count",
+        "tlink_anchor_self_link_count",
+        "tlink_anchor_endpoint_violation_count",
+        "tlink_anchor_filter_suppressed_count",
+        "tlink_missing_anchor_metadata_count",
+        "tlink_reciprocal_cycle_count",
+        "isolated_temporal_anchor_count",
+        "documents_with_temporal_connectivity_gaps_count",
+        "documents_without_temporal_tlinks_count",
+        "temporal_issue_count",
+    )
+    temporal_delta_details = {
+        field: _safe_float(current_temporal_metrics.get(field)) - _safe_float(baseline_temporal_metrics.get(field))
+        for field in temporal_delta_fields
+        if field in baseline_temporal_metrics or field in current_temporal_metrics
+    }
+
     is_regression = _is_regression_delta(overall_quality_delta, tolerance) or bool(regressed_sections)
     return {
         "baseline_quality": baseline_quality,
@@ -488,6 +509,7 @@ def compare_reports(
         "percent_change": percent_change,
         "section_deltas": section_deltas,
         "phase_deltas": phase_deltas,
+        "temporal_delta_details": temporal_delta_details,
         "regressed_sections": regressed_sections,
         "improved_sections": improved_sections,
         "is_regression": is_regression,
