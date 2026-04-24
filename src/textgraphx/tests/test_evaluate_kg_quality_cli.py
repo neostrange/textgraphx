@@ -59,6 +59,12 @@ def test_main_exports_all_formats_by_default(tmp_path, monkeypatch, capsys):
             return (True, [])
 
         runtime_diagnostics = {
+            "tlink_reciprocal_cycle_signals": [
+                {"document_id": 41, "rel_type": "BEFORE", "cycle_count": 2}
+            ],
+            "temporal_anchor_connectivity_gaps": [
+                {"document_id": 41, "connected_anchor_count": 0, "isolated_anchor_count": 3}
+            ],
             "totals": {
                 "entity_state_coverage_ratio": 0.25,
                 "entity_mentions_with_state_count": 5,
@@ -67,6 +73,9 @@ def test_main_exports_all_formats_by_default(tmp_path, monkeypatch, capsys):
                 "tlink_anchor_endpoint_violation_count": 2,
                 "tlink_anchor_filter_suppressed_count": 3,
                 "tlink_missing_anchor_metadata_count": 0,
+                "tlink_reciprocal_cycle_count": 2,
+                "documents_with_temporal_connectivity_gaps_count": 1,
+                "documents_without_temporal_tlinks_count": 1,
             }
         }
 
@@ -142,9 +151,13 @@ def test_main_exports_all_formats_by_default(tmp_path, monkeypatch, capsys):
     assert summary["tlink_anchor_endpoint_violation_count"] == 2
     assert summary["tlink_anchor_filter_suppressed_count"] == 3
     assert summary["tlink_missing_anchor_metadata_count"] == 0
+    assert summary["temporal_findings"]["top_reciprocal_cycle_signal"]["document_id"] == 41
+    assert summary["temporal_findings"]["documents_without_temporal_tlinks"] == [41]
     assert "KG quality operator summary:" in captured.err
     assert "tlink_anchor_inconsistent=3" in captured.err
     assert "missing_anchor_metadata=0" in captured.err
+    assert "reciprocal_cycles=2" in captured.err
+    assert "docs_without_temporal_tlinks=1" in captured.err
 
 
 @pytest.mark.unit
@@ -188,6 +201,12 @@ def test_main_supports_optional_baseline_comparison(tmp_path, monkeypatch, capsy
             return {"mention_layer": 0.84}
 
         runtime_diagnostics = {
+            "tlink_reciprocal_cycle_signals": [
+                {"document_id": 51, "rel_type": "BEFORE", "cycle_count": 1}
+            ],
+            "temporal_anchor_connectivity_gaps": [
+                {"document_id": 51, "connected_anchor_count": 0, "isolated_anchor_count": 2}
+            ],
             "totals": {
                 "entity_state_coverage_ratio": 0.25,
                 "entity_mentions_with_state_count": 5,
@@ -196,6 +215,9 @@ def test_main_supports_optional_baseline_comparison(tmp_path, monkeypatch, capsy
                 "tlink_anchor_endpoint_violation_count": 2,
                 "tlink_anchor_filter_suppressed_count": 3,
                 "tlink_missing_anchor_metadata_count": 0,
+                "tlink_reciprocal_cycle_count": 1,
+                "documents_with_temporal_connectivity_gaps_count": 1,
+                "documents_without_temporal_tlinks_count": 1,
             }
         }
 

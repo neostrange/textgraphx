@@ -331,6 +331,49 @@ def _build_warnings_and_recommendations(
     return warnings, recommendations
 
 
+def _build_temporal_findings(
+    diagnostics: Mapping[str, Any],
+    temporal_metrics: Mapping[str, Any],
+) -> Dict[str, Any]:
+    cycle_rows = diagnostics.get("tlink_reciprocal_cycle_signals", []) if isinstance(diagnostics, Mapping) else []
+    gap_rows = diagnostics.get("temporal_anchor_connectivity_gaps", []) if isinstance(diagnostics, Mapping) else []
+
+    if not isinstance(cycle_rows, list):
+        cycle_rows = []
+    if not isinstance(gap_rows, list):
+        gap_rows = []
+
+    top_cycle = cycle_rows[0] if cycle_rows else {}
+    top_gap = gap_rows[0] if gap_rows else {}
+    docs_without_temporal_tlinks = [
+        row.get("document_id")
+        for row in gap_rows
+        if int(row.get("connected_anchor_count", 0) or 0) == 0 and row.get("document_id") is not None
+    ]
+
+    return {
+        "reciprocal_cycle_count": _safe_int(temporal_metrics.get("tlink_reciprocal_cycle_count")),
+        "isolated_temporal_anchor_count": _safe_int(temporal_metrics.get("isolated_temporal_anchor_count")),
+        "documents_with_connectivity_gaps_count": _safe_int(
+            temporal_metrics.get("documents_with_temporal_connectivity_gaps_count")
+        ),
+        "documents_without_temporal_tlinks_count": _safe_int(
+            temporal_metrics.get("documents_without_temporal_tlinks_count")
+        ),
+        "top_reciprocal_cycle_signal": {
+            "document_id": top_cycle.get("document_id"),
+            "rel_type": top_cycle.get("rel_type"),
+            "cycle_count": _safe_int(top_cycle.get("cycle_count")),
+        },
+        "top_connectivity_gap": {
+            "document_id": top_gap.get("document_id"),
+            "isolated_anchor_count": _safe_int(top_gap.get("isolated_anchor_count")),
+            "connected_anchor_count": _safe_int(top_gap.get("connected_anchor_count")),
+        },
+        "documents_without_temporal_tlinks": docs_without_temporal_tlinks[:5],
+    }
+
+
 def generate_quality_report(
     *,
     graph: Any = None,
@@ -372,6 +415,7 @@ def generate_quality_report(
         semantic_metrics=semantic_metrics,
         temporal_metrics=temporal_metrics,
     )
+    temporal_findings = _build_temporal_findings(diagnostics=diagnostics, temporal_metrics=temporal_metrics)
 
     report = {
         "timestamp": timestamp or _utc_iso_now(),
@@ -384,6 +428,7 @@ def generate_quality_report(
         "structural_metrics": structural_metrics,
         "semantic_metrics": semantic_metrics,
         "temporal_metrics": temporal_metrics,
+        "temporal_findings": temporal_findings,
         "phase_quality_scores": phase_quality_scores,
         "conclusive": conclusive,
         "reasons": reasons,
