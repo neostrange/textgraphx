@@ -8,6 +8,11 @@ from textgraphx.cypher_optimizer import (
     QueryPerformanceContract,
     suggest_optimization_for_phase,
 )
+from textgraphx.database.cypher_optimizer import CypherOptimizer as CanonicalCypherOptimizer
+
+
+def test_root_cypher_optimizer_wrapper_reexports_canonical_optimizer():
+    assert CypherOptimizer is CanonicalCypherOptimizer
 
 
 class TestCypherOptimizer:
