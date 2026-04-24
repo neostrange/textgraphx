@@ -3,7 +3,7 @@
 Supports INI and optional TOML configs and environment variable overrides.
 
 Usage:
-    from textgraphx.config import load_config, get_config
+    from textgraphx.infrastructure.config import load_config, get_config
     cfg = load_config()  # searches for repo/user config and env vars
     neo = cfg.neo4j
 """

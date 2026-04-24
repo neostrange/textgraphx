@@ -46,7 +46,7 @@ class SemanticRoleLabel:
 
     def __init__(self, ):
         self.apiName = "semantic-role-labeling"
-        from textgraphx.config import get_config
+        from textgraphx.infrastructure.config import get_config
         self._srl_url = get_config().services.srl_url
 
 

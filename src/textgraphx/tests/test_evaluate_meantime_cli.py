@@ -39,7 +39,7 @@ def test_evaluate_batch_xml_mode_does_not_import_neo4j(tmp_path, monkeypatch):
     real_import = builtins.__import__
 
     def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
-        if name == "textgraphx.neo4j_client":
+        if name == "textgraphx.database.client":
             raise AssertionError("neo4j client should not be imported for --pred-xml-dir mode")
         return real_import(name, globals, locals, fromlist, level)
 
@@ -262,7 +262,7 @@ def test_evaluate_batch_neo4j_includes_nominal_scope_fields(tmp_path, monkeypatc
             return None
 
     fake_mod = types.SimpleNamespace(make_graph_from_config=lambda: _FakeGraph())
-    monkeypatch.setitem(sys.modules, "textgraphx.neo4j_client", fake_mod)
+    monkeypatch.setitem(sys.modules, "textgraphx.database.client", fake_mod)
 
     captured = {}
 

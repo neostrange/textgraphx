@@ -22,7 +22,7 @@ from typing import Any
 ROOT = Path(__file__).parents[2]
 sys.path.insert(0, str(ROOT))
 
-from textgraphx.neo4j_client import make_graph_from_config
+from textgraphx.database.client import make_graph_from_config
 import logging
 
 logger = logging.getLogger(__name__)

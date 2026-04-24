@@ -38,11 +38,11 @@ def _phase_thresholds_for_mode(phase_name: str):
     In review/testing-like modes we enforce strict upper bounds for newly
     introduced TimeML completeness and TLINK consistency checks.
     """
-    from textgraphx.phase_assertions import PhaseThresholds
+    from textgraphx.pipeline.runtime.phase_assertions import PhaseThresholds
 
     thresholds = PhaseThresholds()
     try:
-        from textgraphx.config import get_config
+        from textgraphx.infrastructure.config import get_config
 
         mode = str(get_config().runtime.mode or "production").strip().lower()
     except Exception:
@@ -496,7 +496,7 @@ class GraphBasedNLPWrapper:
                 # Phase assertions (Item 5) and run marker (Item 7)
                 assertions_passed = None
                 try:
-                    from textgraphx.phase_assertions import PhaseAssertions, record_phase_run
+                    from textgraphx.pipeline.runtime.phase_assertions import PhaseAssertions, record_phase_run
                     assertion_result = PhaseAssertions(
                         nlp.graph,
                         strict_transition_gate=self.strict_transition_gate,
@@ -610,7 +610,7 @@ class RefinementPhaseWrapper:
                         fuse_entities_cross_document,
                         propagate_coreference_identity_cross_document,
                     )
-                    from textgraphx.config import get_config
+                    from textgraphx.infrastructure.config import get_config
 
                     enable_cross_document_fusion = bool(
                         get_config().runtime.enable_cross_document_fusion
@@ -634,7 +634,7 @@ class RefinementPhaseWrapper:
                 # Phase assertions (Item 5) and run marker (Item 7)
                 assertions_passed = None
                 try:
-                    from textgraphx.phase_assertions import PhaseAssertions, record_phase_run
+                    from textgraphx.pipeline.runtime.phase_assertions import PhaseAssertions, record_phase_run
                     assertion_result = PhaseAssertions(
                         refiner.graph,
                         strict_transition_gate=self.strict_transition_gate,
@@ -761,8 +761,8 @@ class TemporalPhaseWrapper:
                 provenance_violations = 0
                 endpoint_violations = 0
                 try:
-                    from textgraphx.phase_assertions import PhaseAssertions, record_phase_run
-                    from textgraphx.provenance import stamp_inferred_relationships
+                    from textgraphx.pipeline.runtime.phase_assertions import PhaseAssertions, record_phase_run
+                    from textgraphx.reasoning.provenance import stamp_inferred_relationships
                     stamp_inferred_relationships(
                         temporal.graph,
                         rel_type="TLINK",
@@ -869,8 +869,8 @@ class EventEnrichmentPhaseWrapper:
                 assertions_passed = None
                 provenance_violations = 0
                 try:
-                    from textgraphx.phase_assertions import PhaseAssertions, record_phase_run
-                    from textgraphx.provenance import stamp_inferred_relationships
+                    from textgraphx.pipeline.runtime.phase_assertions import PhaseAssertions, record_phase_run
+                    from textgraphx.reasoning.provenance import stamp_inferred_relationships
                     stamp_inferred_relationships(
                         enricher.graph,
                         rel_type="DESCRIBES",
@@ -1313,8 +1313,8 @@ class DBpediaEnrichmentPhaseWrapper:
 
     def execute(self) -> Dict[str, Any]:
         """Execute optional DBpedia resolution and enrichment for entity mentions."""
-        from textgraphx.config import get_config
-        from textgraphx.neo4j_client import make_graph_from_config
+        from textgraphx.infrastructure.config import get_config
+        from textgraphx.database.client import make_graph_from_config
 
         cfg = get_config()
         if not cfg.features.enable_dbpedia_enrichment:
@@ -1458,7 +1458,7 @@ class DBpediaEnrichmentPhaseWrapper:
 
                 assertions_passed = None
                 try:
-                    from textgraphx.phase_assertions import record_phase_run
+                    from textgraphx.pipeline.runtime.phase_assertions import record_phase_run
 
                     record_phase_run(
                         graph,
@@ -1524,7 +1524,7 @@ class TlinksRecognizerWrapper:
                     self.logger.debug("TlinksRecognizer initialized")
                 enable_tlink_xml_seed = False
                 try:
-                    from textgraphx.config import get_config
+                    from textgraphx.infrastructure.config import get_config
 
                     enable_tlink_xml_seed = bool(
                         getattr(get_config().runtime, "enable_tlink_xml_seed", False)
@@ -1568,7 +1568,7 @@ class TlinksRecognizerWrapper:
 
                 tlink_shadow_mode = False
                 try:
-                    from textgraphx.config import get_config
+                    from textgraphx.infrastructure.config import get_config
 
                     tlink_shadow_mode = bool(get_config().runtime.tlink_shadow_mode)
                 except Exception:
@@ -1663,8 +1663,8 @@ class TlinksRecognizerWrapper:
                 assertions_passed = None
                 provenance_violations = 0
                 try:
-                    from textgraphx.phase_assertions import PhaseAssertions, record_phase_run
-                    from textgraphx.provenance import stamp_inferred_relationships
+                    from textgraphx.pipeline.runtime.phase_assertions import PhaseAssertions, record_phase_run
+                    from textgraphx.reasoning.provenance import stamp_inferred_relationships
                     stamp_inferred_relationships(
                         recognizer.graph,
                         rel_type="TLINK",

@@ -57,7 +57,7 @@ def _make_mock_graph():
 # ---------------------------------------------------------------------------
 
 def _load_tlinks_class():
-    with patch("textgraphx.neo4j_client.make_graph_from_config", return_value=MagicMock()):
+    with patch("textgraphx.database.client.make_graph_from_config", return_value=MagicMock()):
         from textgraphx.TlinksRecognizer import TlinksRecognizer
     return TlinksRecognizer
 
@@ -80,7 +80,7 @@ def _load_eep_class():
             for k, v in attrs.items():
                 setattr(m, k, v)
             sys.modules[mod_name] = m
-    with patch("textgraphx.neo4j_client.make_graph_from_config", return_value=MagicMock()):
+    with patch("textgraphx.database.client.make_graph_from_config", return_value=MagicMock()):
         import importlib
         if "textgraphx.pipeline.phases.event_enrichment" in sys.modules:
             eep_mod = sys.modules["textgraphx.pipeline.phases.event_enrichment"]

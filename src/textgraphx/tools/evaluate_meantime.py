@@ -213,7 +213,7 @@ def _evaluate_single(args: argparse.Namespace, mapping: EvaluationMapping) -> di
     else:
         if args.doc_id is None:
             raise ValueError("--doc-id is required when using --pred-neo4j")
-        from textgraphx.neo4j_client import make_graph_from_config
+        from textgraphx.database.client import make_graph_from_config
 
         graph = make_graph_from_config()
         try:
@@ -283,7 +283,7 @@ def _evaluate_batch(args: argparse.Namespace, mapping: EvaluationMapping) -> dic
     projection_determinism_by_doc: dict[str, dict] = {}
     graph = None
     if args.pred_neo4j:
-        from textgraphx.neo4j_client import make_graph_from_config
+        from textgraphx.database.client import make_graph_from_config
 
         graph = make_graph_from_config()
     relation_scope = _parse_relation_scope(getattr(args, "relation_scope", None))

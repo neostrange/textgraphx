@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 @pytest.mark.unit
 def test_dbpedia_resolver_accepts_near_exact_company_match():
-    from textgraphx.phase_wrappers import DBpediaResolver
+    from textgraphx.pipeline.runtime.phase_wrappers import DBpediaResolver
 
     resolver = DBpediaResolver(
         lookup_url="https://lookup.dbpedia.org/api/search/KeywordSearch",
@@ -40,7 +40,7 @@ def test_dbpedia_resolver_accepts_near_exact_company_match():
 
 @pytest.mark.unit
 def test_dbpedia_resolver_marks_close_candidates_ambiguous():
-    from textgraphx.phase_wrappers import DBpediaResolver
+    from textgraphx.pipeline.runtime.phase_wrappers import DBpediaResolver
 
     resolver = DBpediaResolver(
         lookup_url="https://lookup.dbpedia.org/api/search/KeywordSearch",
@@ -131,7 +131,7 @@ class _FakeResponse:
 
 @pytest.mark.unit
 def test_dbpedia_enrichment_wrapper_resolves_plain_text_entity(monkeypatch):
-    from textgraphx.phase_wrappers import DBpediaEnrichmentPhaseWrapper
+    from textgraphx.pipeline.runtime.phase_wrappers import DBpediaEnrichmentPhaseWrapper
 
     fake_cfg = SimpleNamespace(
         features=SimpleNamespace(enable_dbpedia_enrichment=True),
@@ -147,12 +147,12 @@ def test_dbpedia_enrichment_wrapper_resolves_plain_text_entity(monkeypatch):
     )
     fake_graph = _FakeGraph()
 
-    fake_phase_assertions = types.ModuleType("textgraphx.phase_assertions")
+    fake_phase_assertions = types.ModuleType("textgraphx.pipeline.runtime.phase_assertions")
     fake_phase_assertions.record_phase_run = lambda *args, **kwargs: None
-    monkeypatch.setitem(sys.modules, "textgraphx.phase_assertions", fake_phase_assertions)
-    monkeypatch.setattr("textgraphx.phase_wrappers.get_config", lambda: fake_cfg, raising=False)
-    monkeypatch.setattr("textgraphx.config.get_config", lambda: fake_cfg)
-    monkeypatch.setattr("textgraphx.neo4j_client.make_graph_from_config", lambda: fake_graph)
+    monkeypatch.setitem(sys.modules, "textgraphx.pipeline.runtime.phase_assertions", fake_phase_assertions)
+    monkeypatch.setattr("textgraphx.pipeline.runtime.phase_wrappers.get_config", lambda: fake_cfg, raising=False)
+    monkeypatch.setattr("textgraphx.infrastructure.config.get_config", lambda: fake_cfg)
+    monkeypatch.setattr("textgraphx.database.client.make_graph_from_config", lambda: fake_graph)
 
     def fake_requests_post(url, data=None, headers=None, timeout=None):
         return _FakeResponse(
@@ -184,8 +184,8 @@ def test_dbpedia_enrichment_wrapper_resolves_plain_text_entity(monkeypatch):
             }
         )
 
-    monkeypatch.setattr("textgraphx.phase_wrappers.requests.post", fake_requests_post)
-    monkeypatch.setattr("textgraphx.phase_wrappers.requests.get", fake_requests_get)
+    monkeypatch.setattr("textgraphx.pipeline.runtime.phase_wrappers.requests.post", fake_requests_post)
+    monkeypatch.setattr("textgraphx.pipeline.runtime.phase_wrappers.requests.get", fake_requests_get)
 
     wrapper = DBpediaEnrichmentPhaseWrapper()
     result = wrapper.execute()

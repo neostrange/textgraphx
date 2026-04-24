@@ -2,7 +2,7 @@
 
 import pytest
 
-import textgraphx.phase_assertions as root_phase_assertions
+import textgraphx.pipeline.runtime.phase_assertions as root_phase_assertions
 import textgraphx.pipeline.runtime.phase_assertions as canonical_phase_assertions
 
 

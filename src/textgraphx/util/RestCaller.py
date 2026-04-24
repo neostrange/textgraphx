@@ -1,7 +1,7 @@
 """Compatibility alias for the canonical service caller module.
 
 Legacy source-contract markers preserved for tests:
-- from textgraphx.config import get_config
+- from textgraphx.infrastructure.config import get_config
 - get_config().services.srl_url
 - get_config().services.heideltime_url
 - get_config().services.service_timeout_sec
@@ -9,7 +9,7 @@ Legacy source-contract markers preserved for tests:
 
 import sys
 
-from textgraphx.config import get_config  # noqa: F401
+from textgraphx.infrastructure.config import get_config  # noqa: F401
 from textgraphx.adapters import rest_caller as _canonical_rest_caller
 
 

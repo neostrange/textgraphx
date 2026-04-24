@@ -31,7 +31,7 @@ def _install_event_enrichment_import_stubs(monkeypatch):
         ("textgraphx.util.EntityFishingLinker", {"EntityFishing": object}),
         ("textgraphx.util.RestCaller", {"callAllenNlpApi": lambda *args, **kwargs: None}),
         ("textgraphx.util.GraphDbBase", {"GraphDBBase": object}),
-        ("textgraphx.neo4j_client", {"make_graph_from_config": lambda: None}),
+        ("textgraphx.database.client", {"make_graph_from_config": lambda: None}),
     ):
         module = types.ModuleType(mod_name)
         for key, value in attrs.items():

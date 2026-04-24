@@ -16,13 +16,13 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from textgraphx.phase_assertions import (
+from textgraphx.pipeline.runtime.phase_assertions import (
     PhaseAssertions,
     PhaseThresholds,
     AssertionResult,
     record_phase_run,
 )
-from textgraphx.run_report import RunReport, DocumentStatus
+from textgraphx.evaluation.reports import RunReport, DocumentStatus
 
 
 # ---------------------------------------------------------------------------

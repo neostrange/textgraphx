@@ -1,7 +1,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from textgraphx.phase_assertions import PhaseAssertions
+from textgraphx.pipeline.runtime.phase_assertions import PhaseAssertions
 
 
 def test_refinement_wrapper_runs_nominal_mentions_family_in_order():

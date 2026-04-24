@@ -150,7 +150,7 @@ def _load_srl_class():
     sys.modules["spacy.matcher"].DependencyMatcher = MagicMock()
     sys.modules["spacy.language"].Language = MagicMock()
 
-    with patch("textgraphx.neo4j_client.make_graph_from_config", return_value=MagicMock()):
+    with patch("textgraphx.database.client.make_graph_from_config", return_value=MagicMock()):
         from textgraphx.text_processing_components.SRLProcessor import SRLProcessor
     return SRLProcessor
 

@@ -75,7 +75,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         print(f"ERROR: unknown diagnostics query: {args.query}", file=sys.stderr)
         return 2
 
-    from textgraphx.neo4j_client import make_graph_from_config
+    from textgraphx.database.client import make_graph_from_config
 
     graph = make_graph_from_config()
     close_fn = getattr(graph, "close", None)

@@ -34,7 +34,7 @@ class TestTextProcessorFactoryWiring:
         fake_driver = MagicMock()
         fake_nlp = MagicMock()
 
-        with patch("textgraphx.config.get_config") as gc, patch(
+        with patch("textgraphx.infrastructure.config.get_config") as gc, patch(
             "textgraphx.text_processing_components.pipeline.component_factory.TextPipelineComponentFactory.build"
         ) as build:
             gc.return_value = SimpleNamespace(
@@ -55,7 +55,7 @@ class TestTextProcessorFactoryWiring:
         fake_driver = MagicMock()
         fake_nlp = MagicMock()
 
-        with patch("textgraphx.config.get_config") as gc, patch(
+        with patch("textgraphx.infrastructure.config.get_config") as gc, patch(
             "textgraphx.text_processing_components.pipeline.component_factory.TextPipelineComponentFactory.build"
         ) as build:
             gc.return_value = SimpleNamespace(

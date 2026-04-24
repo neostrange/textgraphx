@@ -82,3 +82,4 @@ MagicMock/
 backup_code/
 converted_backups/
 .pytest_cache/
+src/textgraphx/.textgraphx/

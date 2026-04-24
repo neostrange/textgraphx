@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 def _neo4j_available() -> bool:
     try:
         from textgraphx.infrastructure.health_check import check_neo4j_connection
-        from textgraphx.config import get_config
+        from textgraphx.infrastructure.config import get_config
 
         cfg = get_config()
         ok, _ = check_neo4j_connection(
@@ -32,7 +32,7 @@ neo4j_required = pytest.mark.skipif(
 
 @pytest.fixture(scope="module")
 def graph():
-    from textgraphx.neo4j_client import make_graph_from_config
+    from textgraphx.database.client import make_graph_from_config
 
     return make_graph_from_config()
 
@@ -41,7 +41,7 @@ def graph():
 @pytest.mark.integration
 class TestProvenanceIntegration:
     def test_stamp_tlink_provenance(self, graph):
-        from textgraphx.provenance import stamp_inferred_relationships
+        from textgraphx.reasoning.provenance import stamp_inferred_relationships
 
         stamp_inferred_relationships(
             graph,
@@ -61,7 +61,7 @@ class TestProvenanceIntegration:
         assert rows[0]["bad"] == 0
 
     def test_stamp_describes_provenance(self, graph):
-        from textgraphx.provenance import stamp_inferred_relationships
+        from textgraphx.reasoning.provenance import stamp_inferred_relationships
 
         stamp_inferred_relationships(
             graph,
@@ -81,7 +81,7 @@ class TestProvenanceIntegration:
         assert rows[0]["bad"] == 0
 
     def test_stamp_frame_describes_event_provenance(self, graph):
-        from textgraphx.provenance import stamp_inferred_relationships
+        from textgraphx.reasoning.provenance import stamp_inferred_relationships
 
         stamp_inferred_relationships(
             graph,
@@ -117,7 +117,7 @@ class TestProvenanceIntegration:
             "Found Keyword -[:DESCRIBES]-> AnnotatedText edges; use KEYWORD_DESCRIBES_DOCUMENT instead"
 
     def test_stamp_event_participant_provenance(self, graph):
-        from textgraphx.provenance import stamp_inferred_relationships
+        from textgraphx.reasoning.provenance import stamp_inferred_relationships
 
         stamp_inferred_relationships(
             graph,
@@ -138,7 +138,7 @@ class TestProvenanceIntegration:
 
     def test_tlink_preserve_existing_blocks_case_rule_collapse(self, graph):
         """Case-level TLINK provenance must survive global TLINK backfill stamping."""
-        from textgraphx.provenance import stamp_inferred_relationships
+        from textgraphx.reasoning.provenance import stamp_inferred_relationships
 
         probe_id = f"tlink_prov_{uuid4().hex}"
         graph.run(

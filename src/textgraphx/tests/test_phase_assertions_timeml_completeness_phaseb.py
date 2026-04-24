@@ -7,7 +7,7 @@ import pytest
 
 @pytest.mark.unit
 def test_after_temporal_exposes_timeml_completeness_labels():
-    from textgraphx.phase_assertions import PhaseAssertions
+    from textgraphx.pipeline.runtime.phase_assertions import PhaseAssertions
 
     graph = MagicMock()
     graph.run.return_value.data.return_value = [{"c": 0}]
@@ -23,7 +23,7 @@ def test_after_temporal_exposes_timeml_completeness_labels():
 
 @pytest.mark.unit
 def test_after_temporal_fails_when_missing_counts_exceed_thresholds():
-    from textgraphx.phase_assertions import PhaseAssertions, PhaseThresholds
+    from textgraphx.pipeline.runtime.phase_assertions import PhaseAssertions, PhaseThresholds
 
     graph = MagicMock()
     graph.run.return_value.data.return_value = [{"c": 2}]

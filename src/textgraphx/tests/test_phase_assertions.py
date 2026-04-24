@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from textgraphx.phase_assertions import (
+from textgraphx.pipeline.runtime.phase_assertions import (
     AssertionResult,
     PhaseAssertions,
     PhaseThresholds,
@@ -351,7 +351,7 @@ class TestPhaseAssertions:
         assert result.passed is False
         assert any("missing factuality" in e for e in result.errors)
 
-    @patch("textgraphx.phase_assertions.validate_inferred_relationship_provenance")
+    @patch("textgraphx.pipeline.runtime.phase_assertions.validate_inferred_relationship_provenance")
     def test_temporal_provenance_contract_fails_when_missing_fields(self, mocked_validate):
         graph = _make_graph(count=1)
         mocked_validate.return_value = 2
@@ -361,7 +361,7 @@ class TestPhaseAssertions:
         assert result.passed is False
         assert any("missing provenance contract fields" in c["label"] for c in result.checks)
 
-    @patch("textgraphx.phase_assertions.validate_inferred_relationship_provenance")
+    @patch("textgraphx.pipeline.runtime.phase_assertions.validate_inferred_relationship_provenance")
     def test_event_enrichment_provenance_contract_passes_when_complete(self, mocked_validate):
         graph = _make_graph(count=1)
         mocked_validate.return_value = 0
@@ -396,7 +396,7 @@ class TestPhaseAssertions:
         assert result.passed is False
         assert any("TLINK relationships upper bound" in e for e in result.errors)
 
-    @patch("textgraphx.phase_assertions.validate_inferred_relationship_provenance")
+    @patch("textgraphx.pipeline.runtime.phase_assertions.validate_inferred_relationship_provenance")
     def test_tlinks_provenance_contract_runs_when_enabled(self, mocked_validate):
         graph = _make_graph(count=1)
         mocked_validate.return_value = 0

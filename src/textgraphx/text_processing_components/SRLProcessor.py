@@ -1,5 +1,5 @@
 import logging
-from textgraphx.neo4j_client import make_graph_from_config
+from textgraphx.database.client import make_graph_from_config
 from textgraphx.utils.id_utils import make_frame_id, make_fa_id
 
 logger = logging.getLogger(__name__)

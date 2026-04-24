@@ -167,7 +167,7 @@ class TestDefaultValueConsistency:
 class TestRestCallerSourceContract:
     def test_imports_get_config(self):
         src = _read(RESTCALLER_SRC)
-        assert "from textgraphx.config import get_config" in src
+        assert "from textgraphx.infrastructure.config import get_config" in src
 
     def test_srl_url_reads_from_config(self):
         """callAllenNlpApi must read srl_url via get_config()."""
@@ -221,7 +221,7 @@ class TestRestCallerSourceContract:
 class TestCorefCallerSourceContract:
     def test_imports_get_config(self):
         src = _read(COREF_SRC)
-        assert "from textgraphx.config import get_config" in src
+        assert "from textgraphx.infrastructure.config import get_config" in src
 
     def test_coref_url_reads_from_config(self):
         """callAllenNlpCoref must read coref_url via get_config()."""
@@ -254,7 +254,7 @@ class TestCorefCallerSourceContract:
 class TestTextProcessorSourceContract:
     def test_imports_get_config(self):
         src = _read(TEXT_PROC_SRC)
-        assert "from textgraphx.config import get_config" in src
+        assert "from textgraphx.infrastructure.config import get_config" in src
 
     def test_wsd_url_reads_from_config(self):
         """TextProcessor must read wsd_url from cfg.services.wsd_url."""
@@ -287,7 +287,7 @@ class TestEnvVarOverrides:
         with patch.dict(os.environ, env, clear=False):
             # Force re-load
             import importlib
-            import textgraphx.config as cfg_mod
+            import textgraphx.infrastructure.config as cfg_mod
             importlib.reload(cfg_mod)
             cfg = cfg_mod.get_config()
             assert cfg.services.srl_url == "http://myhost:1234/predict"
@@ -296,7 +296,7 @@ class TestEnvVarOverrides:
         env = {"TEXTGRAPHX_COREF_URL": "http://coref-prod:9999/coreference_resolution"}
         with patch.dict(os.environ, env, clear=False):
             import importlib
-            import textgraphx.config as cfg_mod
+            import textgraphx.infrastructure.config as cfg_mod
             importlib.reload(cfg_mod)
             cfg = cfg_mod.get_config()
             assert cfg.services.coref_url == "http://coref-prod:9999/coreference_resolution"
@@ -305,7 +305,7 @@ class TestEnvVarOverrides:
         env = {"TEXTGRAPHX_HEIDELTIME_URL": "http://heideltime-prod:5000/annotate"}
         with patch.dict(os.environ, env, clear=False):
             import importlib
-            import textgraphx.config as cfg_mod
+            import textgraphx.infrastructure.config as cfg_mod
             importlib.reload(cfg_mod)
             cfg = cfg_mod.get_config()
             assert cfg.services.heideltime_url == "http://heideltime-prod:5000/annotate"
@@ -314,7 +314,7 @@ class TestEnvVarOverrides:
         env = {"TEXTGRAPHX_WSD_URL": "http://wsd-prod:81/api/model"}
         with patch.dict(os.environ, env, clear=False):
             import importlib
-            import textgraphx.config as cfg_mod
+            import textgraphx.infrastructure.config as cfg_mod
             importlib.reload(cfg_mod)
             cfg = cfg_mod.get_config()
             assert cfg.services.wsd_url == "http://wsd-prod:81/api/model"
@@ -338,7 +338,7 @@ class TestIniConfigLoading:
             encoding="utf-8",
         )
         import importlib
-        import textgraphx.config as cfg_mod
+        import textgraphx.infrastructure.config as cfg_mod
         importlib.reload(cfg_mod)
         cfg = cfg_mod.load_config(str(ini_file))
         assert cfg.services.srl_url == "http://ini-host:8888/predict"
@@ -352,7 +352,7 @@ class TestIniConfigLoading:
             encoding="utf-8",
         )
         import importlib
-        import textgraphx.config as cfg_mod
+        import textgraphx.infrastructure.config as cfg_mod
         importlib.reload(cfg_mod)
         cfg = cfg_mod.load_config(str(ini_file))
         # coref_url was not in the INI, so must fall back to dataclass default

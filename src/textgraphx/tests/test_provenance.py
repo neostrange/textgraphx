@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 @pytest.mark.unit
 class TestProvenanceStamping:
     def test_stamp_relationships_executes_query(self):
-        from textgraphx.provenance import stamp_inferred_relationships
+        from textgraphx.reasoning.provenance import stamp_inferred_relationships
 
         graph = MagicMock()
         graph.run.return_value.data.return_value = [{"c": 3}]
@@ -28,7 +28,7 @@ class TestProvenanceStamping:
         graph.run.assert_called_once()
 
     def test_stamp_relationships_uses_expected_params(self):
-        from textgraphx.provenance import stamp_inferred_relationships
+        from textgraphx.reasoning.provenance import stamp_inferred_relationships
 
         graph = MagicMock()
         graph.run.return_value.data.return_value = [{"c": 0}]
@@ -50,7 +50,7 @@ class TestProvenanceStamping:
         assert params["conflict_policy"] == "additive"
 
     def test_stamp_relationships_invalid_confidence_raises(self):
-        from textgraphx.provenance import stamp_inferred_relationships
+        from textgraphx.reasoning.provenance import stamp_inferred_relationships
 
         graph = MagicMock()
         with pytest.raises(ValueError):
@@ -63,7 +63,7 @@ class TestProvenanceStamping:
             )
 
     def test_stamp_event_participant_uses_expected_params(self):
-        from textgraphx.provenance import stamp_inferred_relationships
+        from textgraphx.reasoning.provenance import stamp_inferred_relationships
 
         graph = MagicMock()
         graph.run.return_value.data.return_value = [{"c": 0}]
@@ -82,7 +82,7 @@ class TestProvenanceStamping:
         assert params["rule_id"] == "participant_linking"
 
     def test_stamp_relationships_accepts_explicit_authority_and_extra_properties(self):
-        from textgraphx.provenance import stamp_inferred_relationships
+        from textgraphx.reasoning.provenance import stamp_inferred_relationships
 
         graph = MagicMock()
         graph.run.return_value.data.return_value = [{"c": 2}]
@@ -107,7 +107,7 @@ class TestProvenanceStamping:
         assert params["meta_notes"] == "validated"
 
     def test_stamp_relationships_can_preserve_existing_values(self):
-        from textgraphx.provenance import stamp_inferred_relationships
+        from textgraphx.reasoning.provenance import stamp_inferred_relationships
 
         graph = MagicMock()
         graph.run.return_value.data.return_value = [{"c": 2}]
@@ -127,7 +127,7 @@ class TestProvenanceStamping:
         assert "r.evidence_source = coalesce(r.evidence_source, $source)" in query
 
     def test_stamp_relationships_accepts_calibration_metadata(self):
-        from textgraphx.provenance import stamp_inferred_relationships
+        from textgraphx.reasoning.provenance import stamp_inferred_relationships
 
         graph = MagicMock()
         graph.run.return_value.data.return_value = [{"c": 1}]
@@ -147,7 +147,7 @@ class TestProvenanceStamping:
         assert params["confidence_components"]["syntax"] == 0.8
 
     def test_stamp_relationships_invalid_source_kind_raises(self):
-        from textgraphx.provenance import stamp_inferred_relationships
+        from textgraphx.reasoning.provenance import stamp_inferred_relationships
 
         graph = MagicMock()
         with pytest.raises(ValueError):
@@ -161,7 +161,7 @@ class TestProvenanceStamping:
             )
 
     def test_stamp_relationships_invalid_conflict_policy_raises(self):
-        from textgraphx.provenance import stamp_inferred_relationships
+        from textgraphx.reasoning.provenance import stamp_inferred_relationships
 
         graph = MagicMock()
         with pytest.raises(ValueError):
@@ -175,7 +175,7 @@ class TestProvenanceStamping:
             )
 
     def test_stamp_relationships_empty_source_raises(self):
-        from textgraphx.provenance import stamp_inferred_relationships
+        from textgraphx.reasoning.provenance import stamp_inferred_relationships
 
         graph = MagicMock()
         with pytest.raises(ValueError):
@@ -191,7 +191,7 @@ class TestProvenanceStamping:
 @pytest.mark.regression
 class TestProvenanceContract:
     def test_stamp_relationships_returns_int(self):
-        from textgraphx.provenance import stamp_inferred_relationships
+        from textgraphx.reasoning.provenance import stamp_inferred_relationships
 
         graph = MagicMock()
         graph.run.return_value.data.return_value = [{"c": 5}]
@@ -207,7 +207,7 @@ class TestProvenanceContract:
         assert isinstance(result, int)
 
     def test_validate_inferred_relationship_provenance_returns_int(self):
-        from textgraphx.provenance import validate_inferred_relationship_provenance
+        from textgraphx.reasoning.provenance import validate_inferred_relationship_provenance
 
         graph = MagicMock()
         graph.run.return_value.data.return_value = [{"c": 4}]

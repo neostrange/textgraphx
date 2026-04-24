@@ -39,8 +39,8 @@ import xml.etree.ElementTree as ET
 import logging
 import warnings
 
-from textgraphx.neo4j_client import make_graph_from_config
-from textgraphx.config import get_config
+from textgraphx.database.client import make_graph_from_config
+from textgraphx.infrastructure.config import get_config
 from textgraphx.utils.id_utils import make_entity_mention_uid
 
 logger = logging.getLogger(__name__)
@@ -2449,7 +2449,7 @@ if __name__ == '__main__':
     # to run repeatedly (MERGE by id) and useful for audits / CI checks.
     try:
         try:
-            from textgraphx.time_utils import utc_iso_now
+            from textgraphx.reasoning.temporal.time import utc_iso_now
         except ImportError:  # pragma: no cover - support script-style execution
             from time_utils import utc_iso_now
 

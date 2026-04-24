@@ -3,7 +3,7 @@ import os
 import sys
 import getopt
 import logging
-from textgraphx.config import get_config
+from textgraphx.infrastructure.config import get_config
 
 # module logger
 logger = logging.getLogger(__name__)

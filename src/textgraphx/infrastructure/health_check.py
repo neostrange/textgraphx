@@ -108,7 +108,7 @@ def check_http_service(name: str, url: str, timeout: int = 3) -> Tuple[bool, str
 def check_external_services(cfg=None, fail_fast: bool = False) -> Tuple[bool, List[str]]:
     """Check all configured external NLP services."""
     if cfg is None:
-        from textgraphx.config import get_config
+        from textgraphx.infrastructure.config import get_config
 
         cfg = get_config()
 

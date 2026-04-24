@@ -19,7 +19,7 @@ from pathlib import Path
 
 try:
     from textgraphx.orchestration.orchestrator import PipelineOrchestrator
-    from textgraphx.config import get_config
+    from textgraphx.infrastructure.config import get_config
     ORCHESTRATOR_AVAILABLE = True
 except (ImportError, ModuleNotFoundError):
     ORCHESTRATOR_AVAILABLE = False

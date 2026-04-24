@@ -38,8 +38,8 @@ except Exception:
         raise RuntimeError("spaCy language char classes unavailable")
 from neo4j import GraphDatabase
 from textgraphx.text_processing_components.DocumentImporter import MeantimeXMLImporter, resolve_document_id_from_naf_root
-from textgraphx.text_normalization import normalize_naf_raw_text
-from textgraphx.config import get_config
+from textgraphx.pipeline.ingestion.text_normalization import normalize_naf_raw_text
+from textgraphx.infrastructure.config import get_config
 # from spacy.util import load_config
 
 # from spacy_llm.util import assemble
@@ -494,8 +494,8 @@ def main() -> None:
 
     # Record an IngestionRun marker for restart visibility (Item 7)
     try:
-        from textgraphx.phase_assertions import record_phase_run
-        from textgraphx.neo4j_client import make_graph_from_config
+        from textgraphx.pipeline.runtime.phase_assertions import record_phase_run
+        from textgraphx.database.client import make_graph_from_config
 
         graph = make_graph_from_config()
         record_phase_run(

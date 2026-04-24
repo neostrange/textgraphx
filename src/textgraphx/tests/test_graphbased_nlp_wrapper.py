@@ -87,13 +87,13 @@ def _install_graphbased_nlp_stubs(monkeypatch):
     document_importer_module.resolve_document_id_from_naf_root = lambda *args, **kwargs: None
     monkeypatch.setitem(sys.modules, "textgraphx.text_processing_components.DocumentImporter", document_importer_module)
 
-    text_normalization_module = types.ModuleType("textgraphx.text_normalization")
+    text_normalization_module = types.ModuleType("textgraphx.pipeline.ingestion.text_normalization")
     text_normalization_module.normalize_naf_raw_text = lambda text: text
-    monkeypatch.setitem(sys.modules, "textgraphx.text_normalization", text_normalization_module)
+    monkeypatch.setitem(sys.modules, "textgraphx.pipeline.ingestion.text_normalization", text_normalization_module)
 
-    config_module = types.ModuleType("textgraphx.config")
+    config_module = types.ModuleType("textgraphx.infrastructure.config")
     config_module.get_config = lambda: SimpleNamespace(runtime=SimpleNamespace(naf_sentence_mode="split"))
-    monkeypatch.setitem(sys.modules, "textgraphx.config", config_module)
+    monkeypatch.setitem(sys.modules, "textgraphx.infrastructure.config", config_module)
 
 
 def test_graphbased_nlp_module_aliases_canonical_module(monkeypatch):

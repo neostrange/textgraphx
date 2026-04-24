@@ -1,6 +1,6 @@
 import requests
 import json
-from textgraphx.config import get_config
+from textgraphx.infrastructure.config import get_config
 
 
 def _service_timeout() -> int:

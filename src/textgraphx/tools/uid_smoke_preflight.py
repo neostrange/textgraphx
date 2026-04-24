@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 from typing import Dict, List
 
-from textgraphx import neo4j_client
+from textgraphx.database import client as neo4j_client
 
 
 def _scalar(graph, query: str, params: Dict | None = None):

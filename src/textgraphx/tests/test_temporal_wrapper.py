@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 @pytest.mark.unit
 def test_temporal_wrapper_accepts_scalar_document_ids(monkeypatch):
-    from textgraphx.phase_wrappers import TemporalPhaseWrapper
+    from textgraphx.pipeline.runtime.phase_wrappers import TemporalPhaseWrapper
 
     created = []
 
@@ -57,7 +57,7 @@ def test_temporal_wrapper_accepts_scalar_document_ids(monkeypatch):
 
 @pytest.mark.regression
 def test_temporal_wrapper_accepts_dict_document_ids(monkeypatch):
-    from textgraphx.phase_wrappers import TemporalPhaseWrapper
+    from textgraphx.pipeline.runtime.phase_wrappers import TemporalPhaseWrapper
 
     seen = []
 
@@ -96,7 +96,7 @@ def test_temporal_wrapper_accepts_dict_document_ids(monkeypatch):
 
 @pytest.mark.regression
 def test_temporal_wrapper_normalizes_numeric_document_ids(monkeypatch):
-    from textgraphx.phase_wrappers import TemporalPhaseWrapper
+    from textgraphx.pipeline.runtime.phase_wrappers import TemporalPhaseWrapper
 
     created = []
 

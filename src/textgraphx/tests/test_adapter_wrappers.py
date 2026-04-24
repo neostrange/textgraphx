@@ -11,11 +11,11 @@ def _install_graph_db_base_stubs(monkeypatch):
     neo4j_module.GraphDatabase = SimpleNamespace(driver=lambda *args, **kwargs: object())
     monkeypatch.setitem(sys.modules, "neo4j", neo4j_module)
 
-    config_module = types.ModuleType("textgraphx.config")
+    config_module = types.ModuleType("textgraphx.infrastructure.config")
     config_module.get_config = lambda: SimpleNamespace(
         neo4j=SimpleNamespace(uri=None, user=None, password=None),
     )
-    monkeypatch.setitem(sys.modules, "textgraphx.config", config_module)
+    monkeypatch.setitem(sys.modules, "textgraphx.infrastructure.config", config_module)
 
 
 def _install_spacy_stubs(monkeypatch):

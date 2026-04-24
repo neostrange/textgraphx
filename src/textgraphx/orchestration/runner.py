@@ -20,7 +20,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from textgraphx.config import get_config
+from textgraphx.infrastructure.config import get_config
 from textgraphx.database.client import make_graph_from_config
 from textgraphx.infrastructure.health_check import print_health_check_report, run_health_checks
 from textgraphx.orchestration.orchestrator import PipelineOrchestrator

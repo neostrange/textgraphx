@@ -144,7 +144,7 @@ class SRLEnricher(GraphDBBase):
         return enriched_output
 
 def main():
-    from textgraphx.config import get_config
+    from textgraphx.infrastructure.config import get_config
     llm_api = get_config().services.llm_url
     enricher = SRLEnricher(argv=[], llm_api=llm_api)
     

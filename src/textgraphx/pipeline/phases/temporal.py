@@ -24,8 +24,8 @@ if __name__ == '__main__' and __package__ is None:
     if repo_root not in sys.path:
         sys.path.insert(0, repo_root)
 
-from textgraphx.config import get_config
-from textgraphx.neo4j_client import make_graph_from_config
+from textgraphx.infrastructure.config import get_config
+from textgraphx.database.client import make_graph_from_config
 from textgraphx.reasoning.contracts import normalize_event_attr
 
 logger = logging.getLogger(__name__)
@@ -789,7 +789,7 @@ if __name__ == '__main__':
 
     duration = _time.time() - start
     try:
-        from textgraphx.phase_assertions import record_phase_run
+        from textgraphx.pipeline.runtime.phase_assertions import record_phase_run
 
         record_phase_run(
             phase.graph,

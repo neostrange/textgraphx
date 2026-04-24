@@ -29,8 +29,8 @@ import xml.etree.ElementTree as ET
 # legacy py2neo imports removed; use bolt-driver wrapper via neo4j_client
 import logging
 
-from textgraphx.neo4j_client import make_graph_from_config
-from textgraphx.config import get_config
+from textgraphx.database.client import make_graph_from_config
+from textgraphx.infrastructure.config import get_config
 from textgraphx.reasoning.contracts import (
     canonical_event_attribute_vocabulary,
     count_endpoint_violations,
@@ -1281,7 +1281,7 @@ if __name__ == '__main__':
 
     # Record a PhaseRun marker in the graph for restart visibility (Item 7)
     try:
-        from textgraphx.phase_assertions import record_phase_run
+        from textgraphx.pipeline.runtime.phase_assertions import record_phase_run
         record_phase_run(
             tp.graph,
             phase_name="event_enrichment",

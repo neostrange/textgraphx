@@ -1,14 +1,14 @@
 """Compatibility alias for the canonical AllenNLP coreference caller module.
 
 Legacy source-contract markers preserved for tests:
-- from textgraphx.config import get_config
+- from textgraphx.infrastructure.config import get_config
 - get_config().services.coref_url
 - get_config().services.service_timeout_sec
 """
 
 import sys
 
-from textgraphx.config import get_config  # noqa: F401
+from textgraphx.infrastructure.config import get_config  # noqa: F401
 from textgraphx.adapters import allen_nlp_coref as _canonical_allen_nlp_coref
 
 

@@ -2,7 +2,7 @@ import requests
 import re
 import json
 import logging
-from textgraphx.config import get_config
+from textgraphx.infrastructure.config import get_config
 logger = logging.getLogger(__name__)
 logger.info("textgraphx.util.RestCaller module imported")
 

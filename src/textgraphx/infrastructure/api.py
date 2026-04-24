@@ -28,7 +28,7 @@ from textgraphx.evaluation.diagnostics import (
     list_diagnostic_queries,
     run_registered_diagnostic,
 )
-from textgraphx.neo4j_client import make_graph_from_config
+from textgraphx.database.client import make_graph_from_config
 from textgraphx.orchestration.orchestrator import PipelineOrchestrator
 
 logger = logging.getLogger(__name__)

@@ -56,8 +56,8 @@ from textgraphx.util.RestCaller import amuse_wsd_api_call
 from transformers import logging
 logging.set_verbosity_error()
 # py2neo usage removed in favor of the bolt-driver helper
-import textgraphx.config as config_module
-from textgraphx.config import get_config
+import textgraphx.infrastructure.config as config_module
+from textgraphx.infrastructure.config import get_config
 import os
 from textgraphx.util.RestCaller import callAllenNlpApi
 from textgraphx.util.CallAllenNlpCoref import callAllenNlpCoref
@@ -112,7 +112,7 @@ class TextProcessor(object):
         
         self.neo4j_repository = Neo4jRepository(self._driver)
         
-        import textgraphx.config as config_module
+        import textgraphx.infrastructure.config as config_module
         cfg = config_module.get_config()
         self.uri = cfg.neo4j.uri
         self.username = cfg.neo4j.user

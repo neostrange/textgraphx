@@ -21,7 +21,7 @@ import argparse
 import logging
 from typing import Dict, Optional, Tuple
 
-from textgraphx import neo4j_client
+from textgraphx.database import client as neo4j_client
 
 logger = logging.getLogger(__name__)
 

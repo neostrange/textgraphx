@@ -29,7 +29,7 @@ from typing import Any, Dict, Optional
 
 from neo4j import Driver, GraphDatabase
 
-from textgraphx.config import get_config
+from textgraphx.infrastructure.config import get_config
 
 
 def get_config_section(path: Optional[str] = None, section: str = "py2neo") -> Dict[str, Any]:

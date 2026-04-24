@@ -72,7 +72,7 @@ def _make_enricher(run_side_effects=None):
 
     # Patch at the neo4j_client source so the constructor gets the mock,
     # regardless of whether the module is already in sys.modules.
-    with patch("textgraphx.neo4j_client.make_graph_from_config", return_value=graph):
+    with patch("textgraphx.database.client.make_graph_from_config", return_value=graph):
         from textgraphx.EventEnrichmentPhase import EventEnrichmentPhase
         enricher = EventEnrichmentPhase(argv=[])
 

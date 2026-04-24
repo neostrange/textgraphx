@@ -575,7 +575,7 @@ class TestPipelineOrchestrator:
 class TestConfigRuntimeMode:
     @pytest.mark.unit
     def test_load_config_reads_runtime_mode(self, tmp_path):
-        from textgraphx.config import load_config
+        from textgraphx.infrastructure.config import load_config
 
         cfg_path = tmp_path / "config.ini"
         cfg_path.write_text(
@@ -590,7 +590,7 @@ class TestConfigRuntimeMode:
 
     @pytest.mark.unit
     def test_load_config_reads_runtime_strict_transition_gate_true(self, tmp_path):
-        from textgraphx.config import load_config
+        from textgraphx.infrastructure.config import load_config
 
         cfg_path = tmp_path / "config.ini"
         cfg_path.write_text(
@@ -606,7 +606,7 @@ class TestConfigRuntimeMode:
 
     @pytest.mark.unit
     def test_load_config_reads_runtime_strict_transition_gate_auto(self, tmp_path):
-        from textgraphx.config import load_config
+        from textgraphx.infrastructure.config import load_config
 
         cfg_path = tmp_path / "config.ini"
         cfg_path.write_text(
@@ -622,7 +622,7 @@ class TestConfigRuntimeMode:
 
     @pytest.mark.unit
     def test_load_config_reads_runtime_naf_sentence_mode(self, tmp_path):
-        from textgraphx.config import load_config
+        from textgraphx.infrastructure.config import load_config
 
         cfg_path = tmp_path / "config.ini"
         cfg_path.write_text(
@@ -638,7 +638,7 @@ class TestConfigRuntimeMode:
 
     @pytest.mark.unit
     def test_load_config_rejects_invalid_runtime_naf_sentence_mode(self, tmp_path):
-        from textgraphx.config import load_config
+        from textgraphx.infrastructure.config import load_config
 
         cfg_path = tmp_path / "config.ini"
         cfg_path.write_text(

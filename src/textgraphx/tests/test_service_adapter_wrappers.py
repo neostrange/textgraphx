@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 
 def _install_service_config_stub(monkeypatch):
-    config_module = types.ModuleType("textgraphx.config")
+    config_module = types.ModuleType("textgraphx.infrastructure.config")
     config_module.get_config = lambda: SimpleNamespace(
         services=SimpleNamespace(
             service_timeout_sec=5,
@@ -16,7 +16,7 @@ def _install_service_config_stub(monkeypatch):
             coref_url="http://example.test/coref",
         ),
     )
-    monkeypatch.setitem(sys.modules, "textgraphx.config", config_module)
+    monkeypatch.setitem(sys.modules, "textgraphx.infrastructure.config", config_module)
 
 
 def _install_spacy_stubs(monkeypatch):

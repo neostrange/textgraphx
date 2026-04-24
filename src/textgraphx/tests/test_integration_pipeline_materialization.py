@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 def _neo4j_available() -> bool:
     try:
         from textgraphx.infrastructure.health_check import check_neo4j_connection
-        from textgraphx.config import get_config
+        from textgraphx.infrastructure.config import get_config
 
         cfg = get_config()
         ok, _ = check_neo4j_connection(

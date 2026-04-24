@@ -17,7 +17,7 @@ if __package__ is None and __name__ == '__main__':
     if repo_root not in sys.path:
         sys.path.insert(0, repo_root)
 
-from textgraphx.neo4j_client import make_graph_from_config
+from textgraphx.database.client import make_graph_from_config
 from textgraphx.reasoning.contracts import count_endpoint_violations
 from textgraphx.reasoning.temporal.constraints import solve_tlink_constraints
 from textgraphx.reasoning.temporal.timeml_relations import CANONICAL_TLINK_RELTYPES
@@ -502,7 +502,7 @@ class TlinksRecognizer:
         """Call TTK service and return XML response body."""
         logger.debug("callTtkService with dct=%s", parameters.get("dct"))
         try:
-            from textgraphx.config import get_config
+            from textgraphx.infrastructure.config import get_config
 
             cfg = get_config()
             ttk_url = cfg.services.temporal_url
@@ -711,7 +711,7 @@ if __name__ == '__main__':
 
     # Record a PhaseRun marker for restart visibility (Item 7)
     try:
-        from textgraphx.phase_assertions import record_phase_run
+        from textgraphx.pipeline.runtime.phase_assertions import record_phase_run
         record_phase_run(
             tp.graph,
             phase_name="tlinks",

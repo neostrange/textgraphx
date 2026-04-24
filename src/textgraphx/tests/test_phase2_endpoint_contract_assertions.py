@@ -2,7 +2,12 @@ from pathlib import Path
 
 
 def test_phase_assertions_enforce_phase2_endpoint_contracts():
-    src = Path(__file__).resolve().parents[1] / "phase_assertions.py"
+    src = (
+        Path(__file__).resolve().parents[1]
+        / "pipeline"
+        / "runtime"
+        / "phase_assertions.py"
+    )
     text = src.read_text(encoding="utf-8")
 
     assert "Endpoint contract violations (HAS_LEMMA)" in text

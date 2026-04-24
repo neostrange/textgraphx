@@ -14,11 +14,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from .db_interface import ExecutionHistory, ExecutionStatus
 from .checkpoint import CheckpointManager
-from textgraphx.config import get_config
+from textgraphx.infrastructure.config import get_config
 from textgraphx.infrastructure.logging_utils import (
     get_logger, log_section, log_subsection, ProgressLogger
 )
-from textgraphx.neo4j_client import make_graph_from_config
+from textgraphx.database.client import make_graph_from_config
 
 logger = get_logger(__name__)
 
@@ -445,7 +445,7 @@ class PipelineOrchestrator:
                     return
 
             # Item 8: per-document run report
-            from textgraphx.run_report import RunReport
+            from textgraphx.evaluation.reports import RunReport
             run_report = RunReport(execution_id=self.execution_id)
 
             logger.info(f"Execution ID: {self.execution_id}")
@@ -650,7 +650,7 @@ class PipelineOrchestrator:
         """Run the ingestion phase - parse documents using GraphBasedNLP."""
         logger.info("Starting ingestion phase...")
         try:
-            from textgraphx.phase_wrappers import GraphBasedNLPWrapper
+            from textgraphx.pipeline.runtime.phase_wrappers import GraphBasedNLPWrapper
             
             wrapper = GraphBasedNLPWrapper(
                 model_name=self.model_name,
@@ -670,7 +670,7 @@ class PipelineOrchestrator:
         """Run the refinement phase - clean and normalize extracted data."""
         logger.info("Starting refinement phase...")
         try:
-            from textgraphx.phase_wrappers import RefinementPhaseWrapper
+            from textgraphx.pipeline.runtime.phase_wrappers import RefinementPhaseWrapper
             
             wrapper = RefinementPhaseWrapper(
                 strict_transition_gate=self.strict_transition_gate
@@ -687,7 +687,7 @@ class PipelineOrchestrator:
         """Run the temporal phase - identify temporal entities and relations."""
         logger.info("Starting temporal phase...")
         try:
-            from textgraphx.phase_wrappers import TemporalPhaseWrapper
+            from textgraphx.pipeline.runtime.phase_wrappers import TemporalPhaseWrapper
             
             wrapper = TemporalPhaseWrapper(
                 strict_transition_gate=self.strict_transition_gate
@@ -704,7 +704,7 @@ class PipelineOrchestrator:
         """Run the event enrichment phase - extract and enrich events."""
         logger.info("Starting event enrichment phase...")
         try:
-            from textgraphx.phase_wrappers import EventEnrichmentPhaseWrapper
+            from textgraphx.pipeline.runtime.phase_wrappers import EventEnrichmentPhaseWrapper
             
             wrapper = EventEnrichmentPhaseWrapper(
                 strict_transition_gate=self.strict_transition_gate
@@ -721,7 +721,7 @@ class PipelineOrchestrator:
         """Run the TLINKs phase - identify temporal links between events."""
         logger.info("Starting TLINKs phase...")
         try:
-            from textgraphx.phase_wrappers import TlinksRecognizerWrapper
+            from textgraphx.pipeline.runtime.phase_wrappers import TlinksRecognizerWrapper
             
             wrapper = TlinksRecognizerWrapper(
                 strict_transition_gate=self.strict_transition_gate
@@ -738,7 +738,7 @@ class PipelineOrchestrator:
         """Run optional DBpedia enrichment phase."""
         logger.info("Starting DBpedia enrichment phase...")
         try:
-            from textgraphx.phase_wrappers import DBpediaEnrichmentPhaseWrapper
+            from textgraphx.pipeline.runtime.phase_wrappers import DBpediaEnrichmentPhaseWrapper
 
             wrapper = DBpediaEnrichmentPhaseWrapper(
                 strict_transition_gate=self.strict_transition_gate

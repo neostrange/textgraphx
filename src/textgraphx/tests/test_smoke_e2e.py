@@ -22,7 +22,7 @@ def _neo4j_available() -> bool:
     """Return True only if a Neo4j connection can be established."""
     try:
         from textgraphx.infrastructure.health_check import check_neo4j_connection
-        from textgraphx.config import get_config
+        from textgraphx.infrastructure.config import get_config
 
         cfg = get_config()
         ok, _ = check_neo4j_connection(
@@ -82,7 +82,7 @@ def test_ingestion_creates_graph_nodes():
         pytest.skip(f"Smoke-test document not found: {SMOKE_DOCUMENT}")
 
     from textgraphx.orchestration.orchestrator import PipelineOrchestrator
-    from textgraphx.config import get_config
+    from textgraphx.infrastructure.config import get_config
     from neo4j import GraphDatabase
 
     cfg = get_config()
