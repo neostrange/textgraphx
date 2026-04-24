@@ -7,17 +7,17 @@ reconstruct quality summaries from CLI output.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from math import isclose
 import json
 from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence
 
 from textgraphx.diagnostics import get_runtime_metrics
+from textgraphx.time_utils import utc_iso_now as _canonical_utc_iso_now
 
 
 def _utc_iso_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return _canonical_utc_iso_now().replace("+00:00", "Z")
 
 
 def _safe_int(value: Any) -> int:
@@ -32,6 +32,10 @@ def _safe_float(value: Any) -> float:
         return float(value or 0.0)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _copy_mapping(value: Any) -> Dict[str, Any]:
+    return dict(value) if isinstance(value, Mapping) else {}
 
 
 def _quality_tier(score: float) -> str:
@@ -383,6 +387,8 @@ def generate_quality_report(
     documents: int | None = None,
     evaluation_version: str = "1.0",
     timestamp: str | None = None,
+    run_metadata: Mapping[str, Any] | None = None,
+    capture_metadata: Mapping[str, Any] | None = None,
 ) -> Dict[str, Any]:
     """Generate a reusable quality report payload.
 
@@ -406,9 +412,7 @@ def generate_quality_report(
     if overall_quality <= 0.0:
         overall_quality = sum(metric_scores.values()) / len(metric_scores)
 
-    flat_runtime_totals = diagnostics.get("totals", {}) if isinstance(diagnostics, dict) else {}
-    if not isinstance(flat_runtime_totals, Mapping):
-        flat_runtime_totals = {}
+    flat_runtime_totals = _copy_mapping(diagnostics.get("totals", {}) if isinstance(diagnostics, dict) else {})
 
     warnings, recommendations = _build_warnings_and_recommendations(
         structural_metrics=structural_metrics,
@@ -416,12 +420,16 @@ def generate_quality_report(
         temporal_metrics=temporal_metrics,
     )
     temporal_findings = _build_temporal_findings(diagnostics=diagnostics, temporal_metrics=temporal_metrics)
+    report_run_metadata = _copy_mapping(run_metadata)
+    report_capture_metadata = _copy_mapping(capture_metadata)
 
     report = {
         "timestamp": timestamp or _utc_iso_now(),
         "document_id": document_id,
         "documents": documents,
         "evaluation_version": evaluation_version,
+        "run_metadata": report_run_metadata,
+        "capture_metadata": report_capture_metadata,
         "overall_quality": overall_quality,
         "quality_tier": _quality_tier(overall_quality),
         "metric_scores": metric_scores,
@@ -501,6 +509,15 @@ def compare_reports(
         if field in baseline_temporal_metrics or field in current_temporal_metrics
     }
 
+    baseline_run_metadata = _copy_mapping(baseline_report.get("run_metadata") if isinstance(baseline_report, Mapping) else {})
+    current_run_metadata = _copy_mapping(current_report.get("run_metadata") if isinstance(current_report, Mapping) else {})
+    baseline_capture_metadata = _copy_mapping(
+        baseline_report.get("capture_metadata") if isinstance(baseline_report, Mapping) else {}
+    )
+    current_capture_metadata = _copy_mapping(
+        current_report.get("capture_metadata") if isinstance(current_report, Mapping) else {}
+    )
+
     is_regression = _is_regression_delta(overall_quality_delta, tolerance) or bool(regressed_sections)
     return {
         "baseline_quality": baseline_quality,
@@ -512,6 +529,10 @@ def compare_reports(
         "temporal_delta_details": temporal_delta_details,
         "regressed_sections": regressed_sections,
         "improved_sections": improved_sections,
+        "baseline_run_metadata": baseline_run_metadata,
+        "current_run_metadata": current_run_metadata,
+        "baseline_capture_metadata": baseline_capture_metadata,
+        "current_capture_metadata": current_capture_metadata,
         "is_regression": is_regression,
         "tolerance": abs(tolerance),
     }

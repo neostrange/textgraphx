@@ -129,6 +129,7 @@ def test_main_exports_all_formats_by_default(tmp_path, monkeypatch, capsys):
         "textgraphx.evaluation.fullstack_harness",
         argparse.Namespace(FullStackEvaluator=_FakeEvaluator),
     )
+    monkeypatch.setattr(evaluate_kg_quality, "_current_git_commit", lambda repo_root: "test-commit")
 
     rc = evaluate_kg_quality.main([
         "--dataset-dir",
@@ -144,6 +145,7 @@ def test_main_exports_all_formats_by_default(tmp_path, monkeypatch, capsys):
 
     captured = capsys.readouterr()
     summary = json.loads(captured.out)
+    report_payload = json.loads((out_dir / "kg_quality_report.json").read_text(encoding="utf-8"))
     assert summary["entity_state_coverage_ratio"] == 0.25
     assert summary["entity_mentions_with_state_count"] == 5
     assert summary["tlink_anchor_inconsistent_count"] == 3
@@ -153,6 +155,11 @@ def test_main_exports_all_formats_by_default(tmp_path, monkeypatch, capsys):
     assert summary["tlink_missing_anchor_metadata_count"] == 0
     assert summary["temporal_findings"]["top_reciprocal_cycle_signal"]["document_id"] == 41
     assert summary["temporal_findings"]["documents_without_temporal_tlinks"] == [41]
+    assert summary["run_metadata"]["seed"] == 42
+    assert summary["run_metadata"]["cleanup_mode"] == "auto"
+    assert summary["capture_metadata"]["snapshot_kind"] == "current"
+    assert summary["capture_metadata"]["git_commit"] == "test-commit"
+    assert report_payload["capture_metadata"]["git_commit"] == "test-commit"
     assert "KG quality operator summary:" in captured.err
     assert "tlink_anchor_inconsistent=3" in captured.err
     assert "missing_anchor_metadata=0" in captured.err
@@ -181,6 +188,8 @@ def test_main_supports_optional_baseline_comparison(tmp_path, monkeypatch, capsy
         json.dumps(
             {
                 "overall_quality": 0.90,
+                "run_metadata": {"dataset_hash": "baseline-hash", "seed": 17},
+                "capture_metadata": {"snapshot_kind": "baseline", "git_commit": "baseline-commit"},
                 "structural_metrics": {"structural_health_score": 0.95},
                 "semantic_metrics": {"semantic_compliance_score": 0.91},
                 "temporal_metrics": {
@@ -272,6 +281,7 @@ def test_main_supports_optional_baseline_comparison(tmp_path, monkeypatch, capsy
         "textgraphx.evaluation.fullstack_harness",
         argparse.Namespace(FullStackEvaluator=_FakeEvaluator),
     )
+    monkeypatch.setattr(evaluate_kg_quality, "_current_git_commit", lambda repo_root: "current-commit")
 
     rc = evaluate_kg_quality.main([
         "--dataset-dir",
@@ -288,9 +298,13 @@ def test_main_supports_optional_baseline_comparison(tmp_path, monkeypatch, capsy
 
     captured = capsys.readouterr()
     summary = json.loads(captured.out)
+    comparison_payload = json.loads((out_dir / "kg_quality_comparison.json").read_text(encoding="utf-8"))
     assert summary["comparison"]["is_regression"] is True
     assert summary["comparison"]["temporal_delta_details"]["tlink_reciprocal_cycle_count"] == pytest.approx(0.0)
-    assert "temporal_delta_details" in json.loads((out_dir / "kg_quality_comparison.json").read_text(encoding="utf-8"))["comparison"]
+    assert summary["comparison"]["baseline_capture_metadata"]["git_commit"] == "baseline-commit"
+    assert summary["comparison"]["current_capture_metadata"]["git_commit"] == "current-commit"
+    assert "temporal_delta_details" in comparison_payload["comparison"]
+    assert comparison_payload["comparison"]["current_run_metadata"]["seed"] == 42
     assert summary["regression_detected"] is True
     assert "KG quality comparison:" in captured.err
     assert "KG temporal comparison:" in captured.err
@@ -312,6 +326,8 @@ def test_main_loads_existing_baseline_before_overwriting_output_report(tmp_path,
         json.dumps(
             {
                 "overall_quality": 0.92,
+                "run_metadata": {"dataset_hash": "baseline-hash", "seed": 11},
+                "capture_metadata": {"snapshot_kind": "baseline", "git_commit": "baseline-commit"},
                 "structural_metrics": {"structural_health_score": 0.95},
                 "semantic_metrics": {"semantic_compliance_score": 0.93},
                 "temporal_metrics": {
@@ -403,18 +419,24 @@ def test_main_loads_existing_baseline_before_overwriting_output_report(tmp_path,
         "textgraphx.evaluation.fullstack_harness",
         argparse.Namespace(FullStackEvaluator=_FakeEvaluator),
     )
+    monkeypatch.setattr(evaluate_kg_quality, "_current_git_commit", lambda repo_root: "current-commit")
 
     rc = evaluate_kg_quality.main([
         "--dataset-dir",
         str(dataset_dir),
         "--output-dir",
         str(out_dir),
+        "--snapshot-kind",
+        "baseline",
         "--baseline-report",
         str(baseline_path),
     ])
 
     assert rc == 0
     summary = json.loads(capsys.readouterr().out)
+    persisted_report = json.loads((out_dir / "kg_quality_report.json").read_text(encoding="utf-8"))
     assert summary["comparison"]["baseline_quality"] == pytest.approx(0.92)
     assert summary["comparison"]["current_quality"] == pytest.approx(0.84)
     assert summary["comparison"]["overall_quality_delta"] == pytest.approx(-0.08)
+    assert summary["capture_metadata"]["snapshot_kind"] == "baseline"
+    assert persisted_report["capture_metadata"]["git_commit"] == "current-commit"
