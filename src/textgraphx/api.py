@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import List, Optional
 
 try:
-    from textgraphx.time_utils import utc_iso_now
+    from textgraphx.reasoning.temporal.time import utc_iso_now
 except ImportError:  # pragma: no cover - support script-style execution
     from time_utils import utc_iso_now
 

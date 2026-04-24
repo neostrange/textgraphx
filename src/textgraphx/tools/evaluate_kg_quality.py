@@ -16,7 +16,7 @@ from textgraphx.evaluation.quality import (
     load_quality_report,
 )
 from textgraphx.evaluation.report_validity import RunMetadata, compute_config_hash, compute_dataset_hash
-from textgraphx.time_utils import utc_iso_now
+from textgraphx.reasoning.temporal.time import utc_iso_now
 
 
 def _build_parser() -> argparse.ArgumentParser:

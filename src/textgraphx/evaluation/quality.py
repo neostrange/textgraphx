@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence
 
 from textgraphx.evaluation.diagnostics import get_runtime_metrics
-from textgraphx.time_utils import utc_iso_now as _canonical_utc_iso_now
+from textgraphx.reasoning.temporal.time import utc_iso_now as _canonical_utc_iso_now
 
 
 def _utc_iso_now() -> str:

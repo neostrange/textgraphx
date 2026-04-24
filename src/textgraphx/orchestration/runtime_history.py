@@ -9,7 +9,7 @@ import sqlite3
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from textgraphx.time_utils import utc_iso_now
+from textgraphx.reasoning.temporal.time import utc_iso_now
 
 logger = logging.getLogger(__name__)
 

@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from math import inf
 from typing import Any, Dict, List, Optional
 
-from textgraphx.time_utils import utc_iso_now
+from textgraphx.reasoning.temporal.time import utc_iso_now
 from textgraphx.reasoning.contracts import count_endpoint_violations
 from textgraphx.reasoning.provenance import validate_inferred_relationship_provenance
 

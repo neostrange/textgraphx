@@ -10,7 +10,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-from textgraphx.time_utils import utc_iso_now, utc_timestamp_now
+from textgraphx.reasoning.temporal.time import utc_iso_now, utc_timestamp_now
 
 from .orchestrator import PipelineOrchestrator
 from .runtime_history import ExecutionHistory, ExecutionRecord
