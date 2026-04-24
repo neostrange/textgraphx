@@ -297,3 +297,124 @@ def test_main_supports_optional_baseline_comparison(tmp_path, monkeypatch, capsy
     assert "issue_delta=+9" in captured.err
     assert "connectivity_gap_docs=+1" in captured.err
     assert "docs_without_temporal_tlinks=+1" in captured.err
+
+
+@pytest.mark.unit
+def test_main_loads_existing_baseline_before_overwriting_output_report(tmp_path, monkeypatch, capsys):
+    dataset_dir = tmp_path / "dataset"
+    out_dir = tmp_path / "out"
+    dataset_dir.mkdir()
+    out_dir.mkdir()
+    (dataset_dir / "doc.naf").write_text("x", encoding="utf-8")
+
+    baseline_path = out_dir / "kg_quality_report.json"
+    baseline_path.write_text(
+        json.dumps(
+            {
+                "overall_quality": 0.92,
+                "structural_metrics": {"structural_health_score": 0.95},
+                "semantic_metrics": {"semantic_compliance_score": 0.93},
+                "temporal_metrics": {
+                    "temporal_consistency_score": 0.94,
+                    "tlink_reciprocal_cycle_count": 0,
+                    "documents_with_temporal_connectivity_gaps_count": 0,
+                    "documents_without_temporal_tlinks_count": 0,
+                    "temporal_issue_count": 1,
+                },
+                "phase_quality_scores": {"mention_layer": 0.93},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class _FakeSuite:
+        def overall_quality(self):
+            return 0.84
+
+        def conclusiveness(self):
+            return (True, [])
+
+        def quality_scores(self):
+            return {"mention_layer": 0.84}
+
+        runtime_diagnostics = {
+            "tlink_reciprocal_cycle_signals": [
+                {"document_id": 61, "rel_type": "BEFORE", "cycle_count": 2}
+            ],
+            "temporal_anchor_connectivity_gaps": [
+                {"document_id": 61, "connected_anchor_count": 0, "isolated_anchor_count": 3}
+            ],
+            "totals": {
+                "entity_state_coverage_ratio": 0.25,
+                "entity_mentions_with_state_count": 5,
+                "tlink_anchor_inconsistent_count": 3,
+                "tlink_anchor_self_link_count": 1,
+                "tlink_anchor_endpoint_violation_count": 2,
+                "tlink_anchor_filter_suppressed_count": 3,
+                "tlink_missing_anchor_metadata_count": 0,
+                "tlink_reciprocal_cycle_count": 2,
+                "documents_with_temporal_connectivity_gaps_count": 1,
+                "documents_without_temporal_tlinks_count": 1,
+            },
+        }
+
+    class _FakeEvaluator:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        def evaluate(self, determinism_pass=None):
+            assert determinism_pass is None
+            return _FakeSuite()
+
+        def export_csv(self, suite, path):
+            path.write_text("metric,val\nq,0.84\n", encoding="utf-8")
+
+        def export_markdown(self, suite, path):
+            path.write_text("# report", encoding="utf-8")
+
+    class _FakeGraph:
+        def close(self):
+            return None
+
+    fake_cfg = argparse.Namespace(
+        runtime=argparse.Namespace(
+            mode="testing",
+            strict_transition_gate=True,
+            enable_cross_document_fusion=False,
+        ),
+        services=argparse.Namespace(
+            temporal_url="http://temporal",
+            coref_url="http://coref",
+            srl_url="http://srl",
+        ),
+    )
+
+    def _fake_get_config():
+        return fake_cfg
+
+    monkeypatch.setitem(__import__("sys").modules, "textgraphx.config", argparse.Namespace(get_config=_fake_get_config))
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "textgraphx.neo4j_client",
+        argparse.Namespace(make_graph_from_config=lambda: _FakeGraph()),
+    )
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "textgraphx.evaluation.fullstack_harness",
+        argparse.Namespace(FullStackEvaluator=_FakeEvaluator),
+    )
+
+    rc = evaluate_kg_quality.main([
+        "--dataset-dir",
+        str(dataset_dir),
+        "--output-dir",
+        str(out_dir),
+        "--baseline-report",
+        str(baseline_path),
+    ])
+
+    assert rc == 0
+    summary = json.loads(capsys.readouterr().out)
+    assert summary["comparison"]["baseline_quality"] == pytest.approx(0.92)
+    assert summary["comparison"]["current_quality"] == pytest.approx(0.84)
+    assert summary["comparison"]["overall_quality_delta"] == pytest.approx(-0.08)
