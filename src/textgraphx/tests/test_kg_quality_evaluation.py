@@ -54,6 +54,13 @@ def _sample_runtime_diagnostics():
                 "duration_seconds": 0.75,
             },
         ],
+        "tlink_reciprocal_cycle_signals": [
+            {"document_id": 17, "rel_type": "BEFORE", "cycle_count": 2},
+        ],
+        "temporal_anchor_connectivity_gaps": [
+            {"document_id": 17, "connected_anchor_count": 1, "isolated_anchor_count": 3},
+            {"document_id": 29, "connected_anchor_count": 0, "isolated_anchor_count": 2},
+        ],
         "totals": {
             "assertion_violation_count": 1,
             "referential_integrity_violation_count": 2,
@@ -119,6 +126,8 @@ def test_generate_quality_report_uses_suite_and_emits_recommendations():
     assert report["conclusive"] is False
     assert report["runtime_diagnostics"]["totals"]["glink_count"] == 3
     assert report["glink_count"] == 3
+    assert report["temporal_findings"]["top_reciprocal_cycle_signal"]["document_id"] == 17
+    assert report["temporal_findings"]["documents_without_temporal_tlinks"] == [29]
     assert report["warnings"]
     assert any("Temporal consistency issues" in warning for warning in report["warnings"])
     assert any("reciprocal cycles" in rec for rec in report["recommendations"])

@@ -157,6 +157,9 @@ def _build_operator_summary(summary: dict) -> str | None:
         "tlink_anchor_endpoint_violation_count",
         "tlink_anchor_filter_suppressed_count",
         "tlink_missing_anchor_metadata_count",
+        "tlink_reciprocal_cycle_count",
+        "documents_with_temporal_connectivity_gaps_count",
+        "documents_without_temporal_tlinks_count",
     )
     if not all(k in summary for k in required):
         return None
@@ -168,7 +171,10 @@ def _build_operator_summary(summary: dict) -> str | None:
         f"self_links={int(summary.get('tlink_anchor_self_link_count', 0))} "
         f"endpoint_violations={int(summary.get('tlink_anchor_endpoint_violation_count', 0))} "
         f"anchor_suppressed={int(summary.get('tlink_anchor_filter_suppressed_count', 0))} "
-        f"missing_anchor_metadata={int(summary.get('tlink_missing_anchor_metadata_count', 0))}"
+        f"missing_anchor_metadata={int(summary.get('tlink_missing_anchor_metadata_count', 0))} "
+        f"reciprocal_cycles={int(summary.get('tlink_reciprocal_cycle_count', 0))} "
+        f"connectivity_gap_docs={int(summary.get('documents_with_temporal_connectivity_gaps_count', 0))} "
+        f"docs_without_temporal_tlinks={int(summary.get('documents_without_temporal_tlinks_count', 0))}"
     )
 
 
