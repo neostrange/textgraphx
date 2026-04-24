@@ -58,7 +58,7 @@ class PipelineOrchestrator:
         "MATCH (n:TagOccurrence) RETURN count(n) AS c": 1,
         "MATCH (n:TEvent) RETURN count(n) AS c": 1,
         "MATCH (n:TIMEX) RETURN count(n) AS c": 1,
-        "MATCH ()-[r:FRAME_DESCRIBES_EVENT]->() WITH count(r) AS canonical MATCH ()-[l:DESCRIBES]->() RETURN CASE WHEN canonical > 0 THEN canonical ELSE count(l) END AS c": 1,
+        "MATCH ()-[r:FRAME_DESCRIBES_EVENT]->() WITH count(r) AS canonical MATCH ()-[l:DESCRIBES]->() WITH canonical, count(l) as l_count RETURN CASE WHEN canonical > 0 THEN canonical ELSE l_count END AS c": 1,
         "MATCH ()-[r:TLINK]->() RETURN count(r) AS c": 1,
     }
 

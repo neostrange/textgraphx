@@ -3,6 +3,7 @@
 __all__ = [
     "EventEnrichmentPhase",
     "TemporalPhase",
+    "TlinksRecognizer",
 ]
 
 
@@ -15,4 +16,8 @@ def __getattr__(name):
         from textgraphx.pipeline.phases.temporal import TemporalPhase
 
         return TemporalPhase
+    if name == "TlinksRecognizer":
+        from textgraphx.pipeline.phases.tlinks_recognizer import TlinksRecognizer
+
+        return TlinksRecognizer
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

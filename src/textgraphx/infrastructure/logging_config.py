@@ -8,7 +8,7 @@ import os
 from logging.handlers import TimedRotatingFileHandler
 from typing import Optional
 
-from textgraphx.config import get_config
+from textgraphx.infrastructure.config import get_config
 
 
 def configure_logging(level: Optional[str] = None) -> None:
