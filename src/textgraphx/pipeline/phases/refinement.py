@@ -1325,8 +1325,8 @@ class RefinementPhase():
         #   the POS tag (which would silently encode Penn-Treebank tags like
         #   'NN' into the ontology).
         query = """
-            MATCH p = (f:FrameArgument WHERE f.type IN ['ARG0','ARG1','ARG2','ARG3','ARG4'])
-                      -[:IN_FRAME]-(complementHead:TagOccurrence)
+                        MATCH (f:FrameArgument WHERE f.type IN ['ARG0','ARG1','ARG2','ARG3','ARG4'])
+                                            -[:IN_FRAME]-(complementHead:TagOccurrence)
             WHERE f.complementIndex = complementHead.tok_index_doc
               AND NOT exists ((complementHead)-[]-(:NamedEntity {headTokenIndex: complementHead.tok_index_doc}))
               AND NOT exists ((f)-[:REFERS_TO]-(:NamedEntity))
@@ -1342,7 +1342,7 @@ class RefinementPhase():
                 source: 'refinement',
                 provenance_rule_id: 'link_fa_pobj_entity'
             }]->(e)
-            RETURN p
+                        RETURN count(*) AS linked
         """
         data = graph.run(query).data()
         
