@@ -39,11 +39,23 @@ TEXTGRAPHX_RUNTIME_MODE=production python -m textgraphx.run_pipeline \
     --dataset-dir src/textgraphx/datastore/dataset \
     --cleanup none
 
-# 3. Capture a post-run quality snapshot.
-bash scripts/run_quality_baseline.sh \
+# 3. Capture a post-run quality snapshot in the canonical latest location.
+python -m textgraphx.tools.evaluate_kg_quality \
     --dataset-dir src/textgraphx/datastore/dataset \
-    --output-dir  out/evaluation/production-$(date -u +%Y%m%d)
+    --output-dir  src/textgraphx/datastore/evaluation/latest \
+    --baseline-report src/textgraphx/datastore/evaluation/baseline/kg_quality_report.json \
+    --json --csv --markdown
 ```
+
+This writes the current report into `src/textgraphx/datastore/evaluation/latest/`
+and emits `kg_quality_comparison.json` there for quick baseline-vs-current
+inspection.
+
+If you are intentionally refreshing the committed baseline instead of validating
+a current production run, use `scripts/run_quality_baseline.sh` with its
+default output directory. That workflow now compares the candidate snapshot
+against the previously accepted baseline before overwrite and writes the delta
+to `src/textgraphx/datastore/evaluation/baseline/kg_quality_comparison.json`.
 
 ## Post-run validation steps
 
@@ -62,7 +74,7 @@ counts were zero or below threshold.
 # Compare the post-run snapshot against the committed baseline.
 python -m textgraphx.tools.check_quality_gate \
     --baseline src/textgraphx/datastore/evaluation/baseline/kg_quality_report.json \
-    --current  out/evaluation/production-$(date -u +%Y%m%d)/kg_quality_report.json \
+    --current  src/textgraphx/datastore/evaluation/latest/kg_quality_report.json \
     --tolerance 0.02 \
     --max-tlink-anchor-inconsistent-increase 0 \
     --max-tlink-reciprocal-cycle-increase 0 \

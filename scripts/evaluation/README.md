@@ -33,4 +33,5 @@ Retention policy (repo hygiene):
 
 - `src/textgraphx/datastore/evaluation/latest/` is the mutable latest snapshot location.
 - `src/textgraphx/datastore/evaluation/baseline/` stores curated baseline snapshots used for comparison.
+- Refreshing the baseline with `scripts/run_quality_baseline.sh` now emits `kg_quality_comparison.json` when a prior baseline exists; review that delta before committing the refreshed snapshot.
 - Historical `cycle_*` runs should not be committed; archive externally when needed.
