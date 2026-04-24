@@ -105,13 +105,51 @@ expected callers during the migration window.
 
 ---
 
+## Module-level shims at the package root
+
+As part of the Phase 4 pipeline reorganization, six legacy module paths at
+`textgraphx.<Name>` were replaced by canonical modules under
+`textgraphx.pipeline.*`.  The legacy paths are retained as
+backward-compatibility shims and are scheduled for **removal in v2.0.0**.
+
+| Legacy import (deprecated) | Canonical replacement | Emits `DeprecationWarning` |
+|----------------------------|-----------------------|----------------------------|
+| `textgraphx.EventEnrichmentPhase` | `textgraphx.pipeline.phases.event_enrichment` | yes |
+| `textgraphx.TemporalPhase` | `textgraphx.pipeline.phases.temporal` | yes |
+| `textgraphx.TlinksRecognizer` | `textgraphx.pipeline.phases.tlinks_recognizer` | yes |
+| `textgraphx.GraphBasedNLP` | `textgraphx.pipeline.ingestion.graph_based_nlp` | not yet (in-tree callers remain) |
+| `textgraphx.RefinementPhase` | `textgraphx.pipeline.phases.refinement` | not yet (in-tree callers remain) |
+| `textgraphx.TextProcessor` | `textgraphx.pipeline.ingestion.text_processor` | not yet (in-tree callers remain) |
+
+The three silent shims will be upgraded to emit `DeprecationWarning` once all
+in-tree callers have been migrated to the canonical paths.  Tracking item:
+migrate `pipeline/runtime/phase_wrappers.py`, `infrastructure/graphbased_api.py`,
+`tools/nominal_coverage_probe.py`, `text_processing_components/EntityExtractor.py`,
+`text_processing_components/EntityProcessor.py`, and the
+`text_processing_components/llm/*` SRL modules.
+
+### Already-removed shims (history)
+
+The following package-root utility shims were deleted in
+commits `06373f8` and `ea58e4d` because they had no remaining callers:
+
+`config`, `neo4j_client`, `phase_assertions`, `phase_wrappers`, `provenance`,
+`run_report`, `text_normalization`, `time_utils`, plus 27 additional
+shims dropped in the bulk-deletion pass.  Use the canonical subpackage
+paths (`infrastructure.config`, `database.client`,
+`pipeline.runtime.phase_assertions`, `pipeline.runtime.phase_wrappers`,
+`reasoning.provenance`, `evaluation.reports`,
+`pipeline.ingestion.text_normalization`, `reasoning.temporal.time`).
+
+---
+
 ## Timeline
 
 | Milestone | Action |
 |-----------|--------|
-| **v1.0.0** (current) | Deprecated methods emit `DeprecationWarning` at runtime |
-| **v1.x** (next minor) | Deprecation warnings upgraded to `FutureWarning` in CI; any new caller in `main` will fail CI |
-| **v2.0.0** | Deprecated methods removed; `temporal_legacy_compat.py` deleted |
+| **v1.0.0** (current) | Deprecated methods emit `DeprecationWarning` at runtime; module-level shims documented (3 of 6 emit warnings) |
+| **v1.x** (next minor) | Deprecation warnings upgraded to `FutureWarning` in CI; any new caller in `main` will fail CI; remaining 3 silent shims upgraded to `DeprecationWarning` after in-tree caller migration |
+| **v2.0.0** | Deprecated methods removed; module-level shims removed; `temporal_legacy_compat.py` deleted |
 
 The v2.0.0 target date is coordinated with the resolution of all outstanding
 callers catalogued in `tests/test_item4_remediation_plan.py`.
