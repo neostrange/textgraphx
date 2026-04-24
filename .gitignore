@@ -76,6 +76,9 @@ datastore/evaluation/tmp_pred_xml/
 # ── Runtime config (contains secrets) ───────────────────────────────────────
 config.ini
 textgraphx/config.ini
+.env
+.env.*
+!.env.example
 
 # ── Development artefacts ────────────────────────────────────────────────────
 MagicMock/
