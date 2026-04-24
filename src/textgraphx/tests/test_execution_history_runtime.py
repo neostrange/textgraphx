@@ -14,10 +14,14 @@ except ModuleNotFoundError:
     pytest.skip("sqlite3 module is unavailable in this Python environment", allow_module_level=True)
 
 from textgraphx.execution_history import ExecutionRecord
+from textgraphx.orchestration.runtime_history import ExecutionRecord as CanonicalExecutionRecord
 
 
 @pytest.mark.unit
 class TestExecutionHistoryTimestampBehavior:
+    def test_root_execution_history_wrapper_reexports_canonical_record(self):
+        assert ExecutionRecord is CanonicalExecutionRecord
+
     def test_default_started_and_completed_are_timezone_aware_utc(self):
         record = ExecutionRecord(
             execution_id="exec-1",

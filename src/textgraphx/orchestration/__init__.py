@@ -1,13 +1,23 @@
 """Orchestration module for the textgraphx pipeline."""
 
-from .orchestrator import PipelineOrchestrator, JobScheduler
-from .db_interface import ExecutionHistory, ExecutionRecord, ExecutionStatus, ExecutionStatistics
+from .checkpoint import CheckpointManager, CheckpointSummary
+from .db_interface import ExecutionHistory, ExecutionRecord, ExecutionStatistics, ExecutionStatus
+from .orchestrator import JobScheduler, PipelineOrchestrator
+from .runtime_summary import ExecutionSummary, PhaseMetrics, print_phase_progress
+from .scheduler import PipelineScheduler, get_scheduler
 
 __all__ = [
-    "PipelineOrchestrator",
-    "JobScheduler",
+    "CheckpointManager",
+    "CheckpointSummary",
     "ExecutionHistory",
     "ExecutionRecord",
-    "ExecutionStatus",
     "ExecutionStatistics",
+    "ExecutionStatus",
+    "ExecutionSummary",
+    "JobScheduler",
+    "PhaseMetrics",
+    "PipelineOrchestrator",
+    "PipelineScheduler",
+    "get_scheduler",
+    "print_phase_progress",
 ]
