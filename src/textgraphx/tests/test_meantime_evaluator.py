@@ -246,6 +246,79 @@ def test_render_markdown_report_contains_key_sections():
     assert "## Per-Document Diagnostics" in md
 
 
+def test_render_markdown_report_renders_batch_determinism_correctly():
+    """Batch reports use 'all_stable'; markdown must read that, not the per-doc 'deterministic' field."""
+    report = {
+        "mode": "batch",
+        "documents_evaluated": 2,
+        "aggregate": {},
+        "diagnostics": {},
+        "reports": [],
+        "projection_determinism": {
+            "all_stable": True,
+            "documents_checked": 2,
+            "stable_documents": 2,
+            "unstable_documents": 0,
+            "runs": 2,
+            "by_doc": {
+                "doc1": {"deterministic": True, "runs": 2, "mismatch_runs": []},
+                "doc2": {"deterministic": True, "runs": 2, "mismatch_runs": []},
+            },
+        },
+    }
+    md = render_markdown_report(report)
+    assert "## Projection Determinism" in md
+    assert "- Deterministic: True" in md
+    assert "- Documents: 2/2 stable" in md
+    assert "- Runs: 2" in md
+    assert "Unstable docs:" not in md
+
+
+def test_render_markdown_report_renders_batch_determinism_with_unstable_docs():
+    report = {
+        "mode": "batch",
+        "documents_evaluated": 2,
+        "aggregate": {},
+        "diagnostics": {},
+        "reports": [],
+        "projection_determinism": {
+            "all_stable": False,
+            "documents_checked": 2,
+            "stable_documents": 1,
+            "unstable_documents": 1,
+            "runs": 3,
+            "by_doc": {
+                "stable_doc": {"deterministic": True, "runs": 3, "mismatch_runs": []},
+                "flaky_doc": {"deterministic": False, "runs": 3, "mismatch_runs": [1, 2]},
+            },
+        },
+    }
+    md = render_markdown_report(report)
+    assert "- Deterministic: False" in md
+    assert "- Documents: 1/2 stable, 1 unstable" in md
+    assert "- Unstable docs: flaky_doc" in md
+
+
+def test_render_markdown_report_renders_singledoc_determinism():
+    """Single-doc reports use the 'deterministic' field; preserve legacy rendering."""
+    report = {
+        "mode": "single",
+        "documents_evaluated": 1,
+        "aggregate": {},
+        "diagnostics": {},
+        "reports": [],
+        "projection_determinism": {
+            "deterministic": True,
+            "runs": 2,
+            "mismatch_runs": [],
+        },
+    }
+    md = render_markdown_report(report)
+    assert "- Deterministic: True" in md
+    assert "- Runs: 2" in md
+    assert "- Mismatch runs: none" in md
+
+
 def test_relation_error_bucket_detects_type_mismatch():
     gold = {
         Relation(

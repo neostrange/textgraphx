@@ -2700,10 +2700,30 @@ def render_markdown_report(report: Dict[str, Any]) -> str:
     if determinism:
         lines.append("## Projection Determinism")
         lines.append("")
-        lines.append(f"- Deterministic: {bool(determinism.get('deterministic', False))}")
-        lines.append(f"- Runs: {int(determinism.get('runs', 0))}")
-        mismatch_runs = determinism.get("mismatch_runs") or []
-        lines.append(f"- Mismatch runs: {mismatch_runs if mismatch_runs else 'none'}")
+        # Aggregate (batch) reports use 'all_stable'; single-doc reports use 'deterministic'.
+        if "all_stable" in determinism:
+            stable = bool(determinism.get("all_stable"))
+            documents_checked = int(determinism.get("documents_checked", 0))
+            stable_documents = int(determinism.get("stable_documents", 0))
+            unstable_documents = int(determinism.get("unstable_documents", 0))
+            lines.append(f"- Deterministic: {stable}")
+            lines.append(f"- Runs: {int(determinism.get('runs', 0))}")
+            lines.append(
+                f"- Documents: {stable_documents}/{documents_checked} stable"
+                + (f", {unstable_documents} unstable" if unstable_documents else "")
+            )
+            unstable = [
+                doc_id
+                for doc_id, info in (determinism.get("by_doc") or {}).items()
+                if not bool(info.get("deterministic", True))
+            ]
+            if unstable:
+                lines.append(f"- Unstable docs: {', '.join(sorted(unstable))}")
+        else:
+            lines.append(f"- Deterministic: {bool(determinism.get('deterministic', False))}")
+            lines.append(f"- Runs: {int(determinism.get('runs', 0))}")
+            mismatch_runs = determinism.get("mismatch_runs") or []
+            lines.append(f"- Mismatch runs: {mismatch_runs if mismatch_runs else 'none'}")
         lines.append("")
 
     diagnostics = report.get("diagnostics", {})
