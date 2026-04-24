@@ -39,7 +39,7 @@ def _resolve_repo_root() -> Path:
 ROOT = _resolve_repo_root()
 ONTOLOGY_JSON = ROOT / "schema" / "ontology.json"
 MIGRATIONS_DIR = ROOT / "schema" / "migrations"
-TEXT_PROCESSOR_SRC = ROOT / "TextProcessor.py"
+TEXT_PROCESSOR_SRC = ROOT / "pipeline" / "ingestion" / "text_processor.py"
 
 
 def _payload() -> dict:
@@ -296,17 +296,21 @@ class TestNegativeDriftDetection:
     def test_id_r_as_node_key_isolated_to_legacy_writer(self):
         """The anti-pattern {id: id(r)} (using a Neo4j internal relationship ID as a
         node property key, making identity non-deterministic across restarts) must only
-        appear in TextProcessor.py — the one legacy writer we documented in M6.
+        appear in the canonical TextProcessor source module.
         Read-only RETURN id(r) clauses are acceptable and excluded from this check."""
         import subprocess
         result = subprocess.run(
             ["grep", "-rn", "id(r)", "--include=*.py",
-             str(ROOT / "textgraphx")],
+             str(ROOT)],
             capture_output=True, text=True
         )
         hits = []
+        this_test_path = Path(__file__).resolve()
         for line in result.stdout.splitlines():
-            if "TextProcessor.py" in line:
+            path_text = line.split(":", 2)[0]
+            if Path(path_text).resolve() == this_test_path:
+                continue
+            if str(TEXT_PROCESSOR_SRC.relative_to(ROOT)) in line:
                 continue
             if line.strip().startswith("#"):
                 continue
@@ -316,7 +320,7 @@ class TestNegativeDriftDetection:
             if re.search(r"id\s*:\s*id\(r\)", code):
                 hits.append(line)
         assert not hits, (
-            "DRIFT DETECTED: id(r) used as a node property key outside TextProcessor.py. "
+            "DRIFT DETECTED: id(r) used as a node property key outside canonical TextProcessor source. "
             "New code must use stable deterministic ids:\n" + "\n".join(hits)
         )
 

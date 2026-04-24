@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 # Path constants
-REPO_ROOT = Path(__file__).parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 PKG_ROOT = REPO_ROOT / "textgraphx"
 TEMPORAL_SRC = PKG_ROOT / "TemporalPhase.py"
 TLINKS_SRC = PKG_ROOT / "TlinksRecognizer.py"
@@ -244,7 +244,7 @@ class TestTextProcessorDecomposition:
             )
 
         # TextProcessor delegates construction to the factory (DI wire-up)
-        tp_path = PKG_ROOT / "TextProcessor.py"
+        tp_path = PKG_ROOT / "pipeline" / "ingestion" / "text_processor.py"
         assert tp_path.exists()
         tp_code = tp_path.read_text()
         assert "component_factory" in tp_code, (

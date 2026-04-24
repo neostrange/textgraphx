@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Dict, List, Set
 
 
-REPO_ROOT = Path(__file__).parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 TEXTGRAPHX_DIR = REPO_ROOT / "textgraphx"
 
 
@@ -117,8 +117,8 @@ class TestTextProcessorDecompositionImplementation:
     @pytest.fixture(autouse=True)
     def setup(self):
         """Load TextProcessor code."""
-        self.text_processor_path = TEXTGRAPHX_DIR / "TextProcessor.py"
-        assert self.text_processor_path.exists(), "TextProcessor.py not found"
+        self.text_processor_path = TEXTGRAPHX_DIR / "pipeline" / "ingestion" / "text_processor.py"
+        assert self.text_processor_path.exists(), "canonical TextProcessor source not found"
         self.text_processor_code = self.text_processor_path.read_text()
 
     def test_text_processor_has_stage_services(self):

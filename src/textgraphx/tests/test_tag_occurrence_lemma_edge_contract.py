@@ -20,7 +20,7 @@ def test_store_tag_query_uses_has_lemma_not_refers_to():
 
 
 def test_text_processor_active_code_uses_has_lemma_not_refers_to_for_tag_links():
-    src = Path(__file__).resolve().parents[1] / "TextProcessor.py"
+    src = Path(__file__).resolve().parents[1] / "pipeline" / "ingestion" / "text_processor.py"
     lines = src.read_text(encoding="utf-8").splitlines()
     active = [line for line in lines if not line.lstrip().startswith("#")]
     active_code = "\n".join(active)

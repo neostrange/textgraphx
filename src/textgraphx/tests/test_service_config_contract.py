@@ -34,7 +34,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 PKG_ROOT = REPO_ROOT / "textgraphx"
 RESTCALLER_SRC = PKG_ROOT / "util" / "RestCaller.py"
 COREF_SRC = PKG_ROOT / "util" / "CallAllenNlpCoref.py"
-TEXT_PROC_SRC = PKG_ROOT / "TextProcessor.py"
+TEXT_PROC_SRC = PKG_ROOT / "pipeline" / "ingestion" / "text_processor.py"
 CONFIG_SRC = PKG_ROOT / "config.py"
 EXAMPLE_TOML = PKG_ROOT / "config.example.toml"
 
