@@ -281,7 +281,8 @@ class RefinementPhase():
                  UNWIND $rows AS row
                  MATCH (e:Entity {{id: row.entity_id}})
                  MERGE (em:EntityMention {{uid: row.mention_uid}})
-                 SET em:NominalMention,
+                      SET em:NominalMention,
+                          em:Mention,
                     em.uid = row.mention_uid,
                     em.id = row.mention_id,
                     em.legacy_span_id = coalesce(em.legacy_span_id, row.mention_id),
@@ -1315,20 +1316,35 @@ class RefinementPhase():
         logger.debug("link_frameArgument_to_namedEntity_for_pobj_entity")
         graph = self.graph
 
-        query = """    
-                        MATCH p= (f:FrameArgument where f.type in ['ARG0','ARG1','ARG2','ARG3','ARG4'])-[:IN_FRAME]-
-                        (complementHead:TagOccurrence)
-                        where f.complementIndex = complementHead.tok_index_doc and not exists 
-                        ((complementHead)-[]-(:NamedEntity {headTokenIndex: complementHead.tok_index_doc})) and not exists
-                        ((f)-[:REFERS_TO]-(:NamedEntity))
-                        MERGE (e:Entity {id: f.complementFullText})
-                        ON CREATE SET e.type = complementHead.pos, e.syntacticType = complementHead.pos, e.head = f.complement, e.headTokenIndex = f.complementIndex
-                        MERGE (complementHead)-[:PARTICIPATES_IN]->(e)
-                        MERGE (f)-[:REFERS_TO]->(e)
-                        RETURN p   
-        
+        # Entity.id is built from a normalized complement + type so it is
+        # deterministic and namespace-scoped (never a raw surface string).
+        # The Cypher expression mirrors make_entity_id's unresolved branch:
+        #   "entity_" + doc-scope is not available here (frame rule runs
+        #   without an explicit document_id param), so we use a content hash
+        #   of the normalized complement + 'NOMINAL' as the type instead of
+        #   the POS tag (which would silently encode Penn-Treebank tags like
+        #   'NN' into the ontology).
+        query = """
+            MATCH p = (f:FrameArgument WHERE f.type IN ['ARG0','ARG1','ARG2','ARG3','ARG4'])
+                      -[:IN_FRAME]-(complementHead:TagOccurrence)
+            WHERE f.complementIndex = complementHead.tok_index_doc
+              AND NOT exists ((complementHead)-[]-(:NamedEntity {headTokenIndex: complementHead.tok_index_doc}))
+              AND NOT exists ((f)-[:REFERS_TO]-(:NamedEntity))
+            WITH f, complementHead,
+                 'entity_' + apoc.text.clean(toLower(coalesce(f.complementFullText, ''))) AS entity_id
+            MERGE (e:Entity {id: entity_id})
+            ON CREATE SET e.type = 'NOMINAL',
+                      e.head = f.complement,
+                      e.headTokenIndex = f.complementIndex
+            MERGE (complementHead)-[:PARTICIPATES_IN]->(e)
+            MERGE (f)-[:REFERS_TO {
+                type: 'evoke',
+                source: 'refinement',
+                provenance_rule_id: 'link_fa_pobj_entity'
+            }]->(e)
+            RETURN p
         """
-        data= graph.run(query).data()
+        data = graph.run(query).data()
         
         return ""
     
@@ -1832,69 +1848,72 @@ class RefinementPhase():
                  OPTIONAL MATCH (tok:TagOccurrence)-[:PARTICIPATES_IN]->(nc)
                  OPTIONAL MATCH (d:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok)
                  WITH nc, d,
-                     min(tok.tok_index_doc) AS min_tok,
-                     max(tok.tok_index_doc) AS max_tok,
-                     min(tok.index) AS min_char,
-                                         max(tok.end_index) AS max_char,
-                                         toLower(trim(coalesce(nc.value, ''))) AS chunk_text_lc
+                      min(tok.tok_index_doc) AS min_tok,
+                      max(tok.tok_index_doc) AS max_tok,
+                      min(tok.index) AS min_char,
+                      max(tok.end_index) AS max_char,
+                      toLower(trim(coalesce(nc.value, ''))) AS chunk_text_lc
                  WHERE min_tok IS NOT NULL AND max_tok IS NOT NULL
+                 OPTIONAL MATCH (headTok:TagOccurrence)-[:PARTICIPATES_IN]->(nc)
+                 WHERE headTok.tok_index_doc = coalesce(nc.headTokenIndex, min_tok)
+                 WITH nc, d, min_tok, max_tok, min_char, max_char, chunk_text_lc,
+                      coalesce(headTok.upos, '') AS head_upos,
+                      coalesce(headTok.pos, '') AS head_pos,
+                      coalesce(nc.syntactic_type, nc.syntacticType, 'NOM') AS syntactic_type
                  OPTIONAL MATCH (ne:NamedEntity)
                  WHERE coalesce(ne.start_tok, ne.token_start, ne.index) = min_tok
                    AND coalesce(ne.end_tok, ne.token_end, ne.end_index, ne.index) = max_tok
-                                 WITH nc, d, min_tok, max_tok, min_char, max_char, chunk_text_lc,
-                                            count(ne) AS ne_count
-                                 WHERE ne_count = 0
-                                     AND chunk_text_lc <> ''
-                                     AND NOT chunk_text_lc IN ['yesterday', 'today', 'tomorrow']
-                                     AND NOT chunk_text_lc CONTAINS '%'
-                                     AND NOT chunk_text_lc CONTAINS '$'
-                                     AND NOT chunk_text_lc CONTAINS '€'
-                                     AND NOT chunk_text_lc CONTAINS '£'
-                                     AND NOT chunk_text_lc CONTAINS '¥'
-                                     AND NOT chunk_text_lc =~ '.*[0-9].*'
-                                     AND NOT (chunk_text_lc STARTS WITH 'this ' AND (chunk_text_lc CONTAINS ' day' OR chunk_text_lc CONTAINS ' week' OR chunk_text_lc CONTAINS ' month' OR chunk_text_lc CONTAINS ' year'))
-                                     AND NOT (chunk_text_lc STARTS WITH 'that ' AND (chunk_text_lc CONTAINS ' day' OR chunk_text_lc CONTAINS ' week' OR chunk_text_lc CONTAINS ' month' OR chunk_text_lc CONTAINS ' year'))
-                                     AND NOT (chunk_text_lc STARTS WITH 'last ' AND (chunk_text_lc CONTAINS ' day' OR chunk_text_lc CONTAINS ' week' OR chunk_text_lc CONTAINS ' month' OR chunk_text_lc CONTAINS ' year'))
-                                     AND NOT (chunk_text_lc STARTS WITH 'next ' AND (chunk_text_lc CONTAINS ' day' OR chunk_text_lc CONTAINS ' week' OR chunk_text_lc CONTAINS ' month' OR chunk_text_lc CONTAINS ' year'))
-                 WITH nc,
-                     CASE WHEN coalesce(toString(d.id), split(nc.id, '_')[1], '0') =~ '^[0-9]+$'
-                         THEN toInteger(coalesce(toString(d.id), split(nc.id, '_')[1], '0'))
-                         ELSE 0 END AS doc_id,
-                     min_tok AS start_tok,
-                     max_tok AS end_tok,
-                     min_char AS start_char,
-                     max_char AS end_char
-                 WITH nc, doc_id, start_tok, end_tok, start_char, end_char,
-                     'nominal_chunk_' + toString(doc_id) + '_' + toString(start_tok) + '_' + toString(end_tok) AS entity_id,
-                     'nom_mention_nc_' + toString(doc_id) + '_' + toString(start_tok) + '_' + toString(end_tok) AS mention_id,
-                     coalesce(nc.syntactic_type, nc.syntacticType, 'NOM') AS syntactic_type
-                 MERGE (e:Entity {id: entity_id, type: 'NOMINAL'})
-                 SET e.syntacticType = syntactic_type,
-                                     e.syntactic_type = syntactic_type,
-                    e.head = coalesce(e.head, nc.value),
-                    e.start_tok = start_tok,
-                    e.end_tok = end_tok,
-                    e.start_char = start_char,
-                    e.end_char = end_char,
-                    e.text = coalesce(e.text, nc.value),
-                    e.source = 'noun_chunk_nominal',
-                    e.source_noun_chunk_id = nc.id,
-                    e.provenance_rule_id = 'refinement.materialize_nominal_mentions_from_noun_chunks'
+                 WITH nc, d, min_tok, max_tok, min_char, max_char, chunk_text_lc,
+                      head_upos, head_pos, syntactic_type,
+                      count(ne) AS ne_count
+                 WITH nc, d, min_tok, max_tok, min_char, max_char, chunk_text_lc,
+                      head_upos, head_pos, syntactic_type,
+                      CASE
+                          WHEN chunk_text_lc = '' THEN 'drop_empty_chunk'
+                          WHEN ne_count > 0 THEN 'drop_named_entity_overlap'
+                          WHEN syntactic_type IN ['PRO', 'PRONOMINAL'] THEN 'drop_pronominal_syntactic_type'
+                          WHEN head_upos IN ['PRON', 'DET', 'NUM'] THEN 'drop_head_upos'
+                          WHEN head_pos IN ['PRP', 'PRP$', 'WP', 'WP$', 'DT', 'WDT', 'PDT', 'CD'] THEN 'drop_head_pos'
+                          ELSE 'keep'
+                      END AS filter_reason
+                 WITH nc, d, min_tok, max_tok, min_char, max_char,
+                      chunk_text_lc, syntactic_type, filter_reason,
+                      CASE WHEN coalesce(toString(d.id), split(nc.id, '_')[1], '0') =~ '^[0-9]+$'
+                           THEN toInteger(coalesce(toString(d.id), split(nc.id, '_')[1], '0'))
+                           ELSE 0 END AS doc_id
                  RETURN DISTINCT
-                    e.id AS entity_id,
-                    nc.id AS source_noun_chunk_id,
-                    doc_id,
-                    coalesce(nc.value, '') AS value,
-                    coalesce(e.head, nc.value) AS head,
-                    start_tok AS headTokenIndex,
-                    start_tok,
-                    end_tok,
-                    start_char,
-                    end_char,
-                    syntactic_type,
-                    mention_id
+                      'nominal_chunk_' + toString(doc_id) + '_' + toString(min_tok) + '_' + toString(max_tok) AS entity_id,
+                      nc.id AS source_noun_chunk_id,
+                      doc_id,
+                      coalesce(nc.value, '') AS value,
+                      coalesce(nc.head, nc.value, '') AS head,
+                      min_tok AS headTokenIndex,
+                      min_tok AS start_tok,
+                      max_tok AS end_tok,
+                      min_char AS start_char,
+                      max_char AS end_char,
+                      syntactic_type,
+                      'nom_mention_nc_' + toString(doc_id) + '_' + toString(min_tok) + '_' + toString(max_tok) AS mention_id,
+                      filter_reason
         """
-        rows = graph.run(candidate_query).data()
+        all_rows = graph.run(candidate_query).data()
+        kept_rows = [row for row in all_rows if row.get("filter_reason") == "keep"]
+
+        dropped_by_reason = {}
+        for row in all_rows:
+            reason = row.get("filter_reason", "unknown")
+            if reason != "keep":
+                dropped_by_reason[reason] = dropped_by_reason.get(reason, 0) + 1
+        logger.info(
+            "materialize_nominal_mentions_from_noun_chunks telemetry",
+            extra={
+                "kept": len(kept_rows),
+                "dropped": max(len(all_rows) - len(kept_rows), 0),
+                "dropped_by_reason": dropped_by_reason,
+            },
+        )
+
+        rows = [{k: v for k, v in row.items() if k != "filter_reason"} for row in kept_rows]
         self._merge_nominal_entity_mentions(
             rows=rows,
             mention_source="nc",

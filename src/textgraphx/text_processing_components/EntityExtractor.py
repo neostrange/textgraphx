@@ -132,6 +132,7 @@ class EntityExtractor:
                         ne.start_index = $start_index, 
                         ne.end_index = $end_index,
                         ne.token_id = $token_id, ne.token_start = $start_index, ne.token_end = $end_index
+                                        SET ne:Mention
                     WITH ne
                     MATCH (text:AnnotatedText)-[:CONTAINS_SENTENCE]->(sentence:Sentence)-[:HAS_TOKEN]->(tagOccurrence:TagOccurrence)
                     WHERE text.id = $documentId AND tagOccurrence.tok_index_doc >= $start_index AND tagOccurrence.tok_index_doc <= $end_index - 1

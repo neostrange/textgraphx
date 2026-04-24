@@ -49,6 +49,7 @@ class CoreferenceResolver:
         WHERE coalesce(ne.start_tok, ne.token_start, ne.index) = $start
           AND coalesce(ne.end_tok, ne.token_end, ne.end_index) = $end
         RETURN ne.id AS node_id
+            ORDER BY ne.uid, ne.id
         LIMIT 1
         """
         params = {"doc_id": doc_id, "start": start_index, "end": end_index}
@@ -81,6 +82,7 @@ class CoreferenceResolver:
                 query = """
                 MATCH (ne:NamedEntity {id: $node_id})
                 SET ne:CorefMention,
+                    ne:Mention,
                     ne.uid = coalesce(ne.uid, $node_uid),
                     ne.text = coalesce(ne.text, ne.value, $text),
                     ne.start_tok = coalesce(ne.start_tok, $start),

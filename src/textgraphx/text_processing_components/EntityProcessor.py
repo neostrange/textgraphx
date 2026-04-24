@@ -308,6 +308,7 @@ class EntityProcessor:
             ne.head = item.head, ne.headTokenIndex = item.head_token_index,
             ne.syntacticType = item.legacy_syntactic_type, ne.syntactic_type = item.syntactic_type,
             ne.token_id = item.token_id, ne.token_start = item.start_index, ne.token_end = item.end_index
+                        SET ne:Mention
             WITH ne, item as neIndex
             MATCH (text:AnnotatedText)-[:CONTAINS_SENTENCE]->(sentence:Sentence)-[:HAS_TOKEN]->(tagOccurrence:TagOccurrence)
             WHERE text.id = $documentId AND tagOccurrence.tok_index_doc >= neIndex.start_index AND tagOccurrence.tok_index_doc <= neIndex.end_index
