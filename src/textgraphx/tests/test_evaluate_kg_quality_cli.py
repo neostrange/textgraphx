@@ -293,3 +293,7 @@ def test_main_supports_optional_baseline_comparison(tmp_path, monkeypatch, capsy
     assert "temporal_delta_details" in json.loads((out_dir / "kg_quality_comparison.json").read_text(encoding="utf-8"))["comparison"]
     assert summary["regression_detected"] is True
     assert "KG quality comparison:" in captured.err
+    assert "KG temporal comparison:" in captured.err
+    assert "issue_delta=+9" in captured.err
+    assert "connectivity_gap_docs=+1" in captured.err
+    assert "docs_without_temporal_tlinks=+1" in captured.err
