@@ -65,6 +65,10 @@ python -m textgraphx.tools.check_quality_gate \
     --current  out/evaluation/production-$(date -u +%Y%m%d)/kg_quality_report.json \
     --tolerance 0.02 \
     --max-tlink-anchor-inconsistent-increase 0 \
+    --max-tlink-reciprocal-cycle-increase 0 \
+    --max-isolated-temporal-anchor-increase 0 \
+    --max-documents-with-temporal-connectivity-gaps-increase 0 \
+    --max-documents-without-temporal-tlinks-increase 0 \
     --max-tlink-missing-anchor-metadata 0 \
     --max-participation-in-frame-missing-increase 0 \
     --max-participation-in-mention-missing-increase 0 \
@@ -75,8 +79,22 @@ python -m textgraphx.tools.check_quality_gate \
 
 A non-zero exit code means the overall quality score regressed more than the
 allowed tolerance (2% by default), the TLINK anchor consistency thresholds
-were violated, or participation-edge transition thresholds were violated
-(`IN_FRAME` / `IN_MENTION` alias coverage regression).
+were violated, the temporal-fragmentation thresholds were violated
+(`tlink_reciprocal_cycle_count`, `isolated_temporal_anchor_count`,
+`documents_with_temporal_connectivity_gaps_count`, or
+`documents_without_temporal_tlinks_count` increased versus baseline), or
+participation-edge transition thresholds were violated (`IN_FRAME` /
+`IN_MENTION` alias coverage regression).
+
+The temporal quality score now penalizes four additional runtime signals:
+
+- reciprocal directional TLINK cycles
+- isolated temporal anchors
+- documents with partial temporal connectivity gaps
+- documents that lose unsuppressed temporal TLINK connectivity entirely
+
+If the overall score regresses while node/edge counts remain stable, inspect
+those temporal totals before widening the investigation.
 
 ### 3. Spot-check key node types
 
@@ -176,6 +194,8 @@ After clearing, re-run from stage 1.
 | Signal | Threshold | Action |
 |--------|-----------|--------|
 | Quality gate delta | > −0.02 | Alert on-call, block promotion |
+| Reciprocal TLINK cycles | any increase vs baseline | Inspect directional TLINK heuristics and suppression behavior |
+| Documents without temporal TLINKs | any increase vs baseline | Inspect anchor connectivity and TLINK suppression drift |
 | Schema validation errors | any ERROR | Block promotion |
 | Cross-phase ERRORs | any | Investigate before deploying |
 | TEvent count per doc | < 5 | Investigate temporal phase |
