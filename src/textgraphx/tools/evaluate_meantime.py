@@ -306,7 +306,7 @@ def _evaluate_batch(args: argparse.Namespace, mapping: EvaluationMapping) -> dic
                     gold_like_nominal_filter=getattr(args, "gold_like_nominal_filter", False),
                     nominal_profile_mode=getattr(args, "nominal_profile_mode", "all"),
                 )
-                if hasattr(graph, "run"):
+                if graph is not None and getattr(args, "projection_determinism_runs", None) is not None:
                     projection_determinism_by_doc[str(gold_doc.doc_id)] = check_projection_determinism(
                         graph=graph,
                         doc_id=gold_doc.doc_id,
