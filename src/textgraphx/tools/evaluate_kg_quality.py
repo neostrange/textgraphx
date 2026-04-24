@@ -249,6 +249,7 @@ def main(argv: Iterable[str] | None = None) -> int:
 
     cfg = get_config()
     config_dict = _config_to_hashable_dict(cfg)
+    baseline_report = load_quality_report(args.baseline_report) if args.baseline_report else None
 
     graph = make_graph_from_config()
     try:
@@ -278,8 +279,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         if export_md:
             evaluator.export_markdown(suite, output_dir / "kg_quality_report.md")
 
-        if args.baseline_report:
-            baseline_report = load_quality_report(args.baseline_report)
+        if baseline_report is not None:
             comparison = compare_reports(baseline_report, report)
             regression, reasons = identify_regression(baseline_report, report)
             report["comparison"] = comparison

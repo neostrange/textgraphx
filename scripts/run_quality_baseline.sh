@@ -36,10 +36,22 @@ echo "" >&2
 
 mkdir -p "$OUTPUT_DIR"
 
+COMPARE_ARGS=()
+if [[ -f "$OUTPUT_DIR/kg_quality_report.json" ]]; then
+    echo "  compare : $OUTPUT_DIR/kg_quality_report.json" >&2
+    COMPARE_ARGS=(
+        --baseline-report "$OUTPUT_DIR/kg_quality_report.json"
+        --comparison-json "$OUTPUT_DIR/kg_quality_comparison.json"
+    )
+else
+    echo "  compare : none (seed capture)" >&2
+fi
+
 "$PYTHON" -m textgraphx.tools.evaluate_kg_quality \
     --dataset-dir "$DATASET_DIR" \
     --output-dir  "$OUTPUT_DIR" \
-    --json --csv --markdown
+    --json --csv --markdown \
+    "${COMPARE_ARGS[@]}"
 
 # Stamp the snapshot with the current git commit so baselines are traceable.
 if command -v git &>/dev/null; then
@@ -49,4 +61,7 @@ fi
 
 echo "" >&2
 echo "Baseline written to $OUTPUT_DIR" >&2
+if [[ -f "$OUTPUT_DIR/kg_quality_comparison.json" ]]; then
+    echo "Baseline comparison written to $OUTPUT_DIR/kg_quality_comparison.json" >&2
+fi
 echo "Commit these files to lock quality thresholds for the gate check." >&2
