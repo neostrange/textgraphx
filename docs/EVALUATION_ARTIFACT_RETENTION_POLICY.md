@@ -28,10 +28,11 @@ This policy is enforced via `.gitignore` rules for `src/textgraphx/datastore/eva
 
 ## Operational Guidance
 
-1. Use the cycle runner with the default `latest` tag for normal runs.
+1. Use the cycle runner or `python -m textgraphx.tools.evaluate_kg_quality --output-dir src/textgraphx/datastore/evaluation/latest` for normal current-run validation.
 2. If you need a historical snapshot, export it externally (artifact store, release asset, or local archive), not in git.
 3. Promote a baseline only when you intentionally accept quality changes.
-4. Use `scripts/run_quality_baseline.sh` defaults unless you explicitly need an alternate output directory.
+4. Use `scripts/run_quality_baseline.sh` defaults only for intentional baseline refreshes.
+5. Review `src/textgraphx/datastore/evaluation/baseline/kg_quality_comparison.json` before committing a refreshed baseline so accepted deltas are explicit.
 
 ## Related Files
 
