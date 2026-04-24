@@ -52,7 +52,7 @@ pipeline_deps = pytest.mark.skipif(
 def test_review_run_materializes_temporal_event_layers():
     from textgraphx.orchestration.orchestrator import PipelineOrchestrator
 
-    dataset_dir = str(Path(__file__).parent.parent / "textgraphx" / "datastore" / "dataset")
+    dataset_dir = str(Path(__file__).parent.parent / "datastore" / "dataset")
     orchestrator = PipelineOrchestrator(directory=dataset_dir, model_name="en_core_web_sm")
 
     prep = orchestrator.run_for_review()

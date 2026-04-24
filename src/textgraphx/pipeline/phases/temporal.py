@@ -1,24 +1,3 @@
-"""Backward-compatibility module for textgraphx.TemporalPhase.
-
-This module redirects all imports to the canonical package location:
-`textgraphx.pipeline.phases.temporal`.
-Please update external references to import from `textgraphx.pipeline.phases` instead.
-"""
-
-import sys
-import warnings
-from textgraphx.pipeline.phases import temporal as _temporal
-
-# Issue deprecation warning on direct module import
-warnings.warn(
-    "Importing from `textgraphx.TemporalPhase` is deprecated. "
-    "Please update your imports to use `textgraphx.pipeline.phases` instead.",
-    DeprecationWarning,
-    stacklevel=2,
-)
-
-# Alias sys.modules for backward compatibility
-sys.modules[__name__] = _temporal
 """Temporal extraction phase.
 
 This module materializes temporal expressions, temporal events, document

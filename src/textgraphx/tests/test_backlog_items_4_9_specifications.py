@@ -19,7 +19,7 @@ from typing import Dict, List, Tuple
 # Path constants
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PKG_ROOT = REPO_ROOT / "textgraphx"
-TEMPORAL_SRC = PKG_ROOT / "TemporalPhase.py"
+TEMPORAL_SRC = PKG_ROOT / "pipeline/phases/temporal.py"
 TLINKS_SRC = PKG_ROOT / "TlinksRecognizer.py"
 REFINEMENT_SRC = PKG_ROOT / "RefinementPhase.py"
 

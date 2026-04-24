@@ -11,7 +11,7 @@ from typing import List, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TEXTGRAPHX_DIR = REPO_ROOT / "textgraphx"
-TEMPORAL_PHASE_PATH = TEXTGRAPHX_DIR / "TemporalPhase.py"
+TEMPORAL_PHASE_PATH = TEXTGRAPHX_DIR / "pipeline/phases/temporal.py"
 TLINKS_RECOGNIZER_PATH = TEXTGRAPHX_DIR / "TlinksRecognizer.py"
 EVENT_ENRICHMENT_PATH = TEXTGRAPHX_DIR / "pipeline" / "phases" / "event_enrichment.py"
 
@@ -89,14 +89,14 @@ class TestItem4RemediationPlan:
                 "order": 1,
                 "item": "Violation 1: Copy create_tlinks_* methods",
                 "target": "TlinksRecognizer.py",
-                "source": "TemporalPhase.py lines 187-297",
+                "source": "pipeline/phases/temporal.py lines 187-297",
                 "validation": "TlinksRecognizer has e2e, e2t, t2t methods with parameterized Neo4j logic",
             },
             {
                 "order": 2,
                 "item": "Violation 2: Move create_event_mentions2 method",
                 "target": "EventEnrichmentPhase.py",
-                "source": "TemporalPhase.py line 600+",
+                "source": "pipeline/phases/temporal.py line 600+",
                 "validation": "EventEnrichmentPhase materializes EventMention nodes",
             },
             {
@@ -109,7 +109,7 @@ class TestItem4RemediationPlan:
             {
                 "order": 4,
                 "item": "Method naming: Rename extracted methods",
-                "target": "TemporalPhase.py remaining methods",
+                "target": "pipeline/phases/temporal.py remaining methods",
                 "source": "Extract-only methods (not yet renamed)",
                 "validation": "Methods use extract_*, identify_*, materialize_temporal_* names",
             },
@@ -206,7 +206,7 @@ class TestItem4FixImplementation:
         """STEP 1: Copy create_tlinks_e2e, e2t, t2t from TemporalPhase to TlinksRecognizer."""
         
         # Expected action:
-        # 1. Read TemporalPhase.py lines 187-297 (create_tlinks_* methods)
+        # 1. Read pipeline/phases/temporal.py lines 187-297 (create_tlinks_* methods)
         # 2. Copy method implementations to TlinksRecognizer.py
         # 3. Ensure Neo4j graph driver is accessible
         # 4. Add logging consistent with TlinksRecognizer style
@@ -239,7 +239,7 @@ class TestItem4FixImplementation:
         """STEP 2: Move create_event_mentions2 from TemporalPhase to EventEnrichmentPhase."""
         
         # Expected action:
-        # 1. Read TemporalPhase.py line 600+ (create_event_mentions2)
+        # 1. Read pipeline/phases/temporal.py line 600+ (create_event_mentions2)
         # 2. Understand the Cypher logic (what EventMention properties it sets)
         # 3. Copy to EventEnrichmentPhase
         # 4. Ensure it complements existing EventMention creation logic
@@ -252,11 +252,11 @@ class TestItem4FixImplementation:
         
         def create_event_mentions2(self, doc_id):
             '''Create EventMention nodes from temporal events + frames (moved from TemporalPhase).'''
-            # Copy Cypher from TemporalPhase.py
+            # Copy Cypher from pipeline/phases/temporal.py
             # Ensure compatibility with create_events_mentions (possibly rename or consolidate)
             ...
         
-        THEN: Delete from TemporalPhase.py line 600+
+        THEN: Delete from pipeline/phases/temporal.py line 600+
         """
         
         assert "create_event_mentions2" in step_description

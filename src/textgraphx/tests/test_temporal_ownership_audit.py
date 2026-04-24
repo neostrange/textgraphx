@@ -16,12 +16,12 @@ TEXTGRAPHX_DIR = REPO_ROOT / "textgraphx"
 
 
 class TestTemporalPhaseOwnershipAudit:
-    """Audit TemporalPhase.py for correct extraction-only responsibility."""
+    """Audit pipeline/phases/temporal.py for correct extraction-only responsibility."""
 
     @pytest.fixture(autouse=True)
     def setup(self):
         """Load source code."""
-        self.temporal_phase_path = TEXTGRAPHX_DIR / "TemporalPhase.py"
+        self.temporal_phase_path = TEXTGRAPHX_DIR / "pipeline/phases/temporal.py"
         assert self.temporal_phase_path.exists(), f"Missing {self.temporal_phase_path}"
         self.temporal_code = self.temporal_phase_path.read_text()
 
@@ -201,7 +201,7 @@ class TestOwnershipIntegration:
 
     def test_no_phase_creates_tlink_besides_tlinks_recognizer(self):
         """TLINK creation should be exclusive to TlinksRecognizer."""
-        temporal_phase_path = TEXTGRAPHX_DIR / "TemporalPhase.py"
+        temporal_phase_path = TEXTGRAPHX_DIR / "pipeline/phases/temporal.py"
         refinement_phase_path = TEXTGRAPHX_DIR / "RefinementPhase.py"
         event_enrichment_path = TEXTGRAPHX_DIR / "pipeline" / "phases" / "event_enrichment.py"
         
@@ -242,7 +242,7 @@ class TestOwnershipDocumentation:
 
     def test_phase_docstrings_clarify_responsibility(self):
         """TemporalPhase and TlinksRecognizer docstrings should be clear about ownership."""
-        temporal_path = TEXTGRAPHX_DIR / "TemporalPhase.py"
+        temporal_path = TEXTGRAPHX_DIR / "pipeline/phases/temporal.py"
         if temporal_path.exists():
             code = temporal_path.read_text()
             # Should mention extraction, TIMEX, TEvent
