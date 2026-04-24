@@ -30,7 +30,7 @@ import pytest
 
 # ----- Path constants --------------------------------------------------------
 
-REPO_ROOT = Path(__file__).parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 PKG_ROOT = REPO_ROOT / "textgraphx"
 RESTCALLER_SRC = PKG_ROOT / "util" / "RestCaller.py"
 COREF_SRC = PKG_ROOT / "util" / "CallAllenNlpCoref.py"
