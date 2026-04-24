@@ -47,7 +47,7 @@ def test_tlinks_recognizer_runs_anchor_consistency_shadow_query():
 def test_tlinks_wrapper_source_includes_anchor_consistency_call():
     from pathlib import Path
 
-    src = (Path(__file__).parent.parent / "phase_wrappers.py").read_text(encoding="utf-8")
+    src = (Path(__file__).parent.parent / "pipeline/runtime/phase_wrappers.py").read_text(encoding="utf-8")
     assert "Validate TLINK anchor consistency" in src
     assert "recognizer.enforce_tlink_anchor_consistency(shadow_only=tlink_shadow_mode)" in src
     assert "anchor_suppressed_tlinks" in src

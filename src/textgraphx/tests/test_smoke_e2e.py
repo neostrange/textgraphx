@@ -50,7 +50,7 @@ neo4j_required = pytest.mark.skipif(
 )
 
 DATASET_DIR = str(
-    Path(__file__).parent.parent / "textgraphx" / "datastore" / "dataset"
+    Path(__file__).parent.parent / "datastore" / "dataset"
 )
 SMOKE_DOCUMENT = (
     Path(DATASET_DIR)

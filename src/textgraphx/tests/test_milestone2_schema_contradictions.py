@@ -82,8 +82,8 @@ def _load_eep_class():
             sys.modules[mod_name] = m
     with patch("textgraphx.neo4j_client.make_graph_from_config", return_value=MagicMock()):
         import importlib
-        if "textgraphx.EventEnrichmentPhase" in sys.modules:
-            eep_mod = sys.modules["textgraphx.EventEnrichmentPhase"]
+        if "textgraphx.pipeline.phases.event_enrichment" in sys.modules:
+            eep_mod = sys.modules["textgraphx.pipeline.phases.event_enrichment"]
         else:
             import textgraphx.EventEnrichmentPhase as eep_mod
     return eep_mod.EventEnrichmentPhase

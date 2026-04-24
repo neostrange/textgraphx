@@ -15,6 +15,8 @@ def test_temporal_phase_module_alias(monkeypatch):
     
     try:
         # If it was imported, remove it to force a fresh import
+        if "textgraphx.pipeline.temporal.extraction" in sys.modules:
+            del sys.modules["textgraphx.pipeline.temporal.extraction"]
         if "textgraphx.TemporalPhase" in sys.modules:
             del sys.modules["textgraphx.TemporalPhase"]
             
@@ -32,7 +34,7 @@ def test_temporal_phase_module_alias(monkeypatch):
         assert hasattr(legacy_module, "TemporalPhase")
         assert legacy_module.TemporalPhase is expected_module.TemporalPhase
         # sys.modules routing is working
-        assert sys.modules["textgraphx.TemporalPhase"] is expected_module
+        assert sys.modules["textgraphx.pipeline.temporal.extraction"] is expected_module
     finally:
         # Restore to avoid polluting later tests
         sys.modules.clear()

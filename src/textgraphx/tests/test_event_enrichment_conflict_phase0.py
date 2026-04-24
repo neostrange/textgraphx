@@ -23,7 +23,7 @@ def _stub_event_enrichment_imports():
         ("textgraphx.util.SemanticRoleLabeler", {"SemanticRoleLabel": object}),
         ("textgraphx.util.EntityFishingLinker", {"EntityFishing": object}),
         ("textgraphx.util.GraphDbBase", {"GraphDBBase": object}),
-        ("textgraphx.TextProcessor", {"TextProcessor": object}),
+        ("textgraphx.pipeline.ingestion.text_processor", {"TextProcessor": object}),
     ):
         if mod_name not in sys.modules:
             module = types.ModuleType(mod_name)

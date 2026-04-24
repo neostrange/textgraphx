@@ -25,7 +25,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 ONTOLOGY_JSON = ROOT / "textgraphx" / "schema" / "ontology.json"
-TEXT_PROCESSOR_SRC = ROOT / "textgraphx" / "TextProcessor.py"
+TEXT_PROCESSOR_SRC = ROOT / "textgraphx" / "pipeline/phases/text_processor.py"
 
 
 def _payload() -> dict:

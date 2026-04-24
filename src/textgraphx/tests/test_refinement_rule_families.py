@@ -98,7 +98,7 @@ def test_numeric_and_value_taggers_are_noop_when_flag_disabled():
     mock_cfg = MagicMock()
     mock_cfg.features = mock_flags
 
-    with patch("textgraphx.RefinementPhase.get_config", return_value=mock_cfg):
+    with patch("textgraphx.pipeline.phases.refinement.get_config", return_value=mock_cfg):
         import warnings
         with warnings.catch_warnings():
             warnings.simplefilter("error")  # any warning becomes an error
@@ -128,7 +128,7 @@ def test_numeric_and_value_taggers_emit_deprecation_warnings_when_flag_enabled()
     mock_cfg = MagicMock()
     mock_cfg.features = mock_flags
 
-    with patch("textgraphx.RefinementPhase.get_config", return_value=mock_cfg):
+    with patch("textgraphx.pipeline.phases.refinement.get_config", return_value=mock_cfg):
         with pytest.deprecated_call(match="tag_numeric_entities"):
             rp.tag_numeric_entities()
 

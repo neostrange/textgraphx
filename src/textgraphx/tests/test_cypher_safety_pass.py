@@ -25,8 +25,8 @@ PKG_ROOT = REPO_ROOT / "textgraphx"
 
 EVENT_ENRICHMENT_SRC = PKG_ROOT / "pipeline" / "phases" / "event_enrichment.py"
 TEMPORAL_SRC = PKG_ROOT / "pipeline/phases/temporal.py"
-REFINEMENT_SRC = PKG_ROOT / "RefinementPhase.py"
-TLINKS_SRC = PKG_ROOT / "TlinksRecognizer.py"
+REFINEMENT_SRC = PKG_ROOT / "pipeline/phases/refinement.py"
+TLINKS_SRC = PKG_ROOT / "pipeline/phases/tlinks_recognizer.py"
 
 
 def _read(path: Path) -> str:

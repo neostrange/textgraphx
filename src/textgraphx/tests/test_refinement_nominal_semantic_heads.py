@@ -5,7 +5,7 @@ from textgraphx.phase_assertions import PhaseAssertions
 
 
 def test_refinement_wrapper_runs_nominal_mentions_family_in_order():
-    with open(Path(__file__).parent.parent / "phase_wrappers.py", "r", encoding="utf-8") as f:
+    with open(Path(__file__).parent.parent / "pipeline/runtime/phase_wrappers.py", "r", encoding="utf-8") as f:
         source = f.read()
 
     numeric = 'refiner.run_rule_family("numeric_value")'

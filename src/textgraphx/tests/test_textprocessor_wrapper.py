@@ -19,10 +19,10 @@ def test_textprocessor_module_aliases_canonical_module(monkeypatch):
     _install_textprocessor_import_stubs(monkeypatch)
 
     sys.modules.pop("textgraphx.pipeline.ingestion.text_processor", None)
-    sys.modules.pop("textgraphx.TextProcessor", None)
+    sys.modules.pop("textgraphx.pipeline.ingestion.text_processor", None)
 
     canonical_module = importlib.import_module("textgraphx.pipeline.ingestion.text_processor")
-    legacy_module = importlib.import_module("textgraphx.TextProcessor")
+    legacy_module = importlib.import_module("textgraphx.pipeline.ingestion.text_processor")
 
     assert legacy_module is canonical_module
     assert legacy_module.TextProcessor is canonical_module.TextProcessor

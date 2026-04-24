@@ -47,7 +47,7 @@ class TestTlinksReasoningRuntime:
         obj.graph = MagicMock()
 
         monkeypatch.setattr(
-            "textgraphx.TlinksRecognizer.count_endpoint_violations",
+            "textgraphx.pipeline.temporal.linking.count_endpoint_violations",
             lambda graph, rel_type: 4 if rel_type == "TLINK" else 0,
         )
 
@@ -58,7 +58,7 @@ class TestTlinksReasoningRuntime:
         obj.graph = MagicMock()
 
         monkeypatch.setattr(
-            "textgraphx.TlinksRecognizer.solve_tlink_constraints",
+            "textgraphx.pipeline.temporal.linking.solve_tlink_constraints",
             lambda graph, shadow_only: {"inverse_created": 2, "bidirectional_conflicts": 1}
             if graph is obj.graph and shadow_only
             else {"inverse_created": 0, "bidirectional_conflicts": 0},

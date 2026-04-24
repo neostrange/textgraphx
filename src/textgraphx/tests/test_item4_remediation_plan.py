@@ -12,7 +12,7 @@ from typing import List, Tuple
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TEXTGRAPHX_DIR = REPO_ROOT / "textgraphx"
 TEMPORAL_PHASE_PATH = TEXTGRAPHX_DIR / "pipeline/phases/temporal.py"
-TLINKS_RECOGNIZER_PATH = TEXTGRAPHX_DIR / "TlinksRecognizer.py"
+TLINKS_RECOGNIZER_PATH = TEXTGRAPHX_DIR / "pipeline/phases/tlinks_recognizer.py"
 EVENT_ENRICHMENT_PATH = TEXTGRAPHX_DIR / "pipeline" / "phases" / "event_enrichment.py"
 
 
@@ -88,14 +88,14 @@ class TestItem4RemediationPlan:
             {
                 "order": 1,
                 "item": "Violation 1: Copy create_tlinks_* methods",
-                "target": "TlinksRecognizer.py",
+                "target": "pipeline/phases/tlinks_recognizer.py",
                 "source": "pipeline/phases/temporal.py lines 187-297",
                 "validation": "TlinksRecognizer has e2e, e2t, t2t methods with parameterized Neo4j logic",
             },
             {
                 "order": 2,
                 "item": "Violation 2: Move create_event_mentions2 method",
-                "target": "EventEnrichmentPhase.py",
+                "target": "pipeline/phases/event_enrichment.py",
                 "source": "pipeline/phases/temporal.py line 600+",
                 "validation": "EventEnrichmentPhase materializes EventMention nodes",
             },

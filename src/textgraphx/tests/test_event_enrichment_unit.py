@@ -68,7 +68,7 @@ def _make_enricher(run_side_effects=None):
 
     _install_event_enrichment_import_stubs()
     sys.modules.pop("textgraphx.pipeline.phases.event_enrichment", None)
-    sys.modules.pop("textgraphx.EventEnrichmentPhase", None)
+    sys.modules.pop("textgraphx.pipeline.phases.event_enrichment", None)
 
     # Patch at the neo4j_client source so the constructor gets the mock,
     # regardless of whether the module is already in sys.modules.

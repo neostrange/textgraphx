@@ -265,7 +265,7 @@ class TestSRLProcessorWriterDualEmit:
 class TestTlinksRecognizerReaderDualAware:
     """TlinksRecognizer should read canonical event description edges with legacy fallback."""
 
-    TLINKS_SRC = ROOT / "textgraphx" / "TlinksRecognizer.py"
+    TLINKS_SRC = ROOT / "textgraphx" / "pipeline/phases/tlinks_recognizer.py"
 
     def _src(self) -> str:
         return self.TLINKS_SRC.read_text(encoding="utf-8")

@@ -100,7 +100,7 @@ class TestTlinksRecognizerOwnershipAudit:
     @pytest.fixture(autouse=True)
     def setup(self):
         """Load source code."""
-        self.tlinks_path = TEXTGRAPHX_DIR / "TlinksRecognizer.py"
+        self.tlinks_path = TEXTGRAPHX_DIR / "pipeline/phases/tlinks_recognizer.py"
         if not self.tlinks_path.exists():
             # May be in a different location; search for it
             for py_file in TEXTGRAPHX_DIR.glob("**/*TLink*.py"):
@@ -202,7 +202,7 @@ class TestOwnershipIntegration:
     def test_no_phase_creates_tlink_besides_tlinks_recognizer(self):
         """TLINK creation should be exclusive to TlinksRecognizer."""
         temporal_phase_path = TEXTGRAPHX_DIR / "pipeline/phases/temporal.py"
-        refinement_phase_path = TEXTGRAPHX_DIR / "RefinementPhase.py"
+        refinement_phase_path = TEXTGRAPHX_DIR / "pipeline/phases/refinement.py"
         event_enrichment_path = TEXTGRAPHX_DIR / "pipeline" / "phases" / "event_enrichment.py"
         
         phases_to_check = [

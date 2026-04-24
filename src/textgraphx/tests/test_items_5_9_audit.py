@@ -29,7 +29,7 @@ class TestCheckpointResumeImplementation:
     def setup(self):
         """Load checkpoint/orchestrator code."""
         checkpoint_candidates = [
-            TEXTGRAPHX_DIR / "checkpoint.py",
+            TEXTGRAPHX_DIR / "orchestration" / "checkpoint.py",
             TEXTGRAPHX_DIR / "execution_history.py",
             TEXTGRAPHX_DIR / "PipelineOrchestrator.py",
         ]
@@ -185,7 +185,7 @@ class TestRefinementRuleCatalogImplementation:
     @pytest.fixture(autouse=True)
     def setup(self):
         """Load RefinementPhase code."""
-        self.refinement_path = TEXTGRAPHX_DIR / "RefinementPhase.py"
+        self.refinement_path = TEXTGRAPHX_DIR / "pipeline/phases/refinement.py"
         assert self.refinement_path.exists(), "RefinementPhase.py not found"
         self.refinement_code = self.refinement_path.read_text()
 

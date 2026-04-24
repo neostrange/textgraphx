@@ -19,9 +19,9 @@ def test_graphbased_api_module_aliases_canonical_module(monkeypatch):
         def execute_cypher_query(self, query):
             return [query]
 
-    fake_graphbased_module = types.ModuleType("textgraphx.GraphBasedNLP")
+    fake_graphbased_module = types.ModuleType("textgraphx.pipeline.ingestion.graph_based_nlp")
     fake_graphbased_module.GraphBasedNLP = FakeGraphBasedNLP
-    monkeypatch.setitem(sys.modules, "textgraphx.GraphBasedNLP", fake_graphbased_module)
+    monkeypatch.setitem(sys.modules, "textgraphx.pipeline.ingestion.graph_based_nlp", fake_graphbased_module)
 
     sys.modules.pop("textgraphx.infrastructure.graphbased_api", None)
     sys.modules.pop("textgraphx.GraphBasedNlpAPI", None)

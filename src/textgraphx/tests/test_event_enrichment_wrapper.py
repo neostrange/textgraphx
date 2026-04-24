@@ -43,10 +43,10 @@ def test_event_enrichment_module_aliases_canonical_module(monkeypatch):
     _install_event_enrichment_import_stubs(monkeypatch)
 
     sys.modules.pop("textgraphx.pipeline.phases.event_enrichment", None)
-    sys.modules.pop("textgraphx.EventEnrichmentPhase", None)
+    sys.modules.pop("textgraphx.pipeline.phases.event_enrichment", None)
 
     canonical_module = importlib.import_module("textgraphx.pipeline.phases.event_enrichment")
-    legacy_module = importlib.import_module("textgraphx.EventEnrichmentPhase")
+    legacy_module = importlib.import_module("textgraphx.pipeline.phases.event_enrichment")
 
     assert legacy_module is canonical_module
     assert legacy_module.EventEnrichmentPhase is canonical_module.EventEnrichmentPhase

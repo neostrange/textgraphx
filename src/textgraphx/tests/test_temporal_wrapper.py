@@ -38,9 +38,9 @@ def test_temporal_wrapper_accepts_scalar_document_ids(monkeypatch):
         def materialize_glinks(self, doc_id):
             created.append(("glinks", doc_id))
 
-    fake_module = types.ModuleType("textgraphx.TemporalPhase")
+    fake_module = types.ModuleType("textgraphx.pipeline.temporal.extraction")
     fake_module.TemporalPhase = FakeTemporalPhase
-    monkeypatch.setitem(sys.modules, "textgraphx.TemporalPhase", fake_module)
+    monkeypatch.setitem(sys.modules, "textgraphx.pipeline.temporal.extraction", fake_module)
 
     wrapper = TemporalPhaseWrapper()
     result = wrapper.execute()
@@ -83,9 +83,9 @@ def test_temporal_wrapper_accepts_dict_document_ids(monkeypatch):
         def materialize_glinks(self, doc_id):
             pass
 
-    fake_module = types.ModuleType("textgraphx.TemporalPhase")
+    fake_module = types.ModuleType("textgraphx.pipeline.temporal.extraction")
     fake_module.TemporalPhase = FakeTemporalPhase
-    monkeypatch.setitem(sys.modules, "textgraphx.TemporalPhase", fake_module)
+    monkeypatch.setitem(sys.modules, "textgraphx.pipeline.temporal.extraction", fake_module)
 
     wrapper = TemporalPhaseWrapper()
     result = wrapper.execute()
@@ -122,9 +122,9 @@ def test_temporal_wrapper_normalizes_numeric_document_ids(monkeypatch):
         def materialize_glinks(self, doc_id):
             pass
 
-    fake_module = types.ModuleType("textgraphx.TemporalPhase")
+    fake_module = types.ModuleType("textgraphx.pipeline.temporal.extraction")
     fake_module.TemporalPhase = FakeTemporalPhase
-    monkeypatch.setitem(sys.modules, "textgraphx.TemporalPhase", fake_module)
+    monkeypatch.setitem(sys.modules, "textgraphx.pipeline.temporal.extraction", fake_module)
 
     wrapper = TemporalPhaseWrapper()
     result = wrapper.execute()

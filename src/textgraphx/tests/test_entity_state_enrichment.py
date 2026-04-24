@@ -4,11 +4,11 @@ from pathlib import Path
 
 
 def _ref_src() -> str:
-    return (Path(__file__).parent.parent / "textgraphx" / "RefinementPhase.py").read_text()
+    return (Path(__file__).parent.parent / "pipeline/phases/refinement.py").read_text()
 
 
 def _wrapper_src() -> str:
-    return (Path(__file__).parent.parent / "textgraphx" / "phase_wrappers.py").read_text()
+    return (Path(__file__).parent.parent / "pipeline/runtime/phase_wrappers.py").read_text()
 
 
 def test_entity_state_family_exists_in_rule_families():

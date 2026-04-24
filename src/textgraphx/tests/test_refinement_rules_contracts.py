@@ -15,7 +15,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).parent.parent
 CATALOG_PATH = REPO_ROOT / "fixtures" / "refinement_rules" / "catalog.json"
-REFINEMENT_PATH = REPO_ROOT / "textgraphx" / "RefinementPhase.py"
+REFINEMENT_PATH = REPO_ROOT / "pipeline" / "phases" / "refinement.py"
 
 REQUIRED_TOP_LEVEL_KEYS = {"catalog_version", "description", "families"}
 REQUIRED_FAMILY_KEYS = {"id", "label", "rules"}

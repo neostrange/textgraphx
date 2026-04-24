@@ -78,9 +78,9 @@ def _install_graphbased_nlp_stubs(monkeypatch):
     graph_db_base_module.GraphDBBase = _FakeGraphDBBase
     monkeypatch.setitem(sys.modules, "textgraphx.util.GraphDbBase", graph_db_base_module)
 
-    text_processor_module = types.ModuleType("textgraphx.TextProcessor")
+    text_processor_module = types.ModuleType("textgraphx.pipeline.ingestion.text_processor")
     text_processor_module.TextProcessor = object
-    monkeypatch.setitem(sys.modules, "textgraphx.TextProcessor", text_processor_module)
+    monkeypatch.setitem(sys.modules, "textgraphx.pipeline.ingestion.text_processor", text_processor_module)
 
     document_importer_module = types.ModuleType("textgraphx.text_processing_components.DocumentImporter")
     document_importer_module.MeantimeXMLImporter = object
@@ -100,10 +100,10 @@ def test_graphbased_nlp_module_aliases_canonical_module(monkeypatch):
     _install_graphbased_nlp_stubs(monkeypatch)
 
     sys.modules.pop("textgraphx.pipeline.ingestion.graph_based_nlp", None)
-    sys.modules.pop("textgraphx.GraphBasedNLP", None)
+    sys.modules.pop("textgraphx.pipeline.ingestion.graph_based_nlp", None)
 
     canonical_module = importlib.import_module("textgraphx.pipeline.ingestion.graph_based_nlp")
-    legacy_module = importlib.import_module("textgraphx.GraphBasedNLP")
+    legacy_module = importlib.import_module("textgraphx.pipeline.ingestion.graph_based_nlp")
 
     assert legacy_module is canonical_module
     assert legacy_module.GraphBasedNLP is canonical_module.GraphBasedNLP

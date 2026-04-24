@@ -62,7 +62,7 @@ def _stub_heavy_deps() -> None:
 _stub_heavy_deps()
 
 ROOT = Path(__file__).resolve().parents[2]
-REFINEMENT_SRC = ROOT / "textgraphx" / "RefinementPhase.py"
+REFINEMENT_SRC = ROOT / "textgraphx" / "pipeline/phases/refinement.py"
 WORDNET_ENRICHER_SRC = ROOT / "textgraphx" / "text_processing_components" / "WordnetTokenEnricher.py"
 
 

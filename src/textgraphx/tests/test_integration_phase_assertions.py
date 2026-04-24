@@ -100,7 +100,7 @@ def _stub_event_enrichment_imports():
         ("textgraphx.util.EntityFishingLinker", {"EntityFishing": MagicMock()}),
         ("textgraphx.util.RestCaller", {"callAllenNlpApi": MagicMock()}),
         ("textgraphx.util.GraphDbBase", {"GraphDBBase": MagicMock()}),
-        ("textgraphx.TextProcessor", {"TextProcessor": MagicMock()}),
+        ("textgraphx.pipeline.ingestion.text_processor", {"TextProcessor": MagicMock()}),
     ):
         if mod_name not in sys.modules:
             module = types.ModuleType(mod_name)
@@ -113,7 +113,7 @@ def _load_temporal_phase_class():
     _stub_spacy_imports()
     import importlib
 
-    module = importlib.import_module("textgraphx.TemporalPhase")
+    module = importlib.import_module("textgraphx.pipeline.temporal.extraction")
     return module.TemporalPhase
 
 
@@ -121,7 +121,7 @@ def _load_event_enrichment_class():
     _stub_event_enrichment_imports()
     import importlib
 
-    module = importlib.import_module("textgraphx.EventEnrichmentPhase")
+    module = importlib.import_module("textgraphx.pipeline.phases.event_enrichment")
     return module.EventEnrichmentPhase
 
 
@@ -277,7 +277,7 @@ class TestEventEnrichmentIntegration:
 
         _stub_event_enrichment_imports()
         sys.modules.pop("textgraphx.pipeline.phases.event_enrichment", None)
-        sys.modules.pop("textgraphx.EventEnrichmentPhase", None)
+        sys.modules.pop("textgraphx.pipeline.phases.event_enrichment", None)
 
         # Patch at the source module where the constructor resolves it.
         with patch("textgraphx.neo4j_client.make_graph_from_config", return_value=graph):
@@ -295,7 +295,7 @@ class TestEventEnrichmentIntegration:
 
         _stub_event_enrichment_imports()
         sys.modules.pop("textgraphx.pipeline.phases.event_enrichment", None)
-        sys.modules.pop("textgraphx.EventEnrichmentPhase", None)
+        sys.modules.pop("textgraphx.pipeline.phases.event_enrichment", None)
 
         with patch("textgraphx.neo4j_client.make_graph_from_config", return_value=graph):
             from textgraphx.EventEnrichmentPhase import EventEnrichmentPhase
@@ -326,7 +326,7 @@ class TestOrchestratorRunReportIntegration:
         from textgraphx.orchestration.orchestrator import PipelineOrchestrator
 
         dataset_dir = str(
-            Path(__file__).parent.parent / "textgraphx" / "datastore" / "dataset"
+            Path(__file__).parent.parent / "datastore" / "dataset"
         )
         orchestrator = PipelineOrchestrator(
             directory=dataset_dir, model_name="en_core_web_sm"

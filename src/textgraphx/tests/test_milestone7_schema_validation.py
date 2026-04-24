@@ -28,10 +28,10 @@ def _resolve_repo_root() -> Path:
     """
     here = Path(__file__).resolve()
     for parent in here.parents:
-        if (parent / "schema" / "ontology.json").exists() and (parent / "TextProcessor.py").exists():
+        if (parent / "schema" / "ontology.json").exists() and (parent / "pipeline/ingestion/text_processor.py").exists():
             return parent
         nested = parent / "textgraphx"
-        if (nested / "schema" / "ontology.json").exists() and (nested / "TextProcessor.py").exists():
+        if (nested / "schema" / "ontology.json").exists() and (nested / "pipeline/ingestion/text_processor.py").exists():
             return nested
     raise RuntimeError("Could not resolve repository root containing schema/ontology.json")
 
