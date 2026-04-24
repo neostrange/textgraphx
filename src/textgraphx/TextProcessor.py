@@ -1,14 +1,14 @@
 """Backward-compatibility shim for textgraphx.TextProcessor.
 
 Canonical module: ``textgraphx.pipeline.ingestion.text_processor``.
-Importing this module emits a DeprecationWarning and aliases ``sys.modules``
-so that attribute lookups and patches resolve to the canonical module.
+Importing this module emits a DeprecationWarning and re-exports
+``TextProcessor`` from the canonical module.
 """
 
-import sys
+import importlib
 import warnings
 
-from textgraphx.pipeline.ingestion import text_processor as _canonical
+_canonical = importlib.import_module("textgraphx.pipeline.ingestion.text_processor")
 
 warnings.warn(
     "Importing from `textgraphx.TextProcessor` is deprecated. "
@@ -17,4 +17,6 @@ warnings.warn(
     stacklevel=2,
 )
 
-sys.modules[__name__] = _canonical
+TextProcessor = _canonical.TextProcessor
+
+__all__ = ["TextProcessor"]
