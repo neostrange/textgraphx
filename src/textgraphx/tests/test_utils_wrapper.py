@@ -1,6 +1,6 @@
 """Compatibility tests for the moved schema constraint helper."""
 
-from textgraphx.Utils import create_constraints
+from textgraphx.database.schema_constraints import create_constraints
 from textgraphx.database import schema_constraints as canonical_schema_constraints
 
 

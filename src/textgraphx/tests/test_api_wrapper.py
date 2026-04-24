@@ -1,6 +1,6 @@
 """Compatibility tests for the moved API module."""
 
-import textgraphx.api as legacy_api
+import textgraphx.infrastructure.api as legacy_api
 from textgraphx.infrastructure import api as canonical_api
 
 

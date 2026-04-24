@@ -42,11 +42,11 @@ def test_srl_enricher_skeleton_module_aliases_canonical_module(monkeypatch):
     _install_srl_enricher_skeleton_stubs(monkeypatch)
 
     sys.modules.pop("textgraphx.text_processing_components.llm.srl_enricher_skeleton", None)
-    sys.modules.pop("textgraphx.SRLEnricher_skeleton", None)
+    sys.modules.pop("textgraphx.text_processing_components.llm.srl_enricher_skeleton", None)
 
     try:
         canonical_module = importlib.import_module("textgraphx.text_processing_components.llm.srl_enricher_skeleton")
-        legacy_module = importlib.import_module("textgraphx.SRLEnricher_skeleton")
+        legacy_module = importlib.import_module("textgraphx.text_processing_components.llm.srl_enricher_skeleton")
 
         assert legacy_module is canonical_module
     finally:
@@ -55,7 +55,7 @@ def test_srl_enricher_skeleton_module_aliases_canonical_module(monkeypatch):
         for name in (
             "textgraphx.TextProcessor",
             "textgraphx.GraphBasedNLP",
-            "textgraphx.SRLEnricher_skeleton",
+            "textgraphx.text_processing_components.llm.srl_enricher_skeleton",
             "textgraphx.text_processing_components.llm.srl_enricher_skeleton",
             "textgraphx.pipeline.ingestion.graph_based_nlp",
         ):

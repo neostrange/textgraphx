@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from textgraphx.evaluation.quality import generate_quality_report as canonical_generate_quality_report
-from textgraphx.kg_quality_evaluation import (
+from textgraphx.evaluation.quality import (
     compare_reports,
     compute_semantic_metrics,
     compute_structural_metrics,

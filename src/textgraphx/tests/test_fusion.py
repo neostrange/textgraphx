@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import sys
 from pathlib import Path
 
-from textgraphx.fusion import fuse_entities_cross_sentence
+from textgraphx.reasoning.fusion import fuse_entities_cross_sentence
 from textgraphx.reasoning.fusion import (
     fuse_entities_cross_sentence as canonical_fuse_entities_cross_sentence,
 )
@@ -20,7 +20,7 @@ def test_root_fusion_wrapper_reexports_canonical_cross_sentence_helper():
 @pytest.mark.unit
 class TestFusionUtilities:
     def test_fuse_cross_sentence_executes_query(self):
-        from textgraphx.fusion import fuse_entities_cross_sentence
+        from textgraphx.reasoning.fusion import fuse_entities_cross_sentence
 
         graph = MagicMock()
         graph.run.return_value.data.return_value = [{"c": 4}]
@@ -30,7 +30,7 @@ class TestFusionUtilities:
         graph.run.assert_called_once()
 
     def test_fuse_cross_sentence_without_doc_filter(self):
-        from textgraphx.fusion import fuse_entities_cross_sentence
+        from textgraphx.reasoning.fusion import fuse_entities_cross_sentence
 
         graph = MagicMock()
         graph.run.return_value.data.return_value = [{"c": 0}]
@@ -38,7 +38,7 @@ class TestFusionUtilities:
         assert count == 0
 
     def test_fuse_cross_document_executes_query(self):
-        from textgraphx.fusion import fuse_entities_cross_document
+        from textgraphx.reasoning.fusion import fuse_entities_cross_document
 
         graph = MagicMock()
         graph.run.return_value.data.return_value = [{"c": 2}]
@@ -48,7 +48,7 @@ class TestFusionUtilities:
         graph.run.assert_called_once()
 
     def test_fuse_cross_document_enforces_type_compatibility_by_default(self):
-        from textgraphx.fusion import fuse_entities_cross_document
+        from textgraphx.reasoning.fusion import fuse_entities_cross_document
 
         graph = MagicMock()
         graph.run.return_value.data.return_value = [{"c": 1}]
@@ -59,7 +59,7 @@ class TestFusionUtilities:
         assert params["require_type_compatibility"] is True
 
     def test_fuse_cross_document_can_disable_type_compatibility(self):
-        from textgraphx.fusion import fuse_entities_cross_document
+        from textgraphx.reasoning.fusion import fuse_entities_cross_document
 
         graph = MagicMock()
         graph.run.return_value.data.return_value = [{"c": 1}]
@@ -70,14 +70,14 @@ class TestFusionUtilities:
         assert params["require_type_compatibility"] is False
 
     def test_invalid_confidence_raises(self):
-        from textgraphx.fusion import fuse_entities_cross_document
+        from textgraphx.reasoning.fusion import fuse_entities_cross_document
 
         graph = MagicMock()
         with pytest.raises(ValueError):
             fuse_entities_cross_document(graph, confidence=1.5)
 
     def test_coref_identity_cross_document_executes_query(self):
-        from textgraphx.fusion import propagate_coreference_identity_cross_document
+        from textgraphx.reasoning.fusion import propagate_coreference_identity_cross_document
 
         graph = MagicMock()
         graph.run.return_value.data.return_value = [{"c": 3}]
@@ -87,7 +87,7 @@ class TestFusionUtilities:
         graph.run.assert_called_once()
 
     def test_coref_identity_can_disable_type_compatibility(self):
-        from textgraphx.fusion import propagate_coreference_identity_cross_document
+        from textgraphx.reasoning.fusion import propagate_coreference_identity_cross_document
 
         graph = MagicMock()
         graph.run.return_value.data.return_value = [{"c": 1}]
@@ -106,21 +106,21 @@ class TestFusionUtilities:
 @pytest.mark.regression
 class TestFusionContracts:
     def test_cross_sentence_returns_int(self):
-        from textgraphx.fusion import fuse_entities_cross_sentence
+        from textgraphx.reasoning.fusion import fuse_entities_cross_sentence
 
         graph = MagicMock()
         graph.run.return_value.data.return_value = [{"c": 1}]
         assert isinstance(fuse_entities_cross_sentence(graph, doc_id="x"), int)
 
     def test_cross_document_returns_int(self):
-        from textgraphx.fusion import fuse_entities_cross_document
+        from textgraphx.reasoning.fusion import fuse_entities_cross_document
 
         graph = MagicMock()
         graph.run.return_value.data.return_value = [{"c": 1}]
         assert isinstance(fuse_entities_cross_document(graph), int)
 
     def test_coref_identity_returns_int(self):
-        from textgraphx.fusion import propagate_coreference_identity_cross_document
+        from textgraphx.reasoning.fusion import propagate_coreference_identity_cross_document
 
         graph = MagicMock()
         graph.run.return_value.data.return_value = [{"c": 2}]

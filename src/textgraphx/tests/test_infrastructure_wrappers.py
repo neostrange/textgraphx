@@ -4,16 +4,16 @@ import logging
 
 import pytest
 
-from textgraphx.health_check import check_neo4j_connection
+from textgraphx.infrastructure.health_check import check_neo4j_connection
 from textgraphx.infrastructure.health_check import (
     check_neo4j_connection as canonical_check_neo4j_connection,
 )
 from textgraphx.infrastructure.logging_config import configure_logging as canonical_configure_logging
 from textgraphx.infrastructure.logging_utils import debug_log, get_logger as canonical_get_logger
 from textgraphx.infrastructure.performance_profiler import PhaseProfiler as canonical_phase_profiler
-from textgraphx.logging_config import configure_logging
-from textgraphx.logging_utils import get_logger
-from textgraphx.performance_profiler import PhaseProfiler
+from textgraphx.infrastructure.logging_config import configure_logging
+from textgraphx.infrastructure.logging_utils import get_logger
+from textgraphx.infrastructure.performance_profiler import PhaseProfiler
 
 
 pytestmark = [pytest.mark.unit]

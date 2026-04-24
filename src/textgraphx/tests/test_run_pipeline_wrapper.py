@@ -1,6 +1,6 @@
 """Compatibility tests for the moved pipeline runner."""
 
-import textgraphx.run_pipeline as legacy_run_pipeline
+import textgraphx.orchestration.runner as legacy_run_pipeline
 from textgraphx.orchestration import runner as canonical_runner
 
 

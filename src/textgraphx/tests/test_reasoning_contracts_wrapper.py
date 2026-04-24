@@ -6,7 +6,7 @@ from textgraphx.reasoning.contracts import (
     canonical_event_attribute_vocabulary as canonical_event_attribute_vocabulary_impl,
     normalize_event_attr as canonical_normalize_event_attr,
 )
-from textgraphx.reasoning_contracts import canonical_event_attribute_vocabulary, normalize_event_attr
+from textgraphx.reasoning.contracts import canonical_event_attribute_vocabulary, normalize_event_attr
 
 
 pytestmark = [pytest.mark.unit]

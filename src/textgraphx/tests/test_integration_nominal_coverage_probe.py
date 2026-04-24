@@ -7,7 +7,7 @@ import pytest
 
 def _neo4j_available() -> bool:
     try:
-        from textgraphx.health_check import check_neo4j_connection
+        from textgraphx.infrastructure.health_check import check_neo4j_connection
         from textgraphx.config import get_config
 
         cfg = get_config()

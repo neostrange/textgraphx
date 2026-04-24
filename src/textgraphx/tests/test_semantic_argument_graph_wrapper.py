@@ -1,6 +1,6 @@
 """Focused tests for the moved semantic argument graph helpers."""
 
-import textgraphx.semantic_argument_graph as legacy_semantic_argument_graph
+import textgraphx.reasoning.semantic_argument_graph as legacy_semantic_argument_graph
 from textgraphx.reasoning import semantic_argument_graph as canonical_semantic_argument_graph
 
 

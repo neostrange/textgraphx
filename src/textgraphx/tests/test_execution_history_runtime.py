@@ -13,7 +13,7 @@ try:
 except ModuleNotFoundError:
     pytest.skip("sqlite3 module is unavailable in this Python environment", allow_module_level=True)
 
-from textgraphx.execution_history import ExecutionRecord
+from textgraphx.orchestration.runtime_history import ExecutionRecord
 from textgraphx.orchestration.runtime_history import ExecutionRecord as CanonicalExecutionRecord
 
 

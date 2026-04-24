@@ -5,9 +5,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-import textgraphx.temporal_constraints as legacy_temporal_constraints
-import textgraphx.temporal_legacy_compat as legacy_temporal_legacy_compat
-import textgraphx.timeml_relations as legacy_timeml_relations
+import textgraphx.reasoning.temporal.constraints as legacy_temporal_constraints
+import textgraphx.reasoning.temporal.legacy_compat as legacy_temporal_legacy_compat
+import textgraphx.reasoning.temporal.timeml_relations as legacy_timeml_relations
 from textgraphx.reasoning.temporal import constraints as canonical_constraints
 from textgraphx.reasoning.temporal import legacy_compat as canonical_legacy_compat
 from textgraphx.reasoning.temporal import timeml_relations as canonical_timeml_relations

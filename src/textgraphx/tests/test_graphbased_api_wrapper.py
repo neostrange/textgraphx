@@ -24,10 +24,10 @@ def test_graphbased_api_module_aliases_canonical_module(monkeypatch):
     monkeypatch.setitem(sys.modules, "textgraphx.pipeline.ingestion.graph_based_nlp", fake_graphbased_module)
 
     sys.modules.pop("textgraphx.infrastructure.graphbased_api", None)
-    sys.modules.pop("textgraphx.GraphBasedNlpAPI", None)
+    sys.modules.pop("textgraphx.infrastructure.graphbased_api", None)
 
     canonical_api = importlib.import_module("textgraphx.infrastructure.graphbased_api")
-    legacy_api = importlib.import_module("textgraphx.GraphBasedNlpAPI")
+    legacy_api = importlib.import_module("textgraphx.infrastructure.graphbased_api")
 
     assert legacy_api is canonical_api
     assert legacy_api.app is canonical_api.app

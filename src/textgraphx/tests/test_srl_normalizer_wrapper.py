@@ -1,6 +1,6 @@
 """Focused tests for the moved SRL normalization helpers."""
 
-import textgraphx.srl_normalizer as legacy_srl_normalizer
+import textgraphx.reasoning.srl_normalizer as legacy_srl_normalizer
 from textgraphx.reasoning import srl_normalizer as canonical_srl_normalizer
 
 

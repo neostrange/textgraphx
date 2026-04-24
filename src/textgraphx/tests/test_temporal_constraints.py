@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from textgraphx.temporal_constraints import (
+from textgraphx.reasoning.temporal.constraints import (
     materialize_inverse_tlinks,
     solve_tlink_constraints,
     suppress_bidirectional_same_rel_conflicts,

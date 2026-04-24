@@ -98,7 +98,7 @@ class TestFusionRelationshipContract:
     """fusion.py queries must use canonical relationship names."""
 
     def _captured_query(self, func_name: str) -> str:
-        import textgraphx.fusion as fusion_mod
+        import textgraphx.reasoning.fusion as fusion_mod
         mock_graph = _make_mock_graph()
         getattr(fusion_mod, func_name)(mock_graph)
         assert mock_graph.run.called, "fusion function did not call graph.run"

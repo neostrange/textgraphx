@@ -127,7 +127,7 @@ class TestParticipationEdgeDiagnosticRegistered:
     """The participation edge migration inventory diagnostic must be registered."""
 
     def test_participation_edge_diagnostic_is_in_registry(self):
-        from textgraphx.diagnostics import DIAGNOSTIC_QUERY_REGISTRY
+        from textgraphx.evaluation.diagnostics import DIAGNOSTIC_QUERY_REGISTRY
         assert "participation_edge_migration_inventory" in DIAGNOSTIC_QUERY_REGISTRY, (
             "participation_edge_migration_inventory must be registered in "
             "DIAGNOSTIC_QUERY_REGISTRY so quality gate can track IN_FRAME/IN_MENTION coverage"

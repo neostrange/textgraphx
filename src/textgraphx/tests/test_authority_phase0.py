@@ -2,7 +2,7 @@
 
 import pytest
 
-from textgraphx.authority import resolve_authority_tier
+from textgraphx.reasoning.authority import resolve_authority_tier
 from textgraphx.reasoning.authority import resolve_authority_tier as canonical_resolve_authority_tier
 
 
@@ -20,7 +20,7 @@ def test_resolve_authority_tier_defaults_by_source():
 
 @pytest.mark.unit
 def test_resolve_authority_tier_rejects_invalid_explicit_tier():
-    from textgraphx.authority import resolve_authority_tier
+    from textgraphx.reasoning.authority import resolve_authority_tier
 
     with pytest.raises(ValueError):
         resolve_authority_tier("spacy", authority_tier="invalid")
@@ -28,7 +28,7 @@ def test_resolve_authority_tier_rejects_invalid_explicit_tier():
 
 @pytest.mark.unit
 def test_choose_authoritative_evidence_prefers_higher_tier_then_confidence():
-    from textgraphx.authority import EvidenceRecord, choose_authoritative_evidence
+    from textgraphx.reasoning.authority import EvidenceRecord, choose_authoritative_evidence
 
     winner = choose_authoritative_evidence(
         [
@@ -44,7 +44,7 @@ def test_choose_authoritative_evidence_prefers_higher_tier_then_confidence():
 
 @pytest.mark.unit
 def test_choose_authoritative_evidence_is_deterministic_for_ties():
-    from textgraphx.authority import EvidenceRecord, choose_authoritative_evidence
+    from textgraphx.reasoning.authority import EvidenceRecord, choose_authoritative_evidence
 
     winner = choose_authoritative_evidence(
         [
@@ -59,7 +59,7 @@ def test_choose_authoritative_evidence_is_deterministic_for_ties():
 
 @pytest.mark.unit
 def test_decide_conflict_additive_keeps_both_with_winner():
-    from textgraphx.authority import EvidenceRecord, decide_conflict
+    from textgraphx.reasoning.authority import EvidenceRecord, decide_conflict
 
     existing = EvidenceRecord(
         value="PAST",
@@ -82,7 +82,7 @@ def test_decide_conflict_additive_keeps_both_with_winner():
 
 @pytest.mark.unit
 def test_decide_conflict_overwrite_replaces_only_when_incoming_wins():
-    from textgraphx.authority import EvidenceRecord, decide_conflict
+    from textgraphx.reasoning.authority import EvidenceRecord, decide_conflict
 
     existing = EvidenceRecord(
         value="PRESENT",
@@ -105,7 +105,7 @@ def test_decide_conflict_overwrite_replaces_only_when_incoming_wins():
 
 @pytest.mark.unit
 def test_decide_conflict_handles_missing_records_and_invalid_policy():
-    from textgraphx.authority import EvidenceRecord, decide_conflict
+    from textgraphx.reasoning.authority import EvidenceRecord, decide_conflict
 
     incoming = EvidenceRecord(
         value="X",

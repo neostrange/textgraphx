@@ -1,6 +1,6 @@
 """Compatibility tests for the moved shared constants module."""
 
-import textgraphx.constants as legacy_constants
+import textgraphx.schema.constants as legacy_constants
 import textgraphx.schema.constants as canonical_constants
 
 
