@@ -26,7 +26,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from textgraphx.kg_quality_evaluation import (
+from textgraphx.evaluation.quality import (
     compare_reports,
     load_quality_report,
     overall_quality_from_report,

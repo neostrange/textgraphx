@@ -246,6 +246,7 @@ class TestRuntimeDiagnosticsImplementation:
     def setup(self):
         """Load diagnostics/monitoring code."""
         diagnostics_candidates = [
+            TEXTGRAPHX_DIR / "evaluation" / "diagnostics.py",
             TEXTGRAPHX_DIR / "diagnostics.py",
             TEXTGRAPHX_DIR / "monitoring.py",
             TEXTGRAPHX_DIR / "phase_diagnostics.py",

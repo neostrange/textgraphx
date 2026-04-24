@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from textgraphx.evaluation.quality import generate_quality_report as canonical_generate_quality_report
 from textgraphx.kg_quality_evaluation import (
     compare_reports,
     compute_semantic_metrics,
@@ -21,6 +22,10 @@ from textgraphx.kg_quality_evaluation import (
 
 
 pytestmark = [pytest.mark.unit]
+
+
+def test_root_quality_wrapper_reexports_canonical_generate_quality_report():
+    assert generate_quality_report is canonical_generate_quality_report
 
 
 class _FakeSuite:

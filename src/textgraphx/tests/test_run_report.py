@@ -13,6 +13,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from textgraphx.evaluation.reports import RunReport as CanonicalRunReport
 from textgraphx.run_report import DocumentStatus, PhaseSummary, RunReport
 
 
@@ -23,6 +24,9 @@ from textgraphx.run_report import DocumentStatus, PhaseSummary, RunReport
 
 @pytest.mark.unit
 class TestDocumentStatus:
+    def test_root_run_report_wrapper_reexports_canonical_run_report(self):
+        assert RunReport is CanonicalRunReport
+
     def test_basic_creation(self):
         ds = DocumentStatus(doc_id="d1", filename="a.xml", status="processed")
         assert ds.doc_id == "d1"

@@ -7,6 +7,7 @@ from textgraphx.queries.query_pack import load_query
 
 import pytest
 
+from textgraphx.evaluation.diagnostics import get_runtime_metrics as canonical_get_runtime_metrics
 from textgraphx.diagnostics import (
     query_edge_type_distribution,
     query_entity_density,
@@ -35,6 +36,10 @@ from textgraphx.diagnostics import (
 
 
 pytestmark = [pytest.mark.unit]
+
+
+def test_root_diagnostics_wrapper_reexports_canonical_runtime_metrics():
+    assert get_runtime_metrics is canonical_get_runtime_metrics
 
 
 def test_registered_diagnostics_contains_expected_queries():
