@@ -1,51 +1,13 @@
-"""TimeML/ISO-TimeML relation normalization helpers."""
+"""Compatibility wrapper for canonical TimeML relation helpers."""
 
-from __future__ import annotations
-
-from typing import Optional
-
-# Canonical relation inventory used for TLINK normalization.
-CANONICAL_TLINK_RELTYPES = (
-    "BEFORE",
-    "AFTER",
-    "INCLUDES",
-    "IS_INCLUDED",
-    "SIMULTANEOUS",
-    "IBEFORE",
-    "IAFTER",
-    "BEGINS",
-    "BEGUN_BY",
-    "ENDS",
-    "ENDED_BY",
-    "DURING",
-    "DURING_INV",
-    "IDENTITY",
-    "VAGUE",
+from textgraphx.reasoning.temporal.timeml_relations import (
+    CANONICAL_TLINK_RELTYPES,
+    is_canonical_tlink_reltype,
+    normalize_tlink_reltype,
 )
 
-_ALIAS_TO_CANONICAL = {
-    "INCLUDE": "INCLUDES",
-    "INCLUDED": "IS_INCLUDED",
-    "SIMULTANEOUSLY": "SIMULTANEOUS",
-    "OVERLAP": "SIMULTANEOUS",
-    "EQUAL": "IDENTITY",
-    "SAMEAS": "IDENTITY",
-    "MEASURE": "DURING",
-}
-
-
-def normalize_tlink_reltype(reltype: Optional[str]) -> str:
-    """Normalize arbitrary relation strings to canonical TimeML-style labels."""
-    raw = str(reltype or "").strip().upper()
-    if not raw:
-        return "VAGUE"
-    if raw in CANONICAL_TLINK_RELTYPES:
-        return raw
-    if raw in _ALIAS_TO_CANONICAL:
-        return _ALIAS_TO_CANONICAL[raw]
-    return "VAGUE"
-
-
-def is_canonical_tlink_reltype(reltype: Optional[str]) -> bool:
-    raw = str(reltype or "").strip().upper()
-    return raw in CANONICAL_TLINK_RELTYPES
+__all__ = [
+    "CANONICAL_TLINK_RELTYPES",
+    "is_canonical_tlink_reltype",
+    "normalize_tlink_reltype",
+]

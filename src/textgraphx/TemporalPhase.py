@@ -167,7 +167,7 @@ class TemporalPhase:
             self.heideltime_url = "http://localhost:5000/annotate"
 
     def __getattr__(self, name):
-        from textgraphx.temporal_legacy_compat import LEGACY_METHODS
+        from textgraphx.reasoning.temporal.legacy_compat import LEGACY_METHODS
 
         legacy_impl = LEGACY_METHODS.get(name)
         if legacy_impl is not None:
