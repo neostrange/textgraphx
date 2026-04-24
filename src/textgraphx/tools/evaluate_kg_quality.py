@@ -4,16 +4,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 from typing import Iterable
 
+from textgraphx.evaluation.report_validity import RunMetadata, compute_config_hash, compute_dataset_hash
 from textgraphx.kg_quality_evaluation import (
     compare_reports,
     generate_quality_report,
     identify_regression,
     load_quality_report,
 )
+from textgraphx.time_utils import utc_iso_now
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -35,6 +38,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "--output-dir",
         default="out/evaluation",
         help="Directory where reports will be written.",
+    )
+    parser.add_argument(
+        "--snapshot-kind",
+        choices=["current", "baseline"],
+        default="current",
+        help="Machine-readable label for the emitted report (current run or accepted baseline snapshot).",
     )
     parser.add_argument(
         "--seed",
@@ -228,6 +237,64 @@ def _write_json(path: Path, payload: dict) -> None:
         json.dump(payload, fh, indent=2)
 
 
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[3]
+
+
+def _portable_path(path: Path, repo_root: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(repo_root.resolve()))
+    except ValueError:
+        return str(path)
+
+
+def _current_git_commit(repo_root: Path) -> str:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return "unknown"
+    commit = result.stdout.strip() if result.returncode == 0 else ""
+    return commit or "unknown"
+
+
+def _capture_timestamp() -> str:
+    return utc_iso_now().replace("+00:00", "Z")
+
+
+def _build_run_metadata(*, args, dataset_paths: list[Path], config_dict: dict, timestamp: str) -> dict:
+    return RunMetadata(
+        dataset_hash=compute_dataset_hash(dataset_paths),
+        config_hash=compute_config_hash(config_dict),
+        seed=int(args.seed),
+        strict_gate_enabled=bool(args.strict_gate),
+        fusion_enabled=bool(args.fusion_enabled),
+        cleanup_mode=str(args.cleanup_mode),
+        timestamp=timestamp,
+    ).to_dict()
+
+
+def _build_capture_metadata(*, args, repo_root: Path, dataset_dir: Path, output_dir: Path, documents: int) -> dict:
+    metadata = {
+        "snapshot_kind": str(args.snapshot_kind),
+        "git_commit": _current_git_commit(repo_root),
+        "dataset_dir": _portable_path(dataset_dir, repo_root),
+        "output_dir": _portable_path(output_dir, repo_root),
+        "document_count": int(documents),
+        "max_docs": int(args.max_docs or 0),
+    }
+    if args.baseline_report:
+        metadata["baseline_report"] = _portable_path(Path(args.baseline_report), repo_root)
+        comparison_path = Path(args.comparison_json) if args.comparison_json else output_dir / "kg_quality_comparison.json"
+        metadata["comparison_json"] = _portable_path(comparison_path, repo_root)
+    return metadata
+
+
 def main(argv: Iterable[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(list(argv) if argv is not None else None)
@@ -242,6 +309,7 @@ def main(argv: Iterable[str] | None = None) -> int:
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    repo_root = _repo_root()
 
     from textgraphx.config import get_config
     from textgraphx.neo4j_client import make_graph_from_config
@@ -250,6 +318,20 @@ def main(argv: Iterable[str] | None = None) -> int:
     cfg = get_config()
     config_dict = _config_to_hashable_dict(cfg)
     baseline_report = load_quality_report(args.baseline_report) if args.baseline_report else None
+    report_timestamp = _capture_timestamp()
+    run_metadata = _build_run_metadata(
+        args=args,
+        dataset_paths=dataset_paths,
+        config_dict=config_dict,
+        timestamp=report_timestamp,
+    )
+    capture_metadata = _build_capture_metadata(
+        args=args,
+        repo_root=repo_root,
+        dataset_dir=dataset_dir,
+        output_dir=output_dir,
+        documents=len(dataset_paths),
+    )
 
     graph = make_graph_from_config()
     try:
@@ -269,6 +351,9 @@ def main(argv: Iterable[str] | None = None) -> int:
             runtime_diagnostics=suite.runtime_diagnostics,
             evaluation_suite=suite,
             documents=len(dataset_paths),
+            timestamp=report_timestamp,
+            run_metadata=run_metadata,
+            capture_metadata=capture_metadata,
         )
 
         export_json, export_csv, export_md = _ensure_any_export_requested(args)

@@ -117,11 +117,31 @@ def test_generate_quality_report_uses_suite_and_emits_recommendations():
         runtime_diagnostics=_sample_runtime_diagnostics(),
         evaluation_suite=_FakeSuite(),
         document_id="doc-7",
+        run_metadata={
+            "dataset_hash": "dataset-1234",
+            "config_hash": "config-5678",
+            "seed": 42,
+            "strict_gate_enabled": False,
+            "fusion_enabled": False,
+            "cleanup_mode": "auto",
+            "timestamp": "2026-04-24T00:00:00Z",
+            "duration_seconds": None,
+        },
+        capture_metadata={
+            "snapshot_kind": "baseline",
+            "git_commit": "abc123",
+            "dataset_dir": "src/textgraphx/datastore/dataset",
+            "output_dir": "src/textgraphx/datastore/evaluation/baseline",
+            "document_count": 1,
+            "max_docs": 0,
+        },
     )
 
     assert report["document_id"] == "doc-7"
     assert report["overall_quality"] == pytest.approx(0.82)
     assert report["quality_tier"] == "ACCEPTABLE"
+    assert report["run_metadata"]["dataset_hash"] == "dataset-1234"
+    assert report["capture_metadata"]["snapshot_kind"] == "baseline"
     assert report["phase_quality_scores"]["mention_layer"] == pytest.approx(0.80)
     assert report["conclusive"] is False
     assert report["runtime_diagnostics"]["totals"]["glink_count"] == 3
@@ -136,6 +156,8 @@ def test_generate_quality_report_uses_suite_and_emits_recommendations():
 def test_compare_reports_and_identify_regression_surface_deltas():
     baseline = {
         "overall_quality": 0.88,
+        "run_metadata": {"dataset_hash": "baseline-ds", "seed": 42},
+        "capture_metadata": {"snapshot_kind": "baseline", "git_commit": "base-commit"},
         "phase_quality_scores": {"mention_layer": 0.90, "edge_semantics": 0.86},
         "structural_metrics": {"structural_health_score": 0.95},
         "semantic_metrics": {"semantic_compliance_score": 0.84},
@@ -149,6 +171,8 @@ def test_compare_reports_and_identify_regression_surface_deltas():
     }
     current = {
         "overall_quality": 0.81,
+        "run_metadata": {"dataset_hash": "current-ds", "seed": 43},
+        "capture_metadata": {"snapshot_kind": "current", "git_commit": "head-commit"},
         "phase_quality_scores": {"mention_layer": 0.83, "edge_semantics": 0.84},
         "structural_metrics": {"structural_health_score": 0.94},
         "semantic_metrics": {"semantic_compliance_score": 0.79},
@@ -172,6 +196,8 @@ def test_compare_reports_and_identify_regression_surface_deltas():
     assert comparison["temporal_delta_details"]["documents_with_temporal_connectivity_gaps_count"] == pytest.approx(2.0)
     assert comparison["temporal_delta_details"]["documents_without_temporal_tlinks_count"] == pytest.approx(1.0)
     assert comparison["temporal_delta_details"]["temporal_issue_count"] == pytest.approx(7.0)
+    assert comparison["baseline_capture_metadata"]["snapshot_kind"] == "baseline"
+    assert comparison["current_run_metadata"]["seed"] == 43
     assert is_regression is True
     assert any("Overall quality regressed" in reason for reason in reasons)
     assert any("Phase 'mention_layer' regressed" in reason for reason in reasons)

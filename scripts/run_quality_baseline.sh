@@ -50,6 +50,7 @@ fi
 "$PYTHON" -m textgraphx.tools.evaluate_kg_quality \
     --dataset-dir "$DATASET_DIR" \
     --output-dir  "$OUTPUT_DIR" \
+    --snapshot-kind baseline \
     --json --csv --markdown \
     "${COMPARE_ARGS[@]}"
 
