@@ -6,7 +6,7 @@ import pytest
 
 
 def _event_enrichment_source() -> str:
-    source_path = Path(__file__).resolve().parents[1] / "EventEnrichmentPhase.py"
+    source_path = Path(__file__).resolve().parents[1] / "pipeline" / "phases" / "event_enrichment.py"
     return source_path.read_text(encoding="utf-8")
 
 

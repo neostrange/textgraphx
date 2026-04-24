@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-EEP_SRC_PATH = Path(__file__).parent.parent / "textgraphx" / "EventEnrichmentPhase.py"
+EEP_SRC_PATH = Path(__file__).resolve().parents[1] / "pipeline" / "phases" / "event_enrichment.py"
 
 
 @pytest.fixture(scope="module")

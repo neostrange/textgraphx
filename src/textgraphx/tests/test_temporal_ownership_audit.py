@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Set, Tuple, List
 
 
-REPO_ROOT = Path(__file__).parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 TEXTGRAPHX_DIR = REPO_ROOT / "textgraphx"
 
 
@@ -203,7 +203,7 @@ class TestOwnershipIntegration:
         """TLINK creation should be exclusive to TlinksRecognizer."""
         temporal_phase_path = TEXTGRAPHX_DIR / "TemporalPhase.py"
         refinement_phase_path = TEXTGRAPHX_DIR / "RefinementPhase.py"
-        event_enrichment_path = TEXTGRAPHX_DIR / "EventEnrichmentPhase.py"
+        event_enrichment_path = TEXTGRAPHX_DIR / "pipeline" / "phases" / "event_enrichment.py"
         
         phases_to_check = [
             (temporal_phase_path, "TemporalPhase"),

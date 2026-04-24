@@ -143,7 +143,7 @@ class TestEventEnrichmentNonCoreParticipants:
     """add_non_core_participants_to_event must not contain a ARGM-TMP CASE branch
     that is unreachable due to the WHERE filter that already excludes ARGM-TMP."""
 
-    EEP_SRC = ROOT / "textgraphx" / "EventEnrichmentPhase.py"
+    EEP_SRC = ROOT / "textgraphx" / "pipeline" / "phases" / "event_enrichment.py"
 
     def _source(self) -> str:
         return self.EEP_SRC.read_text(encoding="utf-8")

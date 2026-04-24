@@ -163,7 +163,7 @@ def _load_srl_class():
 class TestEventEnrichmentWriterDualEmit:
     """EventEnrichmentPhase writers must emit both legacy and canonical edge types."""
 
-    EEP_SRC = ROOT / "textgraphx" / "EventEnrichmentPhase.py"
+    EEP_SRC = ROOT / "textgraphx" / "pipeline" / "phases" / "event_enrichment.py"
 
     def _src(self) -> str:
         return self.EEP_SRC.read_text(encoding="utf-8")

@@ -275,6 +275,10 @@ class TestEventEnrichmentIntegration:
         """link_frameArgument_to_event must return an integer link count."""
         from unittest.mock import patch
 
+        _stub_event_enrichment_imports()
+        sys.modules.pop("textgraphx.pipeline.phases.event_enrichment", None)
+        sys.modules.pop("textgraphx.EventEnrichmentPhase", None)
+
         # Patch at the source module where the constructor resolves it.
         with patch("textgraphx.neo4j_client.make_graph_from_config", return_value=graph):
             from textgraphx.EventEnrichmentPhase import EventEnrichmentPhase
@@ -288,6 +292,10 @@ class TestEventEnrichmentIntegration:
     def test_link_frame_argument_is_idempotent(self, graph):
         """Running link_frameArgument_to_event twice must not increase match count."""
         from unittest.mock import patch
+
+        _stub_event_enrichment_imports()
+        sys.modules.pop("textgraphx.pipeline.phases.event_enrichment", None)
+        sys.modules.pop("textgraphx.EventEnrichmentPhase", None)
 
         with patch("textgraphx.neo4j_client.make_graph_from_config", return_value=graph):
             from textgraphx.EventEnrichmentPhase import EventEnrichmentPhase

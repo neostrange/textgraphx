@@ -9,11 +9,11 @@ from pathlib import Path
 from typing import List, Tuple
 
 
-REPO_ROOT = Path(__file__).parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 TEXTGRAPHX_DIR = REPO_ROOT / "textgraphx"
 TEMPORAL_PHASE_PATH = TEXTGRAPHX_DIR / "TemporalPhase.py"
 TLINKS_RECOGNIZER_PATH = TEXTGRAPHX_DIR / "TlinksRecognizer.py"
-EVENT_ENRICHMENT_PATH = TEXTGRAPHX_DIR / "EventEnrichmentPhase.py"
+EVENT_ENRICHMENT_PATH = TEXTGRAPHX_DIR / "pipeline" / "phases" / "event_enrichment.py"
 
 
 @pytest.mark.unit
