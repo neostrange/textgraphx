@@ -271,8 +271,15 @@ def test_entity_processor_syntactic_type_prefers_valid_upstream_meantime_type():
 
 
 def test_entity_processor_syntactic_type_uses_dependency_rules_for_missing_categories():
-    assert EntityProcessor._syntactic_type_from_tag("NN", dep="appos") == "APP"
-    assert EntityProcessor._syntactic_type_from_tag("NN", dep="conj") == "CONJ"
+    # ENH-NAM-01 (2026-04): dep `appos`/`conj` on an entity head no longer
+    # rewrites the head's mention type. APP and CONJ are reserved for the
+    # wider enclosing mention materialized by a dedicated refinement pass.
+    # The inner head must keep its POS-derived NAM/NOM type so it can match
+    # the inner gold mention exactly (MEANTIME nested-mention semantics).
+    assert EntityProcessor._syntactic_type_from_tag("NN", dep="appos") == "NOM"
+    assert EntityProcessor._syntactic_type_from_tag("NNP", dep="appos") == "NAM"
+    assert EntityProcessor._syntactic_type_from_tag("NN", dep="conj") == "NOM"
+    assert EntityProcessor._syntactic_type_from_tag("NNP", dep="conj") == "NAM"
     assert EntityProcessor._syntactic_type_from_tag("NN", dep="acl:relcl") == "ARC"
     assert EntityProcessor._syntactic_type_from_tag("NN", dep="det") == "PTV"
     assert EntityProcessor._syntactic_type_from_tag("NN", dep="attr") == "PRE"

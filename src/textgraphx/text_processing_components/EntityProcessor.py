@@ -103,11 +103,16 @@ class EntityProcessor:
         if normalized:
             return normalized
 
+        # NOTE (ENH-NAM-01, 2026-04): MEANTIME APP/CONJ labels denote the
+        # *wider* mention that contains an apposition / coordination — not the
+        # inner head. Previously we relabelled inner NAM/NOM heads as APP or
+        # CONJ when their dep_ was `appos`/`conj`, which produced spurious
+        # type/boundary mismatches against the inner gold NAM/NOM mention
+        # (e.g. predicted [18,19,20] APP vs gold [18,19,20] NAM nested in
+        # gold [11..20] APP). Wider APP/CONJ mentions are materialized in a
+        # separate refinement pass; here we keep the inner head's POS-derived
+        # type so it can match the inner gold mention exactly.
         dep = str(dep or "").strip().lower()
-        if dep == "appos":
-            return "APP"
-        if dep == "conj":
-            return "CONJ"
         if dep in {"acl", "acl:relcl", "relcl", "rcmod"}:
             return "ARC"
         if dep in {"predet", "det", "nummod", "quantmod"}:

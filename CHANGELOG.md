@@ -49,7 +49,47 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Evaluator `build_document_from_neo4j` supports all 5 `nominal_profile_mode` values.
 - 55 unit tests in `tests/test_enh_nom_01_02_03.py`.
 
+#### Entity Extraction (ENH-NAM, 2026-04-30)
+- **ENH-NAM-01** — `EntityProcessor._syntactic_type_from_tag()` no longer rewrites
+  inner NAM/NOM heads as APP/CONJ when their dependency relation is `appos`/`conj`.
+  In MEANTIME, APP/CONJ designate the *wider enclosing* mention; the inner head
+  retains its POS-derived NAM/NOM type. Strict micro entity F1: 0.218 → 0.249
+  (+0.031, recall 0.264 → 0.340) on the 6-doc MEANTIME set.
+- **ENH-NAM-02** — Two new refinement rules in
+  `pipeline/phases/refinement.py` materialize the missing wider construction
+  mentions: `materialize_wider_appositive_mentions()` (APP) and
+  `materialize_wider_conjunction_mentions()` (CONJ). Both walk the dep-tree
+  subtree of the construction head, drop punctuation tokens, and tag each new
+  mention with `boundary_policy='wider_construction'`.
+- Boundary trimming passes (`trim_determiners_from_mentions`,
+  `trim_punctuation_from_mentions`) now skip mentions tagged
+  `boundary_policy='wider_construction'` to preserve gold-aligned extents.
+
+#### Compatibility Shims
+- `textgraphx/run_pipeline.py` re-exports `textgraphx.orchestration.runner.main`
+  so that the `textgraphx-run` console script and the eval-cycle script can
+  invoke `python -m textgraphx.run_pipeline`.
+- `textgraphx/neo4j_client.py` re-exports `textgraphx.database.client`
+  (including `make_graph_from_config`) for scripts and helpers still importing
+  from the pre-reorganization path.
+
 #### MEANTIME Evaluation Framework
+- Evaluation CLI now supports constrained non-core participant projection via
+  `--non-core-participant-roles` (used with `--include-non-core-participants`) to
+  reduce relation-noise during aggressive recall diagnostics.
+- `RefinementPhase.materialize_nominal_mentions_from_noun_chunks()` now supports
+  runtime A/B toggling via `TEXTGRAPHX_ENH_NOM_04_STRICT_FILTERS`:
+  `0` for legacy filter behavior, `1` (default) for strict ENH-NOM-04 filtering.
+- Fixed ENH-NOM-04 noun-chunk materialization root cause: kept noun-chunk rows now
+  upsert canonical `Entity` nodes before mention merge (previously zero matching
+  canonical entities caused all noun-chunk nominal mentions to drop at merge time).
+- Noun-chunk materialization now propagates an `is_discourse_entity` signal from
+  event/argument evidence and stamps `:DiscourseEntity` on eligible noun-chunk
+  entities/mentions.
+- Evaluation scope metadata now records non-core role-filter mode and allowlist
+  for reproducible report comparisons.
+- Updated [docs/EVALUATION_DIAGNOSTICS.md](docs/EVALUATION_DIAGNOSTICS.md) with
+  recommended purity-first and constrained-aggressive usage patterns.
 - `textgraphx/evaluation/meantime_evaluator.py` — MEANTIME PRF scorer with strict and
   relaxed matching, per-document and batch evaluation, and relation-error classification
   (`type_mismatch`, `endpoint_mismatch`).
@@ -66,6 +106,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - 31 tests in `tests/test_milestone8_bridge_validator.py`.
 
 #### Dataset & Tooling
+- `scripts/run_participant_scope_benchmark.py` — one-command 3-way MEANTIME
+  benchmark runner for participant scope profiles (core-only, constrained
+  non-core allowlist, full non-core) with automatic delta summary output.
+- `scripts/run_nominal_filter_ab.py` — one-command 2-way ENH-NOM-04 benchmark
+  runner for noun-chunk nominal filters (`legacy` vs `enh_nom4`) with strict
+  entity-metric delta summary output.
+- `scripts/run_nominal_filter_ab.py` refresh now resets profile-dependent artifacts
+  per run (`noun_chunk_nominal` mentions, noun-chunk-sourced entities, and
+  `link_fa_entitymention_entity` REFERS_TO edges) to keep A/B profiles isolated.
+- `scripts/run_nominal_filter_ab.py` now emits evaluator-scope projection
+  diagnostics that distinguish NC-exclusive spans matching gold entity spans
+  vs non-gold-aligned spans (`projected_spans_nc_exclusive_matching_gold_span`,
+  `projected_spans_nc_exclusive_not_in_gold_span`) for root-cause analysis of
+  metric ties.
+- `scripts/run_nominal_filter_ab.py` now writes `diagnostic_verdict` in the
+  summary JSON, including a stable verdict `code`, strict entity deltas, and
+  projection-vs-gold deltas for machine-readable tie interpretation.
+- `Makefile` target `participant-benchmark` to run the participant-scope
+  benchmark using the project Python environment.
+- `Makefile` target `nominal-filter-ab` to run the ENH-NOM-04 A/B benchmark
+  using the project Python environment.
 - `python -m textgraphx.tools.select_eval_dataset` — materializes a matched evaluation
   subset from `datastore/original_dataset` based on `datastore/annotated` XML stems.
 - `python -m textgraphx.tools.nominal_coverage_probe` — existence-scoped Cypher probe for
