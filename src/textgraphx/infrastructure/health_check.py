@@ -120,6 +120,10 @@ def check_external_services(cfg=None, fail_fast: bool = False) -> Tuple[bool, Li
         ("SRL (AllenNLP)", cfg.services.srl_url),
         ("LLM (Ollama)", cfg.services.llm_url),
     ]
+    # Nominal SRL is optional; only probe when configured.
+    nom_srl_url = getattr(cfg.services, "nom_srl_url", "") or ""
+    if nom_srl_url:
+        services.append(("SRL Nominal (CogComp)", nom_srl_url))
 
     results = []
     all_reachable = True

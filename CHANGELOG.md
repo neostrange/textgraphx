@@ -10,6 +10,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+#### SRL — modern verb + nominal services
+- New external service: **transformer-srl** (Riccorl, MIT, PropBank verb SRL).
+  Sibling repo `transformer-srl-service/` exposes `POST /predict` on port 8010
+  and emits PropBank roleset sense (e.g. `run.01`) plus a confidence in addition
+  to the legacy `verb / description / tags` shape. Quality: F1 args ≈ 86,
+  sense F1 ≈ 95.5 (paired checkpoint `srl_bert_base_conll2012.tar.gz` +
+  `transformer-srl 2.4.6`).
+- New external service: **cogcomp-nominal-srl** (CogComp/SRL-English, MIT,
+  NomBank nominal SRL with sense). Sibling repo `cogcomp-nominal-srl-service/`
+  exposes `POST /predict_nom` on port 8011. Quality: predicate-id F1 ≈ 0.81,
+  joint nominal SRL+sense F1 ≈ 82.3, sense acc ≈ 97.9.
+- `SRLProcessor.process_nominal_srl()` consumes the nominal-SRL service
+  response and persists `Frame` (`framework="NOMBANK"`) + `FrameArgument` nodes
+  with deterministic ids, mirroring the existing verb path.
+- `SRLProcessor._merge_frame()` now accepts optional `sense`, `sense_conf`, and
+  `framework` (`"PROPBANK"` default, `"NOMBANK"`); `Frame.sense` and
+  `Frame.sense_conf` are advisory-tier (only set when the upstream service
+  returns them).
+- `services.nom_srl_url` config field (INI / TOML / `TEXTGRAPHX_NOM_SRL_URL`
+  env). Empty string disables the optional nominal pass.
+- `adapters/rest_caller.callNominalSrlApi()` and matching shim in
+  `util/RestCaller.py`.
+- `infrastructure/health_check.py` probes `nom_srl_url` only when configured.
+- `pipeline/ingestion/graph_based_nlp.py` invokes the nominal SRL service per
+  sentence after the verb SRL pass; failures are caught and logged.
+
 #### Schema & Ontology
 - `schema/ontology.json` — machine-readable ontology with `relation_endpoint_contract`,
   `event_attribute_vocabulary`, and `temporal_reasoning_profile` sections.

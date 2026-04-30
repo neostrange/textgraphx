@@ -56,7 +56,10 @@ def test_srl_frame_writer_sets_canonical_and_legacy_token_span_fields():
     assert "f.end_tok = $end" in query
     assert "f.startIndex = $start" in query
     assert "f.endIndex = $end" in query
-    assert "f.framework = 'PROPBANK'" in query
+    # Framework is now parameterised (PropBank for verb SRL, NomBank for
+    # nominal SRL). Default still PropBank.
+    assert "f.framework = $framework" in query
+    assert params["framework"] == "PROPBANK"
     assert params["start"] == 3
     assert params["end"] == 8
 
