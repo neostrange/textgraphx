@@ -4,9 +4,9 @@
     "macro": {
       "relaxed": {
         "entity": {
-          "f1": 0.3128341518585421,
-          "precision": 0.26291782445243544,
-          "recall": 0.4143170044997669
+          "f1": 0.34720418470418474,
+          "precision": 0.3176883155762243,
+          "recall": 0.40554507467520545
         },
         "event": {
           "f1": 0.31016844282116707,
@@ -26,9 +26,9 @@
       },
       "strict": {
         "entity": {
-          "f1": 0.275180948415865,
-          "precision": 0.2367927291053721,
-          "recall": 0.357896541577756
+          "f1": 0.3046136451624257,
+          "precision": 0.285460119638351,
+          "recall": 0.34996003364124806
         },
         "event": {
           "f1": 0.23781040083461658,
@@ -50,12 +50,12 @@
     "micro": {
       "relaxed": {
         "entity": {
-          "f1": 0.3054545454545454,
-          "fn": 61,
-          "fp": 130,
-          "precision": 0.2441860465116279,
-          "recall": 0.4077669902912621,
-          "tp": 42
+          "f1": 0.3445378151260505,
+          "fn": 62,
+          "fp": 94,
+          "precision": 0.3037037037037037,
+          "recall": 0.39805825242718446,
+          "tp": 41
         },
         "event": {
           "f1": 0.30927835051546393,
@@ -84,12 +84,12 @@
       },
       "strict": {
         "entity": {
-          "f1": 0.2733812949640288,
-          "fn": 68,
-          "fp": 134,
-          "precision": 0.22093023255813954,
-          "recall": 0.3584905660377358,
-          "tp": 38
+          "f1": 0.3070539419087137,
+          "fn": 69,
+          "fp": 98,
+          "precision": 0.2740740740740741,
+          "recall": 0.3490566037735849,
+          "tp": 37
         },
         "event": {
           "f1": 0.23711340206185563,
@@ -161,7 +161,7 @@
   "diagnostics": {
     "documents": [
       {
-        "avg_f1": 0.24923133776792314,
+        "avg_f1": 0.2593939393939394,
         "doc_id": "112579",
         "layers": [
           {
@@ -169,7 +169,7 @@
               "boundary_mismatch": 0,
               "endpoint_mismatch": 0,
               "missing": 7,
-              "spurious": 22,
+              "spurious": 17,
               "type_mismatch": 0
             },
             "examples": {
@@ -297,17 +297,6 @@
                     },
                     "kind": "entity",
                     "span": [
-                      74
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "NAM"
-                    },
-                    "kind": "entity",
-                    "span": [
                       160,
                       161
                     ]
@@ -409,19 +398,6 @@
                 {
                   "predicted": {
                     "attrs": {
-                      "syntactic_type": "NAM"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      257,
-                      258,
-                      259
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
                       "syntactic_type": "APP"
                     },
                     "kind": "entity",
@@ -490,33 +466,11 @@
                     },
                     "kind": "entity",
                     "span": [
-                      334
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "NAM"
-                    },
-                    "kind": "entity",
-                    "span": [
                       340,
                       341,
                       342,
                       343,
                       344
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "NAM"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      346
                     ]
                   }
                 },
@@ -541,26 +495,15 @@
                       369
                     ]
                   }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "NAM"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      377
-                    ]
-                  }
                 }
               ],
               "type_mismatch": []
             },
-            "f1": 0.2926829268292683,
+            "f1": 0.33333333333333337,
             "fn": 7,
-            "fp": 22,
+            "fp": 17,
             "layer": "entity",
-            "precision": 0.21428571428571427,
+            "precision": 0.2608695652173913,
             "recall": 0.46153846153846156,
             "tp": 6
           },
@@ -1855,7 +1798,7 @@
         ],
         "mode": "strict",
         "suggestions": [
-          "entity: low F1 (0.293) - inspect extraction and matching rules for this layer.",
+          "entity: low F1 (0.333) - inspect extraction and matching rules for this layer.",
           "entity: precision is weaker than recall - investigate over-generation and filtering criteria.",
           "event: low F1 (0.213) - inspect extraction and matching rules for this layer.",
           "event: precision is weaker than recall - investigate over-generation and filtering criteria.",
@@ -1874,7 +1817,7 @@
         ]
       },
       {
-        "avg_f1": 0.20118230358504957,
+        "avg_f1": 0.20915678524374176,
         "doc_id": "61327",
         "layers": [
           {
@@ -1882,7 +1825,7 @@
               "boundary_mismatch": 2,
               "endpoint_mismatch": 0,
               "missing": 9,
-              "spurious": 17,
+              "spurious": 12,
               "type_mismatch": 0
             },
             "examples": {
@@ -2061,17 +2004,6 @@
                 {
                   "predicted": {
                     "attrs": {
-                      "syntactic_type": "PRO"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      86
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
                       "syntactic_type": "NAM"
                     },
                     "kind": "entity",
@@ -2117,17 +2049,6 @@
                 {
                   "predicted": {
                     "attrs": {
-                      "syntactic_type": "PRO"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      169
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
                       "syntactic_type": "NAM"
                     },
                     "kind": "entity",
@@ -2148,39 +2069,6 @@
                       181,
                       182,
                       183
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "NAM"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      186
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "PRO"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      188
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "PRO"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      191
                     ]
                   }
                 },
@@ -2258,11 +2146,11 @@
               ],
               "type_mismatch": []
             },
-            "f1": 0.2105263157894737,
+            "f1": 0.2424242424242424,
             "fn": 11,
-            "fp": 19,
+            "fp": 14,
             "layer": "entity",
-            "precision": 0.17391304347826086,
+            "precision": 0.2222222222222222,
             "recall": 0.26666666666666666,
             "tp": 4
           },
@@ -3075,7 +2963,7 @@
         "mode": "strict",
         "suggestions": [
           "entity: boundary mismatches detected - verify token span anchoring (`start_tok`, `end_tok`) and overlap threshold.",
-          "entity: low F1 (0.211) - inspect extraction and matching rules for this layer.",
+          "entity: low F1 (0.242) - inspect extraction and matching rules for this layer.",
           "entity: precision is weaker than recall - investigate over-generation and filtering criteria.",
           "event: low F1 (0.261) - inspect extraction and matching rules for this layer.",
           "event: precision is weaker than recall - investigate over-generation and filtering criteria.",
@@ -3094,7 +2982,7 @@
         ]
       },
       {
-        "avg_f1": 0.3582774029767701,
+        "avg_f1": 0.36866701336638047,
         "doc_id": "62405",
         "layers": [
           {
@@ -3102,7 +2990,7 @@
               "boundary_mismatch": 0,
               "endpoint_mismatch": 0,
               "missing": 22,
-              "spurious": 23,
+              "spurious": 15,
               "type_mismatch": 0
             },
             "examples": {
@@ -3415,17 +3303,6 @@
                     },
                     "kind": "entity",
                     "span": [
-                      66
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "NAM"
-                    },
-                    "kind": "entity",
-                    "span": [
                       171,
                       172
                     ]
@@ -3452,17 +3329,6 @@
                     "span": [
                       179,
                       180
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "NOM"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      187
                     ]
                   }
                 },
@@ -3505,17 +3371,6 @@
                 {
                   "predicted": {
                     "attrs": {
-                      "syntactic_type": "PRO"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      231
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
                       "syntactic_type": "NAM"
                     },
                     "kind": "entity",
@@ -3536,17 +3391,6 @@
                       242,
                       243,
                       244
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "PRO"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      247
                     ]
                   }
                 },
@@ -3579,55 +3423,11 @@
                 {
                   "predicted": {
                     "attrs": {
-                      "syntactic_type": "PRO"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      265
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "PRO"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      296
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "PRO"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      311
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
                       "syntactic_type": "NAM"
                     },
                     "kind": "entity",
                     "span": [
                       320
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "PRO"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      331
                     ]
                   }
                 },
@@ -3678,11 +3478,11 @@
               ],
               "type_mismatch": []
             },
-            "f1": 0.28571428571428575,
+            "f1": 0.3272727272727273,
             "fn": 22,
-            "fp": 23,
+            "fp": 15,
             "layer": "entity",
-            "precision": 0.28125,
+            "precision": 0.375,
             "recall": 0.2903225806451613,
             "tp": 9
           },
@@ -4836,8 +4636,8 @@
         ],
         "mode": "strict",
         "suggestions": [
-          "entity: low F1 (0.286) - inspect extraction and matching rules for this layer.",
-          "entity: precision is weaker than recall - investigate over-generation and filtering criteria.",
+          "entity: low F1 (0.327) - inspect extraction and matching rules for this layer.",
+          "entity: recall is weaker than precision - investigate under-generation and missing extractions.",
           "event: low F1 (0.253) - inspect extraction and matching rules for this layer.",
           "event: precision is weaker than recall - investigate over-generation and filtering criteria.",
           "event: type mismatches detected - tune label/attribute mapping in mapping-config.",
@@ -4852,7 +4652,7 @@
         ]
       },
       {
-        "avg_f1": 0.18096442994249573,
+        "avg_f1": 0.18494170266976845,
         "doc_id": "76437",
         "layers": [
           {
@@ -4860,7 +4660,7 @@
               "boundary_mismatch": 0,
               "endpoint_mismatch": 0,
               "missing": 13,
-              "spurious": 34,
+              "spurious": 27,
               "type_mismatch": 1
             },
             "examples": {
@@ -5063,17 +4863,6 @@
                 {
                   "predicted": {
                     "attrs": {
-                      "syntactic_type": "PRO"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      139
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
                       "syntactic_type": "APP"
                     },
                     "kind": "entity",
@@ -5090,17 +4879,6 @@
                     "kind": "entity",
                     "span": [
                       149
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "NAM"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      168
                     ]
                   }
                 },
@@ -5149,41 +4927,8 @@
                     },
                     "kind": "entity",
                     "span": [
-                      204
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "NAM"
-                    },
-                    "kind": "entity",
-                    "span": [
                       228,
                       229
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "PRO"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      235
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "PRO"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      268
                     ]
                   }
                 },
@@ -5242,17 +4987,6 @@
                     "span": [
                       297,
                       298
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "PRO"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      306
                     ]
                   }
                 },
@@ -5378,17 +5112,6 @@
                 {
                   "predicted": {
                     "attrs": {
-                      "syntactic_type": "PRO"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      438
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
                       "syntactic_type": "NAM"
                     },
                     "kind": "entity",
@@ -5465,11 +5188,11 @@
                 }
               ]
             },
-            "f1": 0.10909090909090909,
+            "f1": 0.125,
             "fn": 14,
-            "fp": 35,
+            "fp": 28,
             "layer": "entity",
-            "precision": 0.07894736842105263,
+            "precision": 0.0967741935483871,
             "recall": 0.17647058823529413,
             "tp": 3
           },
@@ -6734,7 +6457,7 @@
         ],
         "mode": "strict",
         "suggestions": [
-          "entity: low F1 (0.109) - inspect extraction and matching rules for this layer.",
+          "entity: low F1 (0.125) - inspect extraction and matching rules for this layer.",
           "entity: precision is weaker than recall - investigate over-generation and filtering criteria.",
           "entity: type mismatches detected - tune label/attribute mapping in mapping-config.",
           "event: boundary mismatches detected - verify token span anchoring (`start_tok`, `end_tok`) and overlap threshold.",
@@ -6755,7 +6478,7 @@
         ]
       },
       {
-        "avg_f1": 0.1740412951151491,
+        "avg_f1": 0.18707218314603713,
         "doc_id": "82738",
         "layers": [
           {
@@ -6763,7 +6486,7 @@
               "boundary_mismatch": 0,
               "endpoint_mismatch": 0,
               "missing": 6,
-              "spurious": 25,
+              "spurious": 16,
               "type_mismatch": 0
             },
             "examples": {
@@ -6866,17 +6589,6 @@
                 {
                   "predicted": {
                     "attrs": {
-                      "syntactic_type": "PRO"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      21
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
                       "syntactic_type": "NAM"
                     },
                     "kind": "entity",
@@ -6940,29 +6652,6 @@
                     },
                     "kind": "entity",
                     "span": [
-                      136
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "NAM"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      162,
-                      163
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "NAM"
-                    },
-                    "kind": "entity",
-                    "span": [
                       172
                     ]
                   }
@@ -6986,51 +6675,7 @@
                     },
                     "kind": "entity",
                     "span": [
-                      213
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "PRO"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      243
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "NAM"
-                    },
-                    "kind": "entity",
-                    "span": [
                       251
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "PRO"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      267
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "PRO"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      288
                     ]
                   }
                 },
@@ -7068,28 +6713,6 @@
                     "span": [
                       319,
                       320
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "PRO"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      358
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "PRO"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      362
                     ]
                   }
                 },
@@ -7145,11 +6768,11 @@
               ],
               "type_mismatch": []
             },
-            "f1": 0.16216216216216214,
+            "f1": 0.21428571428571427,
             "fn": 6,
-            "fp": 25,
+            "fp": 16,
             "layer": "entity",
-            "precision": 0.10714285714285714,
+            "precision": 0.15789473684210525,
             "recall": 0.3333333333333333,
             "tp": 3
           },
@@ -8446,7 +8069,7 @@
         ],
         "mode": "strict",
         "suggestions": [
-          "entity: low F1 (0.162) - inspect extraction and matching rules for this layer.",
+          "entity: low F1 (0.214) - inspect extraction and matching rules for this layer.",
           "entity: precision is weaker than recall - investigate over-generation and filtering criteria.",
           "event: boundary mismatches detected - verify token span anchoring (`start_tok`, `end_tok`) and overlap threshold.",
           "event: low F1 (0.194) - inspect extraction and matching rules for this layer.",
@@ -8467,15 +8090,15 @@
         ]
       },
       {
-        "avg_f1": 0.3278173439463762,
+        "avg_f1": 0.3264315346337376,
         "doc_id": "96770",
         "layers": [
           {
             "errors": {
               "boundary_mismatch": 1,
               "endpoint_mismatch": 0,
-              "missing": 7,
-              "spurious": 9,
+              "missing": 8,
+              "spurious": 7,
               "type_mismatch": 0
             },
             "examples": {
@@ -8549,6 +8172,17 @@
                       18,
                       19,
                       20
+                    ]
+                  }
+                },
+                {
+                  "gold": {
+                    "attrs": {
+                      "syntactic_type": "PRO"
+                    },
+                    "kind": "entity",
+                    "span": [
+                      55
                     ]
                   }
                 },
@@ -8638,18 +8272,6 @@
                 {
                   "predicted": {
                     "attrs": {
-                      "syntactic_type": "NOM"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      147,
-                      148
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
                       "syntactic_type": "NAM"
                     },
                     "kind": "entity",
@@ -8683,17 +8305,6 @@
                 {
                   "predicted": {
                     "attrs": {
-                      "syntactic_type": "NAM"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      231
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
                       "syntactic_type": "APP"
                     },
                     "kind": "entity",
@@ -8705,13 +8316,13 @@
               ],
               "type_mismatch": []
             },
-            "f1": 0.5909090909090909,
-            "fn": 8,
-            "fp": 10,
+            "f1": 0.5853658536585366,
+            "fn": 9,
+            "fp": 8,
             "layer": "entity",
-            "precision": 0.5652173913043478,
-            "recall": 0.6190476190476191,
-            "tp": 13
+            "precision": 0.6,
+            "recall": 0.5714285714285714,
+            "tp": 12
           },
           {
             "errors": {
@@ -9532,8 +9143,8 @@
         "mode": "strict",
         "suggestions": [
           "entity: boundary mismatches detected - verify token span anchoring (`start_tok`, `end_tok`) and overlap threshold.",
-          "entity: low F1 (0.591) - inspect extraction and matching rules for this layer.",
-          "entity: precision is weaker than recall - investigate over-generation and filtering criteria.",
+          "entity: low F1 (0.585) - inspect extraction and matching rules for this layer.",
+          "entity: recall is weaker than precision - investigate under-generation and missing extractions.",
           "event: low F1 (0.227) - inspect extraction and matching rules for this layer.",
           "event: precision is weaker than recall - investigate over-generation and filtering criteria.",
           "event: type mismatches detected - tune label/attribute mapping in mapping-config.",
@@ -9555,17 +9166,7 @@
     "f1_threshold": 0.75,
     "hotspot_documents": [
       {
-        "avg_f1": 0.1740412951151491,
-        "doc_id": "82738",
-        "weak_layers": [
-          "entity",
-          "event",
-          "timex",
-          "relation"
-        ]
-      },
-      {
-        "avg_f1": 0.18096442994249573,
+        "avg_f1": 0.18494170266976845,
         "doc_id": "76437",
         "weak_layers": [
           "entity",
@@ -9575,7 +9176,17 @@
         ]
       },
       {
-        "avg_f1": 0.20118230358504957,
+        "avg_f1": 0.18707218314603713,
+        "doc_id": "82738",
+        "weak_layers": [
+          "entity",
+          "event",
+          "timex",
+          "relation"
+        ]
+      },
+      {
+        "avg_f1": 0.20915678524374176,
         "doc_id": "61327",
         "weak_layers": [
           "entity",
@@ -9585,7 +9196,7 @@
         ]
       },
       {
-        "avg_f1": 0.24923133776792314,
+        "avg_f1": 0.2593939393939394,
         "doc_id": "112579",
         "weak_layers": [
           "entity",
@@ -9595,7 +9206,7 @@
         ]
       },
       {
-        "avg_f1": 0.3278173439463762,
+        "avg_f1": 0.3264315346337376,
         "doc_id": "96770",
         "weak_layers": [
           "entity",
@@ -9605,7 +9216,7 @@
         ]
       },
       {
-        "avg_f1": 0.3582774029767701,
+        "avg_f1": 0.36866701336638047,
         "doc_id": "62405",
         "weak_layers": [
           "entity",
@@ -9618,8 +9229,8 @@
       "entity": {
         "boundary_mismatch": 3,
         "endpoint_mismatch": 0,
-        "missing": 64,
-        "spurious": 130,
+        "missing": 65,
+        "spurious": 94,
         "type_mismatch": 1
       },
       "event": {
@@ -9648,7 +9259,7 @@
     "suggestions": [
       "entity: dataset-level precision gap - tighten confidence filters and post-processing constraints.",
       "entity: high boundary mismatch volume - calibrate span normalization and tokenizer alignment.",
-      "entity: micro F1=0.273 below threshold 0.75 - mark as priority optimization track.",
+      "entity: micro F1=0.307 below threshold 0.75 - mark as priority optimization track.",
       "entity: type mismatch volume present - refine schema mapping and attribute projection.",
       "event: dataset-level precision gap - tighten confidence filters and post-processing constraints.",
       "event: high boundary mismatch volume - calibrate span normalization and tokenizer alignment.",
@@ -9683,42 +9294,42 @@
     "all_stable": true,
     "by_doc": {
       "112579": {
-        "baseline_signature": "0863e6bfc209116619f6aaa293a661f70e95d78b72158b5b76ca6a79cd7abbc3",
+        "baseline_signature": "74f61b652e7d1384aeb4079b08204b77d6513b04f5f7c331fee5757a7668ae96",
         "deterministic": true,
         "doc_id": "112579",
         "mismatch_runs": [],
         "runs": 2
       },
       "61327": {
-        "baseline_signature": "324987ccf317953628a46a591c743052ff2e423d8c9e87546ff5e4266a2610b8",
+        "baseline_signature": "9754ccec101de50e4e9241280110336b88b97093fb252799ca7270cad3edce6c",
         "deterministic": true,
         "doc_id": "61327",
         "mismatch_runs": [],
         "runs": 2
       },
       "62405": {
-        "baseline_signature": "d49a53511c7b0c6998ea1aba7f5e644d2a685e1fa05061a54ab010fa4c61c2bd",
+        "baseline_signature": "dc255cb54204324aca9bb2ef662229bf1b65edd9aa9f018031142bb434751460",
         "deterministic": true,
         "doc_id": "62405",
         "mismatch_runs": [],
         "runs": 2
       },
       "76437": {
-        "baseline_signature": "dc49fb5be5a00d70bf059588b5a026c85ab1f53d41bcbb05ad7fcabe9e57b885",
+        "baseline_signature": "81ac8c6e3e6b4300bfdc28bfd94ebdc2377fe2a68bf735a25e3407edc7613944",
         "deterministic": true,
         "doc_id": "76437",
         "mismatch_runs": [],
         "runs": 2
       },
       "82738": {
-        "baseline_signature": "1888b56a6d35c7a330dcc5f8c071f213ead708a8f2582d28d6b00716cfcf5be9",
+        "baseline_signature": "097d42fbbdda5740ad1218769c5965e0d777f71a613bc9f84bd81f717d7d3a16",
         "deterministic": true,
         "doc_id": "82738",
         "mismatch_runs": [],
         "runs": 2
       },
       "96770": {
-        "baseline_signature": "8f3c8b06e778db1ec428dc480b55f4794037c6fdb9aee5d3995edcd75563454f",
+        "baseline_signature": "a39bee8d90dab026169127aa20ab60201571c96e6d2b2f7bd80d72a2f6f29f8e",
         "deterministic": true,
         "doc_id": "96770",
         "mismatch_runs": [],
@@ -9740,7 +9351,7 @@
           "timex": 6
         },
         "predicted": {
-          "entity": 28,
+          "entity": 23,
           "event": 49,
           "relation": 60,
           "timex": 14
@@ -9991,7 +9602,7 @@
           "errors": {
             "boundary_mismatch": 0,
             "missing": 7,
-            "spurious": 22,
+            "spurious": 17,
             "type_mismatch": 0
           },
           "examples": {
@@ -10119,17 +9730,6 @@
                   },
                   "kind": "entity",
                   "span": [
-                    74
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
                     160,
                     161
                   ]
@@ -10231,19 +9831,6 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    257,
-                    258,
-                    259
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "APP"
                   },
                   "kind": "entity",
@@ -10312,33 +9899,11 @@
                   },
                   "kind": "entity",
                   "span": [
-                    334
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
                     340,
                     341,
                     342,
                     343,
                     344
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    346
                   ]
                 }
               },
@@ -10363,27 +9928,16 @@
                     369
                   ]
                 }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    377
-                  ]
-                }
               }
             ],
             "type_mismatch": []
           },
-          "f1": 0.2926829268292683,
+          "f1": 0.33333333333333337,
           "fn": 7,
-          "fp": 22,
+          "fp": 17,
           "matched_pairs": 6,
           "mode": "relaxed",
-          "precision": 0.21428571428571427,
+          "precision": 0.2608695652173913,
           "recall": 0.46153846153846156,
           "tp": 6
         },
@@ -11516,7 +11070,7 @@
           "errors": {
             "boundary_mismatch": 0,
             "missing": 7,
-            "spurious": 22,
+            "spurious": 17,
             "type_mismatch": 0
           },
           "examples": {
@@ -11644,17 +11198,6 @@
                   },
                   "kind": "entity",
                   "span": [
-                    74
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
                     160,
                     161
                   ]
@@ -11756,19 +11299,6 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    257,
-                    258,
-                    259
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "APP"
                   },
                   "kind": "entity",
@@ -11837,33 +11367,11 @@
                   },
                   "kind": "entity",
                   "span": [
-                    334
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
                     340,
                     341,
                     342,
                     343,
                     344
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    346
                   ]
                 }
               },
@@ -11888,27 +11396,16 @@
                     369
                   ]
                 }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    377
-                  ]
-                }
               }
             ],
             "type_mismatch": []
           },
-          "f1": 0.2926829268292683,
+          "f1": 0.33333333333333337,
           "fn": 7,
-          "fp": 22,
+          "fp": 17,
           "matched_pairs": 6,
           "mode": "strict",
-          "precision": 0.21428571428571427,
+          "precision": 0.2608695652173913,
           "recall": 0.46153846153846156,
           "tp": 6
         },
@@ -13210,7 +12707,7 @@
           "timex": 4
         },
         "predicted": {
-          "entity": 23,
+          "entity": 18,
           "event": 34,
           "relation": 36,
           "timex": 8
@@ -13418,7 +12915,7 @@
           "errors": {
             "boundary_mismatch": 0,
             "missing": 8,
-            "spurious": 17,
+            "spurious": 12,
             "type_mismatch": 0
           },
           "examples": {
@@ -13536,17 +13033,6 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    86
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "NAM"
                   },
                   "kind": "entity",
@@ -13592,17 +13078,6 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    169
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "NAM"
                   },
                   "kind": "entity",
@@ -13623,39 +13098,6 @@
                     181,
                     182,
                     183
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    186
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    188
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    191
                   ]
                 }
               },
@@ -13733,12 +13175,12 @@
             ],
             "type_mismatch": []
           },
-          "f1": 0.3243243243243243,
+          "f1": 0.375,
           "fn": 8,
-          "fp": 17,
+          "fp": 12,
           "matched_pairs": 6,
           "mode": "relaxed",
-          "precision": 0.2608695652173913,
+          "precision": 0.3333333333333333,
           "recall": 0.42857142857142855,
           "tp": 6
         },
@@ -14495,7 +13937,7 @@
           "errors": {
             "boundary_mismatch": 2,
             "missing": 9,
-            "spurious": 17,
+            "spurious": 12,
             "type_mismatch": 0
           },
           "examples": {
@@ -14674,17 +14116,6 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    86
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "NAM"
                   },
                   "kind": "entity",
@@ -14730,17 +14161,6 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    169
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "NAM"
                   },
                   "kind": "entity",
@@ -14761,39 +14181,6 @@
                     181,
                     182,
                     183
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    186
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    188
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    191
                   ]
                 }
               },
@@ -14871,12 +14258,12 @@
             ],
             "type_mismatch": []
           },
-          "f1": 0.2105263157894737,
+          "f1": 0.2424242424242424,
           "fn": 11,
-          "fp": 19,
+          "fp": 14,
           "matched_pairs": 4,
           "mode": "strict",
-          "precision": 0.17391304347826086,
+          "precision": 0.2222222222222222,
           "recall": 0.26666666666666666,
           "tp": 4
         },
@@ -15695,7 +15082,7 @@
           "timex": 6
         },
         "predicted": {
-          "entity": 32,
+          "entity": 24,
           "event": 58,
           "relation": 40,
           "timex": 7
@@ -15909,7 +15296,7 @@
           "errors": {
             "boundary_mismatch": 0,
             "missing": 22,
-            "spurious": 23,
+            "spurious": 15,
             "type_mismatch": 0
           },
           "examples": {
@@ -16222,17 +15609,6 @@
                   },
                   "kind": "entity",
                   "span": [
-                    66
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
                     171,
                     172
                   ]
@@ -16259,17 +15635,6 @@
                   "span": [
                     179,
                     180
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NOM"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    187
                   ]
                 }
               },
@@ -16312,17 +15677,6 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    231
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "NAM"
                   },
                   "kind": "entity",
@@ -16343,17 +15697,6 @@
                     242,
                     243,
                     244
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    247
                   ]
                 }
               },
@@ -16386,55 +15729,11 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    265
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    296
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    311
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "NAM"
                   },
                   "kind": "entity",
                   "span": [
                     320
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    331
                   ]
                 }
               },
@@ -16485,12 +15784,12 @@
             ],
             "type_mismatch": []
           },
-          "f1": 0.28571428571428575,
+          "f1": 0.3272727272727273,
           "fn": 22,
-          "fp": 23,
+          "fp": 15,
           "matched_pairs": 9,
           "mode": "relaxed",
-          "precision": 0.28125,
+          "precision": 0.375,
           "recall": 0.2903225806451613,
           "tp": 9
         },
@@ -17605,7 +16904,7 @@
           "errors": {
             "boundary_mismatch": 0,
             "missing": 22,
-            "spurious": 23,
+            "spurious": 15,
             "type_mismatch": 0
           },
           "examples": {
@@ -17918,17 +17217,6 @@
                   },
                   "kind": "entity",
                   "span": [
-                    66
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
                     171,
                     172
                   ]
@@ -17955,17 +17243,6 @@
                   "span": [
                     179,
                     180
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NOM"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    187
                   ]
                 }
               },
@@ -18008,17 +17285,6 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    231
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "NAM"
                   },
                   "kind": "entity",
@@ -18039,17 +17305,6 @@
                     242,
                     243,
                     244
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    247
                   ]
                 }
               },
@@ -18082,55 +17337,11 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    265
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    296
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    311
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "NAM"
                   },
                   "kind": "entity",
                   "span": [
                     320
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    331
                   ]
                 }
               },
@@ -18181,12 +17392,12 @@
             ],
             "type_mismatch": []
           },
-          "f1": 0.28571428571428575,
+          "f1": 0.3272727272727273,
           "fn": 22,
-          "fp": 23,
+          "fp": 15,
           "matched_pairs": 9,
           "mode": "strict",
-          "precision": 0.28125,
+          "precision": 0.375,
           "recall": 0.2903225806451613,
           "tp": 9
         },
@@ -19347,7 +18558,7 @@
           "timex": 4
         },
         "predicted": {
-          "entity": 38,
+          "entity": 31,
           "event": 55,
           "relation": 96,
           "timex": 13
@@ -19634,7 +18845,7 @@
           "errors": {
             "boundary_mismatch": 0,
             "missing": 13,
-            "spurious": 34,
+            "spurious": 27,
             "type_mismatch": 0
           },
           "examples": {
@@ -19837,17 +19048,6 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    139
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "APP"
                   },
                   "kind": "entity",
@@ -19864,17 +19064,6 @@
                   "kind": "entity",
                   "span": [
                     149
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    168
                   ]
                 }
               },
@@ -19923,41 +19112,8 @@
                   },
                   "kind": "entity",
                   "span": [
-                    204
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
                     228,
                     229
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    235
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    268
                   ]
                 }
               },
@@ -20016,17 +19172,6 @@
                   "span": [
                     297,
                     298
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    306
                   ]
                 }
               },
@@ -20152,17 +19297,6 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    438
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "NAM"
                   },
                   "kind": "entity",
@@ -20212,12 +19346,12 @@
             ],
             "type_mismatch": []
           },
-          "f1": 0.14545454545454545,
+          "f1": 0.16666666666666666,
           "fn": 13,
-          "fp": 34,
+          "fp": 27,
           "matched_pairs": 4,
           "mode": "relaxed",
-          "precision": 0.10526315789473684,
+          "precision": 0.12903225806451613,
           "recall": 0.23529411764705882,
           "tp": 4
         },
@@ -21325,7 +20459,7 @@
           "errors": {
             "boundary_mismatch": 0,
             "missing": 13,
-            "spurious": 34,
+            "spurious": 27,
             "type_mismatch": 1
           },
           "examples": {
@@ -21528,17 +20662,6 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    139
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "APP"
                   },
                   "kind": "entity",
@@ -21555,17 +20678,6 @@
                   "kind": "entity",
                   "span": [
                     149
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    168
                   ]
                 }
               },
@@ -21614,41 +20726,8 @@
                   },
                   "kind": "entity",
                   "span": [
-                    204
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
                     228,
                     229
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    235
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    268
                   ]
                 }
               },
@@ -21707,17 +20786,6 @@
                   "span": [
                     297,
                     298
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    306
                   ]
                 }
               },
@@ -21843,17 +20911,6 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    438
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "NAM"
                   },
                   "kind": "entity",
@@ -21930,12 +20987,12 @@
               }
             ]
           },
-          "f1": 0.10909090909090909,
+          "f1": 0.125,
           "fn": 14,
-          "fp": 35,
+          "fp": 28,
           "matched_pairs": 3,
           "mode": "strict",
-          "precision": 0.07894736842105263,
+          "precision": 0.0967741935483871,
           "recall": 0.17647058823529413,
           "tp": 3
         },
@@ -23207,7 +22264,7 @@
           "timex": 7
         },
         "predicted": {
-          "entity": 28,
+          "entity": 19,
           "event": 57,
           "relation": 32,
           "timex": 12
@@ -23419,7 +22476,7 @@
           "errors": {
             "boundary_mismatch": 0,
             "missing": 6,
-            "spurious": 25,
+            "spurious": 16,
             "type_mismatch": 0
           },
           "examples": {
@@ -23522,17 +22579,6 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    21
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "NAM"
                   },
                   "kind": "entity",
@@ -23596,29 +22642,6 @@
                   },
                   "kind": "entity",
                   "span": [
-                    136
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    162,
-                    163
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
                     172
                   ]
                 }
@@ -23642,51 +22665,7 @@
                   },
                   "kind": "entity",
                   "span": [
-                    213
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    243
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
                     251
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    267
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    288
                   ]
                 }
               },
@@ -23724,28 +22703,6 @@
                   "span": [
                     319,
                     320
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    358
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    362
                   ]
                 }
               },
@@ -23801,12 +22758,12 @@
             ],
             "type_mismatch": []
           },
-          "f1": 0.16216216216216214,
+          "f1": 0.21428571428571427,
           "fn": 6,
-          "fp": 25,
+          "fp": 16,
           "matched_pairs": 3,
           "mode": "relaxed",
-          "precision": 0.10714285714285714,
+          "precision": 0.15789473684210525,
           "recall": 0.3333333333333333,
           "tp": 3
         },
@@ -24808,7 +23765,7 @@
           "errors": {
             "boundary_mismatch": 0,
             "missing": 6,
-            "spurious": 25,
+            "spurious": 16,
             "type_mismatch": 0
           },
           "examples": {
@@ -24911,17 +23868,6 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    21
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "NAM"
                   },
                   "kind": "entity",
@@ -24985,29 +23931,6 @@
                   },
                   "kind": "entity",
                   "span": [
-                    136
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    162,
-                    163
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
                     172
                   ]
                 }
@@ -25031,51 +23954,7 @@
                   },
                   "kind": "entity",
                   "span": [
-                    213
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    243
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
                     251
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    267
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    288
                   ]
                 }
               },
@@ -25113,28 +23992,6 @@
                   "span": [
                     319,
                     320
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    358
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
-                    "syntactic_type": "PRO"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    362
                   ]
                 }
               },
@@ -25190,12 +24047,12 @@
             ],
             "type_mismatch": []
           },
-          "f1": 0.16216216216216214,
+          "f1": 0.21428571428571427,
           "fn": 6,
-          "fp": 25,
+          "fp": 16,
           "matched_pairs": 3,
           "mode": "strict",
-          "precision": 0.10714285714285714,
+          "precision": 0.15789473684210525,
           "recall": 0.3333333333333333,
           "tp": 3
         },
@@ -26499,7 +25356,7 @@
           "timex": 4
         },
         "predicted": {
-          "entity": 23,
+          "entity": 20,
           "event": 24,
           "relation": 36,
           "timex": 10
@@ -26707,8 +25564,8 @@
         "entity": {
           "errors": {
             "boundary_mismatch": 0,
-            "missing": 5,
-            "spurious": 9,
+            "missing": 6,
+            "spurious": 7,
             "type_mismatch": 0
           },
           "examples": {
@@ -26744,6 +25601,17 @@
                   "span": [
                     13,
                     14
+                  ]
+                }
+              },
+              {
+                "gold": {
+                  "attrs": {
+                    "syntactic_type": "PRO"
+                  },
+                  "kind": "entity",
+                  "span": [
+                    55
                   ]
                 }
               },
@@ -26812,18 +25680,6 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "NOM"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    147,
-                    148
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "NAM"
                   },
                   "kind": "entity",
@@ -26857,17 +25713,6 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    231
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "APP"
                   },
                   "kind": "entity",
@@ -26879,14 +25724,14 @@
             ],
             "type_mismatch": []
           },
-          "f1": 0.6666666666666666,
-          "fn": 5,
-          "fp": 9,
-          "matched_pairs": 14,
+          "f1": 0.6666666666666667,
+          "fn": 6,
+          "fp": 7,
+          "matched_pairs": 13,
           "mode": "relaxed",
-          "precision": 0.6086956521739131,
-          "recall": 0.7368421052631579,
-          "tp": 14
+          "precision": 0.65,
+          "recall": 0.6842105263157895,
+          "tp": 13
         },
         "event": {
           "errors": {
@@ -27602,8 +26447,8 @@
         "entity": {
           "errors": {
             "boundary_mismatch": 1,
-            "missing": 7,
-            "spurious": 9,
+            "missing": 8,
+            "spurious": 7,
             "type_mismatch": 0
           },
           "examples": {
@@ -27677,6 +26522,17 @@
                     18,
                     19,
                     20
+                  ]
+                }
+              },
+              {
+                "gold": {
+                  "attrs": {
+                    "syntactic_type": "PRO"
+                  },
+                  "kind": "entity",
+                  "span": [
+                    55
                   ]
                 }
               },
@@ -27766,18 +26622,6 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "NOM"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    147,
-                    148
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "NAM"
                   },
                   "kind": "entity",
@@ -27811,17 +26655,6 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "NAM"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    231
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "APP"
                   },
                   "kind": "entity",
@@ -27833,14 +26666,14 @@
             ],
             "type_mismatch": []
           },
-          "f1": 0.5909090909090909,
-          "fn": 8,
-          "fp": 10,
-          "matched_pairs": 13,
+          "f1": 0.5853658536585366,
+          "fn": 9,
+          "fp": 8,
+          "matched_pairs": 12,
           "mode": "strict",
-          "precision": 0.5652173913043478,
-          "recall": 0.6190476190476191,
-          "tp": 13
+          "precision": 0.6,
+          "recall": 0.5714285714285714,
+          "tp": 12
         },
         "event": {
           "errors": {

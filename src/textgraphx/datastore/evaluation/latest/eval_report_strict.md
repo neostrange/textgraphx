@@ -8,19 +8,19 @@
 
 | Scope | Mode | Layer | Precision | Recall | F1 |
 |---|---|---:|---:|---:|---:|
-| micro | strict | entity | 0.221 | 0.358 | 0.273 |
+| micro | strict | entity | 0.274 | 0.349 | 0.307 |
 | micro | strict | event | 0.166 | 0.414 | 0.237 |
 | micro | strict | timex | 0.281 | 0.581 | 0.379 |
 | micro | strict | relation | 0.067 | 0.132 | 0.088 |
-| micro | relaxed | entity | 0.244 | 0.408 | 0.305 |
+| micro | relaxed | entity | 0.304 | 0.398 | 0.345 |
 | micro | relaxed | event | 0.217 | 0.541 | 0.309 |
 | micro | relaxed | timex | 0.391 | 0.806 | 0.526 |
 | micro | relaxed | relation | 0.033 | 0.132 | 0.053 |
-| macro | strict | entity | 0.237 | 0.358 | 0.275 |
+| macro | strict | entity | 0.285 | 0.350 | 0.305 |
 | macro | strict | event | 0.171 | 0.431 | 0.238 |
 | macro | strict | timex | 0.312 | 0.589 | 0.396 |
 | macro | strict | relation | 0.068 | 0.132 | 0.085 |
-| macro | relaxed | entity | 0.263 | 0.414 | 0.313 |
+| macro | relaxed | entity | 0.318 | 0.406 | 0.347 |
 | macro | relaxed | event | 0.223 | 0.564 | 0.310 |
 | macro | relaxed | timex | 0.410 | 0.778 | 0.524 |
 | macro | relaxed | relation | 0.034 | 0.132 | 0.052 |
@@ -56,7 +56,7 @@
 
 - entity: dataset-level precision gap - tighten confidence filters and post-processing constraints.
 - entity: high boundary mismatch volume - calibrate span normalization and tokenizer alignment.
-- entity: micro F1=0.273 below threshold 0.75 - mark as priority optimization track.
+- entity: micro F1=0.307 below threshold 0.75 - mark as priority optimization track.
 - entity: type mismatch volume present - refine schema mapping and attribute projection.
 - event: dataset-level precision gap - tighten confidence filters and post-processing constraints.
 - event: high boundary mismatch volume - calibrate span normalization and tokenizer alignment.
@@ -74,29 +74,29 @@
 
 | Doc ID | Avg F1 | Weak Layers |
 |---|---:|---|
-| 82738 | 0.174 | entity, event, timex, relation |
-| 76437 | 0.181 | entity, event, timex, relation |
-| 61327 | 0.201 | entity, event, timex, relation |
-| 112579 | 0.249 | entity, event, timex, relation |
-| 96770 | 0.328 | entity, event, timex, relation |
-| 62405 | 0.358 | entity, event, relation |
+| 76437 | 0.185 | entity, event, timex, relation |
+| 82738 | 0.187 | entity, event, timex, relation |
+| 61327 | 0.209 | entity, event, timex, relation |
+| 112579 | 0.259 | entity, event, timex, relation |
+| 96770 | 0.326 | entity, event, timex, relation |
+| 62405 | 0.369 | entity, event, relation |
 
 ## Per-Document Diagnostics
 
 ### Doc 112579
 
-- Avg F1: 0.249
+- Avg F1: 0.259
 - Weak layers: entity, event, timex, relation
 
 | Layer | TP | FP | FN | Precision | Recall | F1 |
 |---|---:|---:|---:|---:|---:|---:|
-| entity | 6 | 22 | 7 | 0.214 | 0.462 | 0.293 |
+| entity | 6 | 17 | 7 | 0.261 | 0.462 | 0.333 |
 | event | 8 | 41 | 18 | 0.163 | 0.308 | 0.213 |
 | timex | 4 | 10 | 2 | 0.286 | 0.667 | 0.400 |
 | relation | 2 | 28 | 12 | 0.067 | 0.143 | 0.091 |
 
 Suggested actions:
-- entity: low F1 (0.293) - inspect extraction and matching rules for this layer.
+- entity: low F1 (0.333) - inspect extraction and matching rules for this layer.
 - entity: precision is weaker than recall - investigate over-generation and filtering criteria.
 - event: low F1 (0.213) - inspect extraction and matching rules for this layer.
 - event: precision is weaker than recall - investigate over-generation and filtering criteria.
@@ -113,10 +113,10 @@ Top failure examples:
   - gold={'kind': 'entity', 'span': [1], 'attrs': {'syntactic_type': 'NAM'}}
   - gold={'kind': 'entity', 'span': [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34], 'attrs': {'syntactic_type': 'APP'}}
   - gold={'kind': 'entity', 'span': [22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34], 'attrs': {'syntactic_type': 'NOM'}}
-- spurious (22 shown):
-  - predicted={'kind': 'entity', 'span': [74], 'attrs': {'syntactic_type': 'NAM'}}
+- spurious (17 shown):
   - predicted={'kind': 'entity', 'span': [160, 161], 'attrs': {'syntactic_type': 'NAM'}}
   - predicted={'kind': 'entity', 'span': [166, 167], 'attrs': {'syntactic_type': 'NAM'}}
+  - predicted={'kind': 'entity', 'span': [174, 175, 176, 177], 'attrs': {'syntactic_type': 'NAM'}}
 - event:
 - type_mismatch (3 shown):
   - gold={'kind': 'event', 'span': [30], 'attrs': {'aspect': 'NONE', 'pos': 'NOUN', 'pred': 'performance', 'tense': 'NONE'}} | predicted={'kind': 'event', 'span': [30], 'attrs': {'certainty': 'CERTAIN', 'polarity': 'POS', 'pos': 'NOUN', 'pred': 'performance', 'time': 'NON_FUTURE'}}
@@ -151,19 +151,19 @@ Top failure examples:
 
 ### Doc 61327
 
-- Avg F1: 0.201
+- Avg F1: 0.209
 - Weak layers: entity, event, timex, relation
 
 | Layer | TP | FP | FN | Precision | Recall | F1 |
 |---|---:|---:|---:|---:|---:|---:|
-| entity | 4 | 19 | 11 | 0.174 | 0.267 | 0.211 |
+| entity | 4 | 14 | 11 | 0.222 | 0.267 | 0.242 |
 | event | 6 | 28 | 6 | 0.176 | 0.500 | 0.261 |
 | timex | 2 | 6 | 2 | 0.250 | 0.500 | 0.333 |
 | relation | 0 | 18 | 11 | 0.000 | 0.000 | 0.000 |
 
 Suggested actions:
 - entity: boundary mismatches detected - verify token span anchoring (`start_tok`, `end_tok`) and overlap threshold.
-- entity: low F1 (0.211) - inspect extraction and matching rules for this layer.
+- entity: low F1 (0.242) - inspect extraction and matching rules for this layer.
 - entity: precision is weaker than recall - investigate over-generation and filtering criteria.
 - event: low F1 (0.261) - inspect extraction and matching rules for this layer.
 - event: precision is weaker than recall - investigate over-generation and filtering criteria.
@@ -183,10 +183,10 @@ Top failure examples:
   - gold={'kind': 'entity', 'span': [1, 2], 'attrs': {'syntactic_type': 'NOM'}}
   - gold={'kind': 'entity', 'span': [11, 12, 13, 14, 15, 16], 'attrs': {'syntactic_type': 'NOM'}}
   - gold={'kind': 'entity', 'span': [11, 12, 13, 14, 15, 16, 17, 18, 19, 20], 'attrs': {'syntactic_type': 'APP'}}
-- spurious (17 shown):
-  - predicted={'kind': 'entity', 'span': [86], 'attrs': {'syntactic_type': 'PRO'}}
+- spurious (12 shown):
   - predicted={'kind': 'entity', 'span': [110], 'attrs': {'syntactic_type': 'NAM'}}
   - predicted={'kind': 'entity', 'span': [149], 'attrs': {'syntactic_type': 'NAM'}}
+  - predicted={'kind': 'entity', 'span': [157, 158], 'attrs': {'syntactic_type': 'NAM'}}
 - event:
 - type_mismatch (1 shown):
   - gold={'kind': 'event', 'span': [50], 'attrs': {'certainty': 'CERTAIN', 'polarity': 'POS', 'pos': 'NOUN', 'pred': 'attacks', 'time': 'NON_FUTURE'}} | predicted={'kind': 'event', 'span': [50], 'attrs': {'certainty': 'CERTAIN', 'polarity': 'POS', 'pos': 'NOUN', 'pred': 'attack', 'time': 'NON_FUTURE'}}
@@ -220,19 +220,19 @@ Top failure examples:
 
 ### Doc 62405
 
-- Avg F1: 0.358
+- Avg F1: 0.369
 - Weak layers: entity, event, relation
 
 | Layer | TP | FP | FN | Precision | Recall | F1 |
 |---|---:|---:|---:|---:|---:|---:|
-| entity | 9 | 23 | 22 | 0.281 | 0.290 | 0.286 |
+| entity | 9 | 15 | 22 | 0.375 | 0.290 | 0.327 |
 | event | 10 | 48 | 11 | 0.172 | 0.476 | 0.253 |
 | timex | 5 | 2 | 1 | 0.714 | 0.833 | 0.769 |
 | relation | 2 | 18 | 10 | 0.100 | 0.167 | 0.125 |
 
 Suggested actions:
-- entity: low F1 (0.286) - inspect extraction and matching rules for this layer.
-- entity: precision is weaker than recall - investigate over-generation and filtering criteria.
+- entity: low F1 (0.327) - inspect extraction and matching rules for this layer.
+- entity: recall is weaker than precision - investigate under-generation and missing extractions.
 - event: low F1 (0.253) - inspect extraction and matching rules for this layer.
 - event: precision is weaker than recall - investigate over-generation and filtering criteria.
 - event: type mismatches detected - tune label/attribute mapping in mapping-config.
@@ -246,10 +246,10 @@ Top failure examples:
   - gold={'kind': 'entity', 'span': [1], 'attrs': {'syntactic_type': 'PRE.NOM'}}
   - gold={'kind': 'entity', 'span': [1, 2], 'attrs': {'syntactic_type': 'NOM'}}
   - gold={'kind': 'entity', 'span': [6, 7], 'attrs': {'syntactic_type': 'NOM'}}
-- spurious (23 shown):
-  - predicted={'kind': 'entity', 'span': [66], 'attrs': {'syntactic_type': 'NAM'}}
+- spurious (15 shown):
   - predicted={'kind': 'entity', 'span': [171, 172], 'attrs': {'syntactic_type': 'NAM'}}
   - predicted={'kind': 'entity', 'span': [176, 177], 'attrs': {'syntactic_type': 'NAM'}}
+  - predicted={'kind': 'entity', 'span': [179, 180], 'attrs': {'syntactic_type': 'NAM'}}
 - event:
 - type_mismatch (1 shown):
   - gold={'kind': 'event', 'span': [84], 'attrs': {}} | predicted={'kind': 'event', 'span': [84], 'attrs': {'aspect': 'NONE', 'certainty': 'CERTAIN', 'polarity': 'POS', 'pos': 'VERB', 'pred': 'close', 'tense': 'PAST', 'time': 'NON_FUTURE'}}
@@ -281,18 +281,18 @@ Top failure examples:
 
 ### Doc 76437
 
-- Avg F1: 0.181
+- Avg F1: 0.185
 - Weak layers: entity, event, timex, relation
 
 | Layer | TP | FP | FN | Precision | Recall | F1 |
 |---|---:|---:|---:|---:|---:|---:|
-| entity | 3 | 35 | 14 | 0.079 | 0.176 | 0.109 |
+| entity | 3 | 28 | 14 | 0.097 | 0.176 | 0.125 |
 | event | 10 | 45 | 7 | 0.182 | 0.588 | 0.278 |
 | timex | 2 | 11 | 2 | 0.154 | 0.500 | 0.235 |
 | relation | 3 | 45 | 8 | 0.062 | 0.273 | 0.102 |
 
 Suggested actions:
-- entity: low F1 (0.109) - inspect extraction and matching rules for this layer.
+- entity: low F1 (0.125) - inspect extraction and matching rules for this layer.
 - entity: precision is weaker than recall - investigate over-generation and filtering criteria.
 - entity: type mismatches detected - tune label/attribute mapping in mapping-config.
 - event: boundary mismatches detected - verify token span anchoring (`start_tok`, `end_tok`) and overlap threshold.
@@ -313,10 +313,10 @@ Top failure examples:
   - gold={'kind': 'entity', 'span': [1], 'attrs': {'syntactic_type': 'NOM'}}
   - gold={'kind': 'entity', 'span': [11, 12, 13], 'attrs': {'syntactic_type': 'NOM'}}
   - gold={'kind': 'entity', 'span': [23, 24, 25], 'attrs': {}}
-- spurious (34 shown):
+- spurious (27 shown):
   - predicted={'kind': 'entity', 'span': [109, 110, 111, 112], 'attrs': {'syntactic_type': 'NAM'}}
   - predicted={'kind': 'entity', 'span': [122, 123, 124, 125], 'attrs': {'syntactic_type': 'NAM'}}
-  - predicted={'kind': 'entity', 'span': [139], 'attrs': {'syntactic_type': 'PRO'}}
+  - predicted={'kind': 'entity', 'span': [142], 'attrs': {'syntactic_type': 'APP'}}
 - event:
 - boundary_mismatch (1 shown):
   - gold={'kind': 'event', 'span': [2, 3], 'attrs': {'aspect': 'NONE', 'certainty': 'CERTAIN', 'polarity': 'POS', 'pos': 'VERB', 'pred': 'drag down', 'tense': 'PAST', 'time': 'NON_FUTURE'}} | predicted={'kind': 'event', 'span': [2], 'attrs': {'aspect': 'NONE', 'certainty': 'CERTAIN', 'polarity': 'POS', 'pos': 'VERB', 'pred': 'drag', 'tense': 'PAST', 'time': 'NON_FUTURE'}}
@@ -352,18 +352,18 @@ Top failure examples:
 
 ### Doc 82738
 
-- Avg F1: 0.174
+- Avg F1: 0.187
 - Weak layers: entity, event, timex, relation
 
 | Layer | TP | FP | FN | Precision | Recall | F1 |
 |---|---:|---:|---:|---:|---:|---:|
-| entity | 3 | 25 | 6 | 0.107 | 0.333 | 0.162 |
+| entity | 3 | 16 | 6 | 0.158 | 0.333 | 0.214 |
 | event | 7 | 50 | 8 | 0.123 | 0.467 | 0.194 |
 | timex | 2 | 10 | 5 | 0.167 | 0.286 | 0.211 |
 | relation | 2 | 14 | 13 | 0.125 | 0.133 | 0.129 |
 
 Suggested actions:
-- entity: low F1 (0.162) - inspect extraction and matching rules for this layer.
+- entity: low F1 (0.214) - inspect extraction and matching rules for this layer.
 - entity: precision is weaker than recall - investigate over-generation and filtering criteria.
 - event: boundary mismatches detected - verify token span anchoring (`start_tok`, `end_tok`) and overlap threshold.
 - event: low F1 (0.194) - inspect extraction and matching rules for this layer.
@@ -382,10 +382,10 @@ Top failure examples:
   - gold={'kind': 'entity', 'span': [1, 2, 3], 'attrs': {'syntactic_type': 'NOM'}}
   - gold={'kind': 'entity', 'span': [15], 'attrs': {'syntactic_type': 'HLS'}}
   - gold={'kind': 'entity', 'span': [35, 36, 37, 38, 39, 40, 41], 'attrs': {}}
-- spurious (25 shown):
+- spurious (16 shown):
   - predicted={'kind': 'entity', 'span': [7, 8, 9], 'attrs': {'syntactic_type': 'NAM'}}
-  - predicted={'kind': 'entity', 'span': [21], 'attrs': {'syntactic_type': 'PRO'}}
   - predicted={'kind': 'entity', 'span': [51, 52], 'attrs': {'syntactic_type': 'NAM'}}
+  - predicted={'kind': 'entity', 'span': [105], 'attrs': {'syntactic_type': 'NAM'}}
 - event:
 - boundary_mismatch (3 shown):
   - gold={'kind': 'event', 'span': [48, 49], 'attrs': {'aspect': 'PERFECTIVE', 'certainty': 'CERTAIN', 'polarity': 'POS', 'pos': 'VERB', 'pred': 'know', 'tense': 'PRESENT', 'time': 'NON_FUTURE'}} | predicted={'kind': 'event', 'span': [48], 'attrs': {'aspect': 'NONE', 'certainty': 'CERTAIN', 'polarity': 'POS', 'pos': 'VERB', 'pred': 'know', 'tense': 'PRESENT', 'time': 'NON_FUTURE'}}
@@ -426,20 +426,20 @@ Top failure examples:
 
 ### Doc 96770
 
-- Avg F1: 0.328
+- Avg F1: 0.326
 - Weak layers: entity, event, timex, relation
 
 | Layer | TP | FP | FN | Precision | Recall | F1 |
 |---|---:|---:|---:|---:|---:|---:|
-| entity | 13 | 10 | 8 | 0.565 | 0.619 | 0.591 |
+| entity | 12 | 8 | 9 | 0.600 | 0.571 | 0.585 |
 | event | 5 | 19 | 15 | 0.208 | 0.250 | 0.227 |
 | timex | 3 | 7 | 1 | 0.300 | 0.750 | 0.429 |
 | relation | 1 | 17 | 12 | 0.056 | 0.077 | 0.065 |
 
 Suggested actions:
 - entity: boundary mismatches detected - verify token span anchoring (`start_tok`, `end_tok`) and overlap threshold.
-- entity: low F1 (0.591) - inspect extraction and matching rules for this layer.
-- entity: precision is weaker than recall - investigate over-generation and filtering criteria.
+- entity: low F1 (0.585) - inspect extraction and matching rules for this layer.
+- entity: recall is weaker than precision - investigate under-generation and missing extractions.
 - event: low F1 (0.227) - inspect extraction and matching rules for this layer.
 - event: precision is weaker than recall - investigate over-generation and filtering criteria.
 - event: type mismatches detected - tune label/attribute mapping in mapping-config.
@@ -454,11 +454,11 @@ Top failure examples:
 - entity:
 - boundary_mismatch (1 shown):
   - gold={'kind': 'entity', 'span': [47, 48, 49, 50], 'attrs': {'syntactic_type': 'NAM'}} | predicted={'kind': 'entity', 'span': [48, 49], 'attrs': {'syntactic_type': 'NAM'}}
-- missing (7 shown):
+- missing (8 shown):
   - gold={'kind': 'entity', 'span': [1, 2], 'attrs': {}}
   - gold={'kind': 'entity', 'span': [13], 'attrs': {'syntactic_type': 'PRE.NOM'}}
   - gold={'kind': 'entity', 'span': [13, 14], 'attrs': {'syntactic_type': 'NOM'}}
-- spurious (9 shown):
+- spurious (7 shown):
   - predicted={'kind': 'entity', 'span': [36, 37, 38], 'attrs': {'syntactic_type': 'NOM'}}
   - predicted={'kind': 'entity', 'span': [113, 114, 115], 'attrs': {'syntactic_type': 'NAM'}}
   - predicted={'kind': 'entity', 'span': [134], 'attrs': {'syntactic_type': 'NAM'}}

@@ -1958,7 +1958,7 @@ class RefinementPhase():
                       doc_id,
                       coalesce(nc.value, '') AS value,
                       coalesce(nc.head, nc.value, '') AS head,
-                      min_tok AS headTokenIndex,
+                      coalesce(nc.headTokenIndex, max_tok) AS headTokenIndex,
                       min_tok AS start_tok,
                       max_tok AS end_tok,
                       min_char AS start_char,

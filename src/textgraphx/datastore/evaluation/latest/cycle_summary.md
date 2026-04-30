@@ -7,16 +7,16 @@
 - Fallback run used: false
 
 ## Micro F1 (Legacy Scope)
-- entity: strict=0.2734, relaxed=0.3055
+- entity: strict=0.3071, relaxed=0.3445
 - event: strict=0.2371, relaxed=0.3093
 - timex: strict=0.3789, relaxed=0.5263
 - relation: strict=0.0885, relaxed=0.0532
 
 ## Micro F1 (Full Relation Scope)
-- entity: strict=0.2754, relaxed=0.3077
+- entity: strict=0.2975, relaxed=0.3347
 - event: strict=0.2371, relaxed=0.3093
 - timex: strict=0.3789, relaxed=0.5263
-- relation: strict=0.0851, relaxed=0.0585
+- relation: strict=0.0872, relaxed=0.0594
 
 ## Scorecards (Legacy Scope)
 - TimeML compliance composite: 0.2351
@@ -25,7 +25,7 @@
 ## Top Suggestions
 - entity: dataset-level precision gap - tighten confidence filters and post-processing constraints.
 - entity: high boundary mismatch volume - calibrate span normalization and tokenizer alignment.
-- entity: micro F1=0.273 below threshold 0.75 - mark as priority optimization track.
+- entity: micro F1=0.307 below threshold 0.75 - mark as priority optimization track.
 - entity: type mismatch volume present - refine schema mapping and attribute projection.
 - event: dataset-level precision gap - tighten confidence filters and post-processing constraints.
 - event: high boundary mismatch volume - calibrate span normalization and tokenizer alignment.
