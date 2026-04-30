@@ -151,14 +151,44 @@ class CoreferenceResolver:
         logger.debug("connect_node_to_tag_occurrences: linking %d indices to node %s in doc %s", len(list(index_range)), node_id, doc_id)
         self.graph.run(query, params)
 
+    def _service_span_to_inclusive_bounds(self, span_token_indexes, doc_length):
+        """Normalize a service span to inclusive token boundaries.
+
+        The live coreference service returns two-value spans as half-open
+        `[start, end)` boundaries. Longer lists are treated as explicit token
+        indices and collapsed to their first/last index.
+        """
+        if doc_length <= 0:
+            raise ValueError("Cannot normalize coreference spans for an empty document")
+
+        values = [int(index) for index in span_token_indexes]
+        if not values:
+            raise ValueError("Coreference service returned an empty span")
+
+        if len(values) == 1:
+            start = end = values[0]
+        elif len(values) == 2:
+            start, end_exclusive = values
+            end = start if end_exclusive <= start else end_exclusive - 1
+        else:
+            start, end = values[0], values[-1]
+
+        if start < 0 or end < 0 or start >= doc_length or end >= doc_length or start > end:
+            raise ValueError(
+                f"Invalid coreference span {values!r} for document length {doc_length}"
+            )
+
+        return start, end
+
     def resolve_coreference(self, doc, text_id):
         """Resolve coreference clusters and persist nodes/relations in the graph.
 
         The method expects the external coreference service to return a JSON
         structure containing a `clusters` key whose value is a list of clusters.
-        Each cluster is a sequence of spans where a span is itself a list of
-        integer token indices. The first span in each cluster is treated as the
-        antecedent and subsequent spans are treated as mentions referring to it.
+        Each cluster is a sequence of spans where a span is either an explicit
+        list of token indices or a two-value half-open token range `[start, end)`.
+        The first span in each cluster is treated as the antecedent and
+        subsequent spans are treated as mentions referring to it.
 
         The function will create `Antecedent` and `CorefMention` nodes and
         connect TagOccurrence nodes to them. It also creates `COREF` relations
@@ -183,13 +213,29 @@ class CoreferenceResolver:
             if not cluster:
                 continue
             antecedent = cluster[0]
-            ant_start, ant_end = antecedent[0], antecedent[-1]
+            try:
+                ant_start, ant_end = self._service_span_to_inclusive_bounds(antecedent, len(doc))
+            except ValueError:
+                logger.warning(
+                    "resolve_coreference: skipping invalid antecedent span %r for text_id=%s",
+                    antecedent,
+                    text_id,
+                )
+                continue
             antecedent_node_id = self.create_node("Antecedent", doc[ant_start:ant_end+1].text, ant_start, ant_end, text_id)
             self.connect_node_to_tag_occurrences(antecedent_node_id, range(ant_start, ant_end + 1), text_id)
             logger.debug("Created antecedent %s for cluster size=%d", antecedent_node_id, len(cluster))
 
             for span_token_indexes in cluster[1:]:
-                start, end = span_token_indexes[0], span_token_indexes[-1]
+                try:
+                    start, end = self._service_span_to_inclusive_bounds(span_token_indexes, len(doc))
+                except ValueError:
+                    logger.warning(
+                        "resolve_coreference: skipping invalid mention span %r for text_id=%s",
+                        span_token_indexes,
+                        text_id,
+                    )
+                    continue
                 mention_node_id = self.create_node("CorefMention", doc[start:end+1].text, start, end, text_id)
                 self.connect_node_to_tag_occurrences(mention_node_id, range(start, end + 1), text_id)
                 # create COREF relation

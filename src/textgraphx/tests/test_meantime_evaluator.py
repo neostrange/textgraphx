@@ -455,6 +455,42 @@ def test_relation_scoring_uses_kind_specific_attr_keys_for_participant_roles():
     assert out["errors"]["type_mismatch"] == 1
 
 
+def test_relaxed_relation_scoring_canonicalizes_tlink_direction_and_reltype():
+    """Relaxed matching should canonicalize TLINK orientation the same way as strict.
+
+    Gold uses TIMEX->EVENT BEFORE while prediction uses EVENT->TIMEX AFTER,
+    which are semantically equivalent under TLINK inversion rules.
+    """
+    gold = {
+        Relation(
+            kind="tlink",
+            source_kind="timex",
+            source_span=(30,),
+            target_kind="event",
+            target_span=(20,),
+            attrs=(("reltype", "BEFORE"),),
+        )
+    }
+    pred = {
+        Relation(
+            kind="tlink",
+            source_kind="event",
+            source_span=(20,),
+            target_kind="timex",
+            target_span=(30,),
+            attrs=(("reltype", "AFTER"),),
+        )
+    }
+
+    strict = score_relation_layer(gold, pred, mode="strict")
+    relaxed = score_relation_layer(gold, pred, mode="relaxed")
+
+    assert strict["tp"] == 1
+    assert relaxed["tp"] == 1
+    assert relaxed["fp"] == 0
+    assert relaxed["fn"] == 0
+
+
 def test_canonicalize_event_attrs_defaults_meantime_fields_for_verbal_events():
     attrs = dict(
         _canonicalize_event_attrs(

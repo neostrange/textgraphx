@@ -1,0 +1,498 @@
+# Entity strict-eval breakdown (latest cycle)
+
+Aggregate: {'f1': 0.2560553633217993, 'fn': 69, 'fp': 146, 'precision': 0.20218579234972678, 'recall': 0.3490566037735849, 'tp': 37}
+
+
+==============================================================================
+DOC 112579  TP=5 FP=25 FN=8 P=0.167 R=0.385 F1=0.233
+  errors: {'boundary_mismatch': 0, 'missing': 8, 'spurious': 25, 'type_mismatch': 0}
+  GOLD entity mentions: 13
+
+  -- GOLD (13) --
+    NAM      span=[63, 64, 65, 66]  text='The New York Times'
+    NAM      span=[76, 77, 78, 79, 80]  text='the U.S. Department of Labor'
+    NOM      span=[89, 90, 91]  text='several large corporations'
+    NAM      span=[95, 96, 97]  text='the Associated Press'
+    NOM      span=[102]  text='people'
+    APP      span=[16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]  text='The Dow Jones Industrial Average , a stock market index used to gauge the performance of American stock exchanges'
+    NAM      span=[16, 17, 18, 19, 20]  text='The Dow Jones Industrial Average'
+    NOM      span=[22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]  text='a stock market index used to gauge the performance of American stock exchanges'
+    NOM      span=[32, 33, 34]  text='American stock exchanges'
+    NAM      span=[118, 119, 120, 121]  text='The New York Times'
+    NAM      span=[1]  text='Dow'
+    PRE.NOM  span=[32]  text='American'
+    NOM      span=[55, 56, 57]  text='different news agencies'
+
+  -- TP (5, derived as gold − FN) --
+    NAM      span=[63, 64, 65, 66]  text='The New York Times'
+    NAM      span=[76, 77, 78, 79, 80]  text='the U.S. Department of Labor'
+    NAM      span=[95, 96, 97]  text='the Associated Press'
+    NAM      span=[16, 17, 18, 19, 20]  text='The Dow Jones Industrial Average'
+    NAM      span=[118, 119, 120, 121]  text='The New York Times'
+
+  -- FP (25) --
+    NAM      pred_span=[12]  text='September'  -> spurious_NAM_singleton
+    NAM      pred_span=[74]  text='released'  -> spurious_NAM_singleton
+    NOM      pred_span=[104, 105, 106]  text='claiming weekly unemployment'  -> spurious_NOM_short
+    NAM      pred_span=[160, 161]  text='” Joseph'  -> spurious_NAM_short
+    NAM      pred_span=[166, 167]  text='at Merk'  -> spurious_NAM_short
+    NAM      pred_span=[174, 175, 176, 177]  text='to The New York'  -> spurious_NAM_medium
+    NAM      pred_span=[189]  text='was'  -> spurious_NAM_singleton
+    NAM      pred_span=[210]  text='retailer'  -> spurious_NAM_singleton
+    NAM      pred_span=[220]  text='companies'  -> spurious_NAM_singleton
+    NAM      pred_span=[222]  text='and'  -> spurious_NAM_singleton
+    NAM      pred_span=[242, 243]  text='. The'  -> spurious_NAM_short
+    NAM      pred_span=[250]  text='the'  -> spurious_NAM_singleton
+    NAM      pred_span=[257, 258, 259]  text='. The Dow'  -> spurious_NAM_short
+    APP      pred_span=[271]  text='percent'  -> spurious_APP_singleton
+    NAM      pred_span=[281, 282, 283, 284]  text='to The New York'  -> spurious_NAM_medium
+    NAM      pred_span=[292]  text='since'  -> spurious_NAM_singleton
+    NAM      pred_span=[313, 314, 315, 316]  text='. The New York'  -> spurious_NAM_medium
+    NAM      pred_span=[318, 319, 320]  text='and the Associated'  -> spurious_NAM_short
+    NOM      pred_span=[330, 331]  text='the service'  -> spurious_NOM_short
+    NAM      pred_span=[334]  text='in'  -> spurious_NAM_singleton
+    NAM      pred_span=[340, 341, 342, 343, 344]  text='by the Institute for Supply'  -> spurious_NAM_medium
+    NAM      pred_span=[346]  text='.'  -> spurious_NAM_singleton
+    NAM      pred_span=[360]  text='.'  -> spurious_NAM_singleton
+    NAM      pred_span=[369]  text='of'  -> spurious_NAM_singleton
+    NAM      pred_span=[377]  text='released'  -> spurious_NAM_singleton
+
+  -- FN (8) --
+    NAM      span=[1]  text='Dow'  -> missed_singleton_NAM
+    APP      span=[16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]  text='The Dow Jones Industrial Average , a stock market index used to gauge the performance of American stock exchanges'  -> missed_long_APP
+    NOM      span=[22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]  text='a stock market index used to gauge the performance of American stock exchanges'  -> missed_long_NOM
+    PRE.NOM  span=[32]  text='American'  -> missed_singleton_PRE.NOM
+    NOM      span=[32, 33, 34]  text='American stock exchanges'  -> missed_multi_NOM
+    NOM      span=[55, 56, 57]  text='different news agencies'  -> missed_multi_NOM
+    NOM      span=[89, 90, 91]  text='several large corporations'  -> missed_multi_NOM
+    NOM      span=[102]  text='people'  -> missed_singleton_NOM
+
+==============================================================================
+DOC 61327  TP=4 FP=22 FN=11 P=0.154 R=0.267 F1=0.195
+  errors: {'boundary_mismatch': 2, 'missing': 9, 'spurious': 20, 'type_mismatch': 0}
+  GOLD entity mentions: 15
+
+  -- GOLD (15) --
+    NOM      span=[1, 2]  text='U.S. stocks'
+    NAM      span=[1]  text='U.S.'
+    NAM      span=[13]  text='U.S.'
+    APP      span=[11, 12, 13, 14, 15, 16, 17, 18, 19, 20]  text='The biggest U.S. stock market index , the Dow Jones'
+    NOM      span=[11, 12, 13, 14, 15, 16]  text='The biggest U.S. stock market index'
+    NAM      span=[18, 19, 20]  text='the Dow Jones'
+    NOM      span=[43, 44]  text='the markets'
+    NOM      span=[60, 61]  text='Chinese markets'
+    NOM      span=[60]  text='Chinese'
+    NOM      span=[63, 64, 65]  text='Other stock indices'
+    CONJ     span=[69, 70, 71, 72, 73, 74]  text='the Nasdaq and the S&P 500'
+    NAM      span=[69, 70]  text='the Nasdaq'
+    NAM      span=[72, 73, 74]  text='the S&P 500'
+    NAM      span=[94]  text='U.S.'
+             span=[13, 14, 15]  text='U.S. stock market'
+
+  -- TP (6, derived as gold − FN) --
+    NAM      span=[1]  text='U.S.'
+    NAM      span=[13]  text='U.S.'
+    NAM      span=[18, 19, 20]  text='the Dow Jones'
+    CONJ     span=[69, 70, 71, 72, 73, 74]  text='the Nasdaq and the S&P 500'
+    NAM      span=[69, 70]  text='the Nasdaq'
+    NAM      span=[94]  text='U.S.'
+
+  -- FP (20) --
+    NAM      pred_span=[7]  text='February'  -> spurious_NAM_singleton
+    NAM      pred_span=[33]  text='on'  -> spurious_NAM_singleton
+    PRO      pred_span=[86]  text='.'  -> spurious_PRO_singleton
+    NAM      pred_span=[110]  text=')'  -> spurious_NAM_singleton
+    NAM      pred_span=[149]  text='the'  -> spurious_NAM_singleton
+    NAM      pred_span=[157, 158]  text='. Alan'  -> spurious_NAM_short
+    NAM      pred_span=[161]  text='on'  -> spurious_NAM_singleton
+    NAM      pred_span=[164]  text='the'  -> spurious_NAM_singleton
+    PRO      pred_span=[169]  text='sustain'  -> spurious_PRO_singleton
+    NAM      pred_span=[174, 175, 176]  text='where the Dow'  -> spurious_NAM_short
+    NAM      pred_span=[181, 182, 183]  text='and the White'  -> spurious_NAM_short
+    NAM      pred_span=[186]  text='on'  -> spurious_NAM_singleton
+    PRO      pred_span=[188]  text='that'  -> spurious_PRO_singleton
+    PRO      pred_span=[191]  text='revise'  -> spurious_PRO_singleton
+    NAM      pred_span=[230]  text='p.m.'  -> spurious_NAM_singleton
+    NAM      pred_span=[232]  text=','  -> spurious_NAM_singleton
+    NAM      pred_span=[235, 236, 237, 238, 239]  text='that the New York Stock'  -> spurious_NAM_medium
+    NAM      pred_span=[264]  text='assassinate'  -> spurious_NAM_singleton
+    NAM      pred_span=[267, 268]  text='President Richard'  -> spurious_NAM_short
+    NAM      pred_span=[271]  text='in'  -> spurious_NAM_singleton
+
+  -- FN (9) --
+    NOM      span=[1, 2]  text='U.S. stocks'  -> missed_multi_NOM
+    NOM      span=[11, 12, 13, 14, 15, 16]  text='The biggest U.S. stock market index'  -> missed_multi_NOM
+    APP      span=[11, 12, 13, 14, 15, 16, 17, 18, 19, 20]  text='The biggest U.S. stock market index , the Dow Jones'  -> missed_long_APP
+    ?        span=[13, 14, 15]  text='U.S. stock market'  -> missed_multi_?
+    NOM      span=[43, 44]  text='the markets'  -> missed_multi_NOM
+    NOM      span=[60]  text='Chinese'  -> missed_singleton_NOM
+    NOM      span=[60, 61]  text='Chinese markets'  -> missed_multi_NOM
+    NOM      span=[63, 64, 65]  text='Other stock indices'  -> missed_multi_NOM
+    NAM      span=[72, 73, 74]  text='the S&P 500'  -> missed_multi_NAM
+
+  -- boundary_mismatch examples (2) --
+    {'gold': {'attrs': {'syntactic_type': 'NAM'}, 'kind': 'entity', 'span': [69, 70]}, 'predicted': {'attrs': {'syntactic_type': 'NAM'}, 'kind': 'entity', 'span': [70]}}
+    {'gold': {'attrs': {'syntactic_type': 'CONJ'}, 'kind': 'entity', 'span': [69, 70, 71, 72, 73, 74]}, 'predicted': {'attrs': {'syntactic_type': 'NAM'}, 'kind': 'entity', 'span': [72, 73]}}
+
+==============================================================================
+DOC 62405  TP=9 FP=23 FN=22 P=0.281 R=0.290 F1=0.286
+  errors: {'boundary_mismatch': 0, 'missing': 22, 'spurious': 23, 'type_mismatch': 0}
+  GOLD entity mentions: 31
+
+  -- GOLD (31) --
+    NOM      span=[127, 128]  text='US banks'
+    NAM      span=[127]  text='US'
+    NOM      span=[131, 132, 133, 134, 135]  text='multi-national banks around the globe'
+    NOM      span=[134, 135]  text='the globe'
+    NOM      span=[44, 45, 46, 47, 48, 49, 50]  text='The three major US stock market indices'
+    NAM      span=[47]  text='US'
+    PRE.NOM  span=[1]  text='Sub-prime'
+    PRE.NOM  span=[27, 28]  text='sub-prime mortgage'
+    NOM      span=[58, 59]  text='closing price'
+             span=[127, 128, 129, 130, 131, 132, 133, 134, 135]  text='US banks but also multi-national banks around the globe'
+    NAM      span=[68, 69, 70, 71]  text="London 's FTSE 100"
+    NOM      span=[115]  text='their'
+    NAM      span=[73, 74, 75, 76]  text="Paris ' CAC 40"
+    NAM      span=[78, 79, 80, 81, 82]  text="Frankfurt 's DAX 30 indices"
+    NOM      span=[1, 2]  text='Sub-prime lenders'
+    CONJ     span=[68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82]  text="London 's FTSE 100 , Paris ' CAC 40 and Frankfurt 's DAX 30 indices"
+    NAM      span=[68]  text='London'
+    NAM      span=[73]  text='Paris'
+    NAM      span=[78]  text='Frankfurt'
+    NOM      span=[6, 7]  text='global markets'
+    NAM      span=[92, 93, 94, 95]  text='the Mortgage Bankers Association'
+    NAM      span=[16]  text='China'
+    NOM      span=[18, 19]  text='global markets'
+             span=[101]  text='mortgages'
+    NOM      span=[27, 28, 29, 30, 31, 32, 33]  text='sub-prime mortgage lenders in the United States'
+    NAM      span=[31, 32, 33]  text='the United States'
+    NAM      span=[107]  text='US'
+    NOM      span=[38, 39, 40, 41, 42]  text='stock exchanges around the globe'
+    NOM      span=[41, 42]  text='the globe'
+    NOM      span=[121]  text='investors'
+             span=[47, 48, 49]  text='US stock market'
+
+  -- TP (9, derived as gold − FN) --
+    NAM      span=[127]  text='US'
+    NAM      span=[47]  text='US'
+    NAM      span=[68]  text='London'
+    NAM      span=[73]  text='Paris'
+    NAM      span=[78]  text='Frankfurt'
+    NAM      span=[92, 93, 94, 95]  text='the Mortgage Bankers Association'
+    NAM      span=[16]  text='China'
+    NAM      span=[31, 32, 33]  text='the United States'
+    NAM      span=[107]  text='US'
+
+  -- FP (23) --
+    NAM      pred_span=[8]  text='March'  -> spurious_NAM_singleton
+    NAM      pred_span=[66]  text='of'  -> spurious_NAM_singleton
+    NAM      pred_span=[171, 172]  text='said Nicolas'  -> spurious_NAM_short
+    NAM      pred_span=[176, 177]  text='of Housing'  -> spurious_NAM_short
+    NAM      pred_span=[179, 180]  text='at Harvard'  -> spurious_NAM_short
+    NAM      pred_span=[202, 203, 204, 205]  text='" . New Century'  -> spurious_NAM_medium
+    APP      pred_span=[211]  text='largest'  -> spurious_APP_singleton
+    NAM      pred_span=[214]  text='in'  -> spurious_NAM_singleton
+    PRO      pred_span=[231]  text='further'  -> spurious_PRO_singleton
+    NAM      pred_span=[237]  text='of'  -> spurious_NAM_singleton
+    NAM      pred_span=[240, 241, 242, 243, 244]  text='investigation . The New York'  -> spurious_NAM_medium
+    PRO      pred_span=[247]  text='has'  -> spurious_PRO_singleton
+    NAM      pred_span=[250, 251]  text='will delist'  -> spurious_NAM_short
+    NAM      pred_span=[253, 254, 255, 256]  text='Century . Accredited Home'  -> spurious_NAM_medium
+    PRO      pred_span=[265]  text=','  -> spurious_PRO_singleton
+    PRO      pred_span=[296]  text='due'  -> spurious_PRO_singleton
+    PRO      pred_span=[311]  text='loans'  -> spurious_PRO_singleton
+    NAM      pred_span=[320]  text='such'  -> spurious_NAM_singleton
+    PRO      pred_span=[331]  text='and'  -> spurious_PRO_singleton
+    NAM      pred_span=[350]  text='such'  -> spurious_NAM_singleton
+    NAM      pred_span=[352]  text='Citibank'  -> spurious_NAM_singleton
+    NAM      pred_span=[355]  text=','  -> spurious_NAM_singleton
+    NOM      pred_span=[401]  text='of'  -> spurious_NOM_singleton
+
+  -- FN (22) --
+    PRE.NOM  span=[1]  text='Sub-prime'  -> missed_singleton_PRE.NOM
+    NOM      span=[1, 2]  text='Sub-prime lenders'  -> missed_multi_NOM
+    NOM      span=[6, 7]  text='global markets'  -> missed_multi_NOM
+    NOM      span=[18, 19]  text='global markets'  -> missed_multi_NOM
+    PRE.NOM  span=[27, 28]  text='sub-prime mortgage'  -> missed_multi_PRE.NOM
+    NOM      span=[27, 28, 29, 30, 31, 32, 33]  text='sub-prime mortgage lenders in the United States'  -> missed_multi_NOM
+    NOM      span=[38, 39, 40, 41, 42]  text='stock exchanges around the globe'  -> missed_multi_NOM
+    NOM      span=[41, 42]  text='the globe'  -> missed_multi_NOM
+    NOM      span=[44, 45, 46, 47, 48, 49, 50]  text='The three major US stock market indices'  -> missed_multi_NOM
+    ?        span=[47, 48, 49]  text='US stock market'  -> missed_multi_?
+    NOM      span=[58, 59]  text='closing price'  -> missed_multi_NOM
+    NAM      span=[68, 69, 70, 71]  text="London 's FTSE 100"  -> missed_multi_NAM
+    CONJ     span=[68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82]  text="London 's FTSE 100 , Paris ' CAC 40 and Frankfurt 's DAX 30 indices"  -> missed_long_CONJ
+    NAM      span=[73, 74, 75, 76]  text="Paris ' CAC 40"  -> missed_multi_NAM
+    NAM      span=[78, 79, 80, 81, 82]  text="Frankfurt 's DAX 30 indices"  -> missed_multi_NAM
+    ?        span=[101]  text='mortgages'  -> missed_singleton_?
+    NOM      span=[115]  text='their'  -> missed_singleton_NOM
+    NOM      span=[121]  text='investors'  -> missed_singleton_NOM
+    NOM      span=[127, 128]  text='US banks'  -> missed_multi_NOM
+    ?        span=[127, 128, 129, 130, 131, 132, 133, 134, 135]  text='US banks but also multi-national banks around the globe'  -> missed_multi_?
+    NOM      span=[131, 132, 133, 134, 135]  text='multi-national banks around the globe'  -> missed_multi_NOM
+    NOM      span=[134, 135]  text='the globe'  -> missed_multi_NOM
+
+==============================================================================
+DOC 76437  TP=3 FP=37 FN=14 P=0.075 R=0.176 F1=0.105
+  errors: {'boundary_mismatch': 0, 'missing': 13, 'spurious': 36, 'type_mismatch': 1}
+  GOLD entity mentions: 17
+
+  -- GOLD (17) --
+    NAM      span=[57, 58, 59, 60, 61]  text="The UK 's FTSE-100 index"
+    NAM      span=[58]  text='UK'
+    NAM      span=[69, 70, 71, 72]  text="Japan 's Nikkei 225"
+    NAM      span=[69]  text='Japan'
+    NOM      span=[79, 80, 81, 82, 83]  text='Central banks across the world'
+    NOM      span=[82, 83]  text='the world'
+    NOM      span=[1]  text='Markets'
+    NOM      span=[86]  text='funds'
+    NOM      span=[88, 89, 90]  text='their banking systems'
+    PRO      span=[88]  text='their'
+    NOM      span=[11, 12, 13]  text='Global stock markets'
+    NOM      span=[93]  text='liquidity'
+    NOM      span=[97, 98, 99, 100, 101, 102]  text='many financial firms with subprime ties'
+    NOM      span=[101]  text='subprime'
+    NAM      span=[28, 29, 30]  text='the United States'
+             span=[32, 33, 34, 35, 36]  text='The Dow Jones Industrial Average'
+             span=[23, 24, 25]  text='the sub-prime mortgage'
+
+  -- TP (4, derived as gold − FN) --
+    NAM      span=[58]  text='UK'
+    NAM      span=[69]  text='Japan'
+    NAM      span=[28, 29, 30]  text='the United States'
+             span=[32, 33, 34, 35, 36]  text='The Dow Jones Industrial Average'
+
+  -- FP (36) --
+    NAM      pred_span=[7]  text='August'  -> spurious_NAM_singleton
+    NAM      pred_span=[109, 110, 111, 112]  text=', the U.S. Federal'  -> spurious_NAM_medium
+    NAM      pred_span=[122, 123, 124, 125]  text='following the European Central'  -> spurious_NAM_medium
+    PRO      pred_span=[139]  text=','  -> spurious_PRO_singleton
+    APP      pred_span=[142]  text='cash'  -> spurious_APP_singleton
+    NAM      pred_span=[146]  text='On'  -> spurious_NAM_singleton
+    NAM      pred_span=[149]  text='the'  -> spurious_NAM_singleton
+    NAM      pred_span=[168]  text='on'  -> spurious_NAM_singleton
+    NAM      pred_span=[170, 171, 172, 173]  text=', the Bank of'  -> spurious_NAM_medium
+    NAM      pred_span=[179]  text='into'  -> spurious_NAM_singleton
+    NAM      pred_span=[184, 185, 186]  text='. The Federal'  -> spurious_NAM_short
+    NAM      pred_span=[204]  text='on'  -> spurious_NAM_singleton
+    NAM      pred_span=[228, 229]  text='with Bear'  -> spurious_NAM_short
+    PRO      pred_span=[235]  text='from'  -> spurious_PRO_singleton
+    PRO      pred_span=[268]  text='announced'  -> spurious_PRO_singleton
+    NAM      pred_span=[278, 279]  text='. Washington'  -> spurious_NAM_short
+    NAM      pred_span=[282, 283]  text='and Countrywide'  -> spurious_NAM_short
+    NAM      pred_span=[288]  text='large'  -> spurious_NAM_singleton
+    APP      pred_span=[291]  text='loan'  -> spurious_APP_singleton
+    NAM      pred_span=[297, 298]  text='. Countrywide'  -> spurious_NAM_short
+    PRO      pred_span=[306]  text='saying'  -> spurious_PRO_singleton
+    NAM      pred_span=[318, 319, 320, 321, 322]  text='. American Home Mortgage Investment'  -> spurious_NAM_medium
+    NAM      pred_span=[334]  text='The'  -> spurious_NAM_singleton
+    NAM      pred_span=[346, 347, 348]  text='after the Federal'  -> spurious_NAM_short
+    NAM      pred_span=[388, 389]  text='. Jim'  -> spurious_NAM_short
+    NAM      pred_span=[392]  text='of'  -> spurious_NAM_singleton
+    NAM      pred_span=[394, 395]  text="'s Mad"  -> spurious_NAM_short
+    NAM      pred_span=[416]  text=','  -> spurious_NAM_singleton
+    NAM      pred_span=[422]  text='on'  -> spurious_NAM_singleton
+    NAM      pred_span=[424, 425]  text="'s Street"  -> spurious_NAM_short
+    NAM      pred_span=[431]  text='"'  -> spurious_NAM_singleton
+    PRO      pred_span=[438]  text='for'  -> spurious_PRO_singleton
+    NAM      pred_span=[459]  text='the'  -> spurious_NAM_singleton
+    NAM      pred_span=[460, 461, 462, 463]  text='U.S. Deutsche Bank of'  -> spurious_NAM_medium
+    NAM      pred_span=[481]  text='.'  -> spurious_NAM_singleton
+    NAM      pred_span=[486, 487, 488]  text=', BNP Paribas'  -> spurious_NAM_short
+
+  -- FN (13) --
+    NOM      span=[1]  text='Markets'  -> missed_singleton_NOM
+    NOM      span=[11, 12, 13]  text='Global stock markets'  -> missed_multi_NOM
+    ?        span=[23, 24, 25]  text='the sub-prime mortgage'  -> missed_multi_?
+    NAM      span=[57, 58, 59, 60, 61]  text="The UK 's FTSE-100 index"  -> missed_multi_NAM
+    NAM      span=[69, 70, 71, 72]  text="Japan 's Nikkei 225"  -> missed_multi_NAM
+    NOM      span=[79, 80, 81, 82, 83]  text='Central banks across the world'  -> missed_multi_NOM
+    NOM      span=[82, 83]  text='the world'  -> missed_multi_NOM
+    NOM      span=[86]  text='funds'  -> missed_singleton_NOM
+    PRO      span=[88]  text='their'  -> missed_singleton_PRO
+    NOM      span=[88, 89, 90]  text='their banking systems'  -> missed_multi_NOM
+    NOM      span=[93]  text='liquidity'  -> missed_singleton_NOM
+    NOM      span=[97, 98, 99, 100, 101, 102]  text='many financial firms with subprime ties'  -> missed_multi_NOM
+    NOM      span=[101]  text='subprime'  -> missed_singleton_NOM
+
+==============================================================================
+DOC 82738  TP=3 FP=27 FN=6 P=0.100 R=0.333 F1=0.154
+  errors: {'boundary_mismatch': 0, 'missing': 6, 'spurious': 27, 'type_mismatch': 0}
+  GOLD entity mentions: 9
+
+  -- GOLD (9) --
+    NAM      span=[73, 74, 75]  text='the Dow Jones'
+             span=[81, 82]  text='the market'
+    HLS      span=[15]  text='Some'
+    NOM      span=[1, 2, 3]  text='US stock markets'
+    NAM      span=[1]  text='US'
+    NAM      span=[35, 36, 37, 38, 39, 40, 41, 42]  text='the United States Dow Jones Industrial Average market'
+    NAM      span=[36, 37]  text='United States'
+    NOM      span=[58, 59]  text='the market'
+             span=[35, 36, 37, 38, 39, 40, 41]  text='the United States Dow Jones Industrial Average'
+
+  -- TP (3, derived as gold − FN) --
+    NAM      span=[73, 74, 75]  text='the Dow Jones'
+    NAM      span=[1]  text='US'
+    NAM      span=[36, 37]  text='United States'
+
+  -- FP (27) --
+    NAM      pred_span=[7, 8, 9]  text="Monday ' anniversary"  -> spurious_NAM_short
+    NAM      pred_span=[11]  text='October'  -> spurious_NAM_singleton
+    PRO      pred_span=[21]  text='repeat'  -> spurious_PRO_singleton
+    NAM      pred_span=[51, 52]  text="' Black"  -> spurious_NAM_short
+    NAM      pred_span=[71]  text='On'  -> spurious_NAM_singleton
+    NAM      pred_span=[105]  text='being'  -> spurious_NAM_singleton
+    NAM      pred_span=[119]  text='into'  -> spurious_NAM_singleton
+    NAM      pred_span=[128, 129, 130, 131]  text='of the Kurdistan Workers'  -> spurious_NAM_medium
+    NAM      pred_span=[133]  text='('  -> spurious_NAM_singleton
+    NAM      pred_span=[136]  text='.'  -> spurious_NAM_singleton
+    NAM      pred_span=[162]  text='on'  -> spurious_NAM_singleton
+    NAM      pred_span=[172]  text='the'  -> spurious_NAM_singleton
+    NAM      pred_span=[181, 182]  text='lead Caterpillar'  -> spurious_NAM_short
+    NAM      pred_span=[213]  text='On'  -> spurious_NAM_singleton
+    PRO      pred_span=[243]  text='"'  -> spurious_PRO_singleton
+    NAM      pred_span=[251]  text='like'  -> spurious_NAM_singleton
+    PRO      pred_span=[267]  text='.'  -> spurious_PRO_singleton
+    PRO      pred_span=[288]  text='played'  -> spurious_PRO_singleton
+    NAM      pred_span=[293, 294, 295]  text='said Bell Curve'  -> spurious_NAM_short
+    NAM      pred_span=[300, 301]  text=', Bill'  -> spurious_NAM_short
+    NAM      pred_span=[319, 320]  text="' Black"  -> spurious_NAM_short
+    PRO      pred_span=[358]  text='I'  -> spurious_PRO_singleton
+    PRO      pred_span=[362]  text='laugh'  -> spurious_PRO_singleton
+    NAM      pred_span=[367, 368, 369, 370]  text='" said T Rowe'  -> spurious_NAM_medium
+    NAM      pred_span=[373, 374]  text='trader ,'  -> spurious_NAM_short
+    NAM      pred_span=[377]  text='.'  -> spurious_NAM_singleton
+    NAM      pred_span=[395, 396]  text='2,725.16 .'  -> spurious_NAM_short
+
+  -- FN (6) --
+    NOM      span=[1, 2, 3]  text='US stock markets'  -> missed_multi_NOM
+    HLS      span=[15]  text='Some'  -> missed_singleton_HLS
+    ?        span=[35, 36, 37, 38, 39, 40, 41]  text='the United States Dow Jones Industrial Average'  -> missed_multi_?
+    NAM      span=[35, 36, 37, 38, 39, 40, 41, 42]  text='the United States Dow Jones Industrial Average market'  -> missed_multi_NAM
+    NOM      span=[58, 59]  text='the market'  -> missed_multi_NOM
+    ?        span=[81, 82]  text='the market'  -> missed_multi_?
+
+==============================================================================
+DOC 96770  TP=13 FP=12 FN=8 P=0.520 R=0.619 F1=0.565
+  errors: {'boundary_mismatch': 1, 'missing': 7, 'spurious': 11, 'type_mismatch': 0}
+  GOLD entity mentions: 21
+
+  -- GOLD (21) --
+    CONJ     span=[78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88]  text='India , China , Britain , France , Germany and Canada'
+    NAM      span=[78]  text='India'
+    NAM      span=[80]  text='China'
+    NAM      span=[82]  text='Britain'
+    NAM      span=[84]  text='France'
+    NAM      span=[86]  text='Germany'
+    NAM      span=[88]  text='Canada'
+    NOM      span=[99]  text='analysts'
+    NOM      span=[13, 14]  text='Stock prices'
+    NAM      span=[18]  text='Europe'
+    NAM      span=[20]  text='Asia'
+    CONJ     span=[18, 19, 20]  text='Europe and Asia'
+    NAM      span=[109, 110, 111]  text='the United States'
+    NAM      span=[29, 30, 31]  text='the United States'
+    NOM      span=[96, 97]  text='national economies'
+    PRE.NOM  span=[13]  text='Stock'
+    NAM      span=[44, 45]  text='Hong Kong'
+    NAM      span=[47, 48, 49, 50]  text='the Hang Seng index'
+             span=[1, 2]  text='World stocks'
+    PRO      span=[55]  text='its'
+    NAM      span=[7]  text='US'
+
+  -- TP (14, derived as gold − FN) --
+    NAM      span=[78]  text='India'
+    NAM      span=[80]  text='China'
+    NAM      span=[82]  text='Britain'
+    NAM      span=[84]  text='France'
+    NAM      span=[86]  text='Germany'
+    NAM      span=[88]  text='Canada'
+    NAM      span=[18]  text='Europe'
+    NAM      span=[20]  text='Asia'
+    NAM      span=[109, 110, 111]  text='the United States'
+    NAM      span=[29, 30, 31]  text='the United States'
+    NAM      span=[44, 45]  text='Hong Kong'
+    NAM      span=[47, 48, 49, 50]  text='the Hang Seng index'
+    PRO      span=[55]  text='its'
+    NAM      span=[7]  text='US'
+
+  -- FP (11) --
+    NAM      pred_span=[9]  text='January'  -> spurious_NAM_singleton
+    NOM      pred_span=[36, 37, 38]  text='the biggest single-day'  -> spurious_NOM_short
+    NAM      pred_span=[113, 114, 115]  text='. The United'  -> spurious_NAM_short
+    NAM      pred_span=[134]  text='in'  -> spurious_NAM_singleton
+    NOM      pred_span=[147, 148]  text='of defaulting'  -> spurious_NOM_short
+    NAM      pred_span=[168]  text='about'  -> spurious_NAM_singleton
+    NAM      pred_span=[179]  text='President'  -> spurious_NAM_singleton
+    NAM      pred_span=[226]  text='.'  -> spurious_NAM_singleton
+    NAM      pred_span=[231]  text='on'  -> spurious_NAM_singleton
+    NAM      pred_span=[233, 234, 235, 236, 237, 238]  text='for Martin Luther King Jr. Day'  -> spurious_NAM_medium
+    APP      pred_span=[242]  text='holiday'  -> spurious_APP_singleton
+
+  -- FN (7) --
+    ?        span=[1, 2]  text='World stocks'  -> missed_multi_?
+    PRE.NOM  span=[13]  text='Stock'  -> missed_singleton_PRE.NOM
+    NOM      span=[13, 14]  text='Stock prices'  -> missed_multi_NOM
+    CONJ     span=[18, 19, 20]  text='Europe and Asia'  -> missed_multi_CONJ
+    CONJ     span=[78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88]  text='India , China , Britain , France , Germany and Canada'  -> missed_long_CONJ
+    NOM      span=[96, 97]  text='national economies'  -> missed_multi_NOM
+    NOM      span=[99]  text='analysts'  -> missed_singleton_NOM
+
+  -- boundary_mismatch examples (1) --
+    {'gold': {'attrs': {'syntactic_type': 'NAM'}, 'kind': 'entity', 'span': [47, 48, 49, 50]}, 'predicted': {'attrs': {'syntactic_type': 'NAM'}, 'kind': 'entity', 'span': [48, 49]}}
+
+
+==============================================================================
+# AGGREGATE STATS
+
+Gold entities by syntactic_type:
+  NAM        46
+  NOM        38
+  (none)     9
+  PRE.NOM    4
+  CONJ       4
+  APP        2
+  PRO        2
+  HLS        1
+
+False-positives by syntactic_type:
+  NAM        111
+  PRO        21
+  NOM        5
+  APP        5
+
+False-negatives by syntactic_type:
+  NOM        38
+  NAM        8
+  ?          8
+  PRE.NOM    4
+  CONJ       3
+  APP        2
+  PRO        1
+  HLS        1
+
+FP reasons:
+  spurious_NAM_singleton         63
+  spurious_NAM_short             32
+  spurious_PRO_singleton         21
+  spurious_NAM_medium            16
+  spurious_APP_singleton         5
+  spurious_NOM_short             4
+  spurious_NOM_singleton         1
+
+FN reasons:
+  missed_multi_NOM               28
+  missed_singleton_NOM           9
+  missed_multi_?                 7
+  missed_multi_NAM               7
+  missed_singleton_PRE.NOM       3
+  missed_long_APP                2
+  missed_long_CONJ               2
+  missed_singleton_NAM           1
+  missed_long_NOM                1
+  missed_multi_PRE.NOM           1
+  missed_singleton_?             1
+  missed_singleton_PRO           1
+  missed_singleton_HLS           1
+  missed_multi_CONJ              1

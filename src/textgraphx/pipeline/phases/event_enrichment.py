@@ -75,23 +75,41 @@ class EventEnrichmentPhase():
         return defaults.get(field_name, ("temporal_phase", 0.90))
 
     @staticmethod
-    def _participant_source_subquery(frame_argument_alias="fa", source_alias="participant", include_frame_argument=False):
+    def _participant_source_subquery(
+        frame_argument_alias="fa",
+        source_alias="participant",
+        include_frame_argument=False,
+        include_general_namedentity=False,
+        prefer_namedentity_over_entity=False,
+    ):
         """Return a Cypher subquery resolving participant sources with canonical preference.
 
         Resolution order is:
-        1. canonical `Entity`
+             1. canonical `Entity` (or fallback if no preferred NamedEntity)
         2. canonical `VALUE`
-        3. legacy fallback NamedEntity of numeric/value semantic type (CARDINAL, ORDINAL,
-           MONEY, QUANTITY, PERCENT) — independent of whether the transitional :NUMERIC
-           or :VALUE labels have been written.
+                 3. legacy fallback NamedEntity of numeric/value semantic type (CARDINAL,
+                     ORDINAL, MONEY, QUANTITY, PERCENT)
+                 4. optional guarded fallback to general NamedEntity when canonical
+                    Entity/VALUE is unavailable for the FrameArgument
 
         Some semantic-relation paths also allow `FrameArgument` as a direct
         source during the maintained transition period.
         """
+        if prefer_namedentity_over_entity:
+            entity_guard = (
+                "AND NOT EXISTS { "
+                f"MATCH ({frame_argument_alias})-[:REFERS_TO]->(ne_pref:NamedEntity) "
+                "WHERE NOT (coalesce(ne_pref.type, '') IN ['CARDINAL', 'ORDINAL', 'MONEY', 'QUANTITY', 'PERCENT']) "
+                "}"
+            )
+        else:
+            entity_guard = ""
+
         branches = [
             f"""
                     WITH {frame_argument_alias}
                     MATCH ({frame_argument_alias})-[:REFERS_TO]->({source_alias}:Entity)
+                    WHERE true {entity_guard}
                     RETURN {source_alias}
             """,
             f"""
@@ -106,6 +124,24 @@ class EventEnrichmentPhase():
                     RETURN {source_alias}
             """,
         ]
+        if include_general_namedentity:
+            if prefer_namedentity_over_entity:
+                general_namedentity_guard = ""
+            else:
+                general_namedentity_guard = (
+                    f"AND NOT EXISTS {{ MATCH ({frame_argument_alias})-[:REFERS_TO]->(:Entity) }}\n"
+                    f"                      AND NOT EXISTS {{ MATCH ({frame_argument_alias})-[:REFERS_TO]->(:VALUE) }}"
+                )
+            branches.append(
+                f"""
+                    WITH {frame_argument_alias}
+                    MATCH ({frame_argument_alias})-[:REFERS_TO]->({source_alias}:NamedEntity)
+                    WHERE NOT (coalesce({source_alias}.type, '') IN ['CARDINAL', 'ORDINAL', 'MONEY', 'QUANTITY', 'PERCENT'])
+                      AND coalesce({source_alias}.syntactic_type, {source_alias}.syntacticType, '') IN ['NAM', 'NOM', 'PRO', 'CONJ', 'PRE.NOM', 'APP', 'HLS']
+                      {general_namedentity_guard}
+                    RETURN {source_alias}
+                """
+            )
         if include_frame_argument:
             branches.append(
                 f"""
@@ -121,9 +157,7 @@ class EventEnrichmentPhase():
         """Return a Cypher subquery collecting participant-support sources with canonical preference.
 
         Support evidence is counted across canonical `Entity`, canonical `VALUE`,
-        and legacy fallback NamedEntity of numeric/value semantic type (CARDINAL, ORDINAL,
-        MONEY, QUANTITY, PERCENT) — independent of whether the transitional :NUMERIC
-        or :VALUE labels have been written.
+        and legacy fallback NamedEntity of numeric/value type.
         The subquery returns list batches so outer rows remain available even when
         an event has no participants.
         """
@@ -603,7 +637,12 @@ class EventEnrichmentPhase():
     def add_core_participants_to_event(self):
         logger.debug("add_core_participants_to_event")
         graph = self.graph
-        participant_source_subquery = self._participant_source_subquery("fa", "e")
+        participant_source_subquery = self._participant_source_subquery(
+            "fa",
+            "e",
+            include_general_namedentity=True,
+            prefer_namedentity_over_entity=True,
+        )
 
         # Original query: Link canonical Entity/VALUE or legacy NamedEntity:NUMERIC|VALUE to canonical TEvent.
         query = f"""    
@@ -625,7 +664,8 @@ class EventEnrichmentPhase():
                                              ) AS distance
                                         ORDER BY rel_priority ASC, distance ASC
                                         WITH fa, e, head(collect(event)) AS event
-                                        WHERE event IS NOT NULL
+                                                                                WHERE event IS NOT NULL
+                                                                                    AND coalesce(e.doc_id, event.doc_id) = event.doc_id
                     merge (e)-[r:PARTICIPANT]->(event)
                     set r.type = fa.type,
                         r.prep = CASE WHEN fa.syntacticType IN ['IN'] THEN fa.head ELSE r.prep END,
@@ -636,7 +676,6 @@ class EventEnrichmentPhase():
                         r.source_kind = 'rule',
                         r.conflict_policy = 'additive',
                         r.created_at = coalesce(r.created_at, datetime().epochMillis),
-                        r.is_core = true,
                         r.is_core = true
                     merge (e)-[nr:EVENT_PARTICIPANT]->(event)
                     set nr.type = fa.type,
@@ -662,6 +701,7 @@ class EventEnrichmentPhase():
                                         {participant_source_subquery}
                                         WITH f, em, event, fa, e
                                         WHERE fa.type IN ['ARG0','ARG1','ARG2','ARG3','ARG4']
+                                                                                    AND coalesce(e.doc_id, em.doc_id, event.doc_id) = event.doc_id
                                         WITH DISTINCT f, em, event, fa, e
                     merge (e)-[r:PARTICIPANT]->(em)
                     set r.type = fa.type,
@@ -673,7 +713,7 @@ class EventEnrichmentPhase():
                         r.source_kind = 'rule',
                         r.conflict_policy = 'additive',
                         r.created_at = coalesce(r.created_at, datetime().epochMillis),
-                        r.is_core = true
+                        r.is_core = false
                     merge (e)-[nr:EVENT_PARTICIPANT]->(em)
                     set nr.type = fa.type,
                         nr.prep = CASE WHEN fa.syntacticType IN ['IN'] THEN fa.head ELSE nr.prep END,
@@ -684,7 +724,7 @@ class EventEnrichmentPhase():
                         nr.source_kind = 'rule',
                         nr.conflict_policy = 'additive',
                         nr.created_at = coalesce(nr.created_at, datetime().epochMillis),
-                        nr.is_core = true
+                        nr.is_core = false
                                         return count(*) AS linked_mention
         """
         data_mention = graph.run(query_mention).data()

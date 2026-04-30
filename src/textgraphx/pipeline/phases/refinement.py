@@ -1878,31 +1878,34 @@ class RefinementPhase():
                   OPTIONAL MATCH (ncTok:TagOccurrence)-[:PARTICIPATES_IN]->(nc)
                   OPTIONAL MATCH (ncTok)-[:IN_FRAME]->(fa:FrameArgument)
                   OPTIONAL MATCH (ncTok)-[:TRIGGERS]->(evt:TEvent)
+                  OPTIONAL MATCH (ncTok)-[:IN_MENTION|PARTICIPATES_IN]->(timex:TimexMention)
+                  OPTIONAL MATCH (ncTok)-[:TRIGGERS]->(timex2:TimexMention)
                   WITH nc, d, min_tok, max_tok, min_char, max_char, chunk_text_lc,
                       coalesce(headTok.upos, '') AS head_upos,
                       coalesce(headTok.pos, '') AS head_pos,
                       toLower(coalesce(headTok.lemma, headTok.text, '')) AS head_lemma,
                       coalesce(nc.syntactic_type, nc.syntacticType, 'NOM') AS syntactic_type,
                       count(DISTINCT fa) AS fa_hits,
-                      count(DISTINCT evt) AS event_hits
+                      count(DISTINCT evt) AS event_hits,
+                      (count(DISTINCT timex) + count(DISTINCT timex2)) AS timex_hits
                  OPTIONAL MATCH (ne:NamedEntity)
                  WHERE coalesce(ne.start_tok, ne.token_start, ne.index) = min_tok
                    AND coalesce(ne.end_tok, ne.token_end, ne.end_index, ne.index) = max_tok
                  OPTIONAL MATCH (ncTokOverlap:TagOccurrence)-[:PARTICIPATES_IN]->(nc)
                  OPTIONAL MATCH (ncTokOverlap)-[:IN_MENTION|PARTICIPATES_IN]->(overlap_ne:NamedEntity)
                  WITH nc, d, min_tok, max_tok, min_char, max_char, chunk_text_lc,
-                      head_upos, head_pos, head_lemma, syntactic_type, fa_hits, event_hits,
+                      head_upos, head_pos, head_lemma, syntactic_type, fa_hits, event_hits, timex_hits,
                       count(ne) AS ne_count,
                       count(DISTINCT overlap_ne) AS overlap_ne_count
                  WITH nc, d, min_tok, max_tok, min_char, max_char, chunk_text_lc,
-                      head_upos, head_pos, head_lemma, syntactic_type, fa_hits, event_hits,
+                      head_upos, head_pos, head_lemma, syntactic_type, fa_hits, event_hits, timex_hits,
                       ne_count, overlap_ne_count,
                       CASE
                           WHEN $strict_nominal_filters THEN syntactic_type IN ['NOM', 'NOMINAL', 'APP', 'PRE.NOM']
                           ELSE syntactic_type IN ['NOM', 'APP', 'PRE.NOM']
                       END AS nominal_like
                  WITH nc, d, min_tok, max_tok, min_char, max_char, chunk_text_lc,
-                      head_upos, head_pos, head_lemma, syntactic_type, fa_hits, event_hits,
+                      head_upos, head_pos, head_lemma, syntactic_type, fa_hits, event_hits, timex_hits,
                       ne_count, overlap_ne_count, nominal_like,
                       CASE
                           WHEN chunk_text_lc = '' THEN 'drop_empty_chunk'
@@ -1911,6 +1914,15 @@ class RefinementPhase():
                           WHEN syntactic_type IN ['PRO', 'PRONOMINAL'] THEN 'drop_pronominal_syntactic_type'
                           WHEN head_upos IN ['PRON', 'DET', 'NUM'] THEN 'drop_head_upos'
                           WHEN head_pos IN ['PRP', 'PRP$', 'WP', 'WP$', 'DT', 'WDT', 'PDT', 'CD'] THEN 'drop_head_pos'
+                          WHEN $strict_nominal_filters AND timex_hits > 0 THEN 'drop_timex_overlap'
+                          WHEN $strict_nominal_filters AND head_lemma IN [
+                                  'january','february','march','april','may','june','july',
+                                  'august','september','october','november','december',
+                                  'monday','tuesday','wednesday','thursday','friday','saturday','sunday',
+                                  'jan','feb','mar','apr','jun','jul','aug','sep','sept','oct','nov','dec',
+                                  'mon','tue','tues','wed','thu','thur','thurs','fri','sat','sun',
+                                  'a.m.','p.m.','am','pm','est','edt','gmt','utc','pst','pdt','cst','cdt'
+                              ] THEN 'drop_calendar_date_head'
                           WHEN nominal_like
                               AND fa_hits = 0
                               AND event_hits = 0

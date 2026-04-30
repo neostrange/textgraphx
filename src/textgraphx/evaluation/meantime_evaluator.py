@@ -15,7 +15,7 @@ import logging
 import re
 
 
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple, Optional, Sequence
 import spacy
 try:
     _eval_nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
@@ -356,6 +356,8 @@ def build_document_from_neo4j(
     normalize_nominal_boundaries: bool = True,
     gold_like_nominal_filter: bool = False,
     nominal_profile_mode: str = "all",
+    include_non_core_participants: bool = False,
+    non_core_participant_roles: Optional[Sequence[str]] = None,
 ) -> NormalizedDocument:
     """Extract mention/relation projections for a document from Neo4j.
 
@@ -369,6 +371,14 @@ def build_document_from_neo4j(
     ``tag_discourse_relevant_entities``.  Running with ``discourse_only=True``
     on a graph where that rule has not yet executed will return an empty entity
     set; re-run the pipeline first.
+
+    Participant relation projection is core-only by default (``is_core=true``).
+    Set ``include_non_core_participants=True`` to include non-core participant
+    links for aggressive recall-oriented analysis.
+
+    Optionally provide ``non_core_participant_roles`` to constrain non-core
+    links to a role allowlist (for example ``["ARG0", "ARG1"]``). Core links
+    are always retained.
     """
     doc_id_int = _resolve_graph_doc_id(graph, doc_id)
     profile_mode = str(nominal_profile_mode or "all").strip().lower()
@@ -378,6 +388,10 @@ def build_document_from_neo4j(
             f"Unsupported nominal_profile_mode: {nominal_profile_mode}. "
             f"Expected one of: {sorted(allowed_profile_modes)}"
         )
+
+    non_core_role_allowlist = tuple(
+        sorted({str(role).strip().upper() for role in (non_core_participant_roles or ()) if str(role).strip()})
+    )
 
     doc = NormalizedDocument(doc_id=str(doc_id))
     token_index_alignment = _build_token_index_alignment(
@@ -962,7 +976,18 @@ def build_document_from_neo4j(
         CALL {
             WITH $doc_id AS doc_id
             MATCH (src)-[r:EVENT_PARTICIPANT|PARTICIPANT]->(evt)
-              WHERE (evt:TEvent OR evt:EventMention) AND coalesce(r.is_core, true) = true AND (evt.doc_id = doc_id
+              WHERE (evt:TEvent OR evt:EventMention)
+                AND (
+                    coalesce(r.is_core, true) = true
+                    OR (
+                        $include_non_core_participants
+                        AND (
+                            $non_core_role_filter_empty
+                            OR toUpper(coalesce(r.type, '')) IN $non_core_participant_roles
+                        )
+                    )
+                )
+                AND (evt.doc_id = doc_id
                OR EXISTS {
                    MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|IN_MENTION]->(evt)
                })
@@ -994,7 +1019,12 @@ def build_document_from_neo4j(
         RETURN DISTINCT src_start, src_end, evt_start, evt_end, sem_role, source_labels, endpoint_id
         ORDER BY evt_start, src_start
         """,
-        {"doc_id": doc_id_int},
+        {
+            "doc_id": doc_id_int,
+            "include_non_core_participants": bool(include_non_core_participants),
+            "non_core_participant_roles": list(non_core_role_allowlist),
+            "non_core_role_filter_empty": len(non_core_role_allowlist) == 0,
+        },
     ).data()
     LOGGER.debug("doc %s participant_rows count: %s", doc_id, len(participant_rows))
     for row in participant_rows:
@@ -2175,53 +2205,104 @@ def score_relation_layer(
         out["examples"] = _collect_relation_examples(set(gold_keys.keys()), set(pred_keys.keys()), max_examples=max_examples)
         return out
         
-    else:  # Relaxed Mode
-        matched_gold = set()
-        matched_pred = set()
-        tp_pairs = []
-        
-        for g in gold_relations:
-            for p in predicted_relations:
-                if p in matched_pred: continue
-                
-                # In relaxed mode, relations match if:
-                # 1. Kinds match (e.g. has_participant == has_participant)
-                # 2. Source kinds match, and source spans OVERLAP
-                # 3. Target kinds match, and target spans OVERLAP
-                # 4. Canonicalized reltype (if applicable) matches
-                
-                if g.kind != p.kind: continue
-                if g.source_kind != p.source_kind or g.target_kind != p.target_kind: continue
-                
-                # Check overlapping endpoints
-                if _span_iou(g.source_span, p.source_span) == 0.0: continue
-                if _span_iou(g.target_span, p.target_span) == 0.0: continue
-                
-                # Check attributes (in relaxed, only reltype matters if present)
-                g_reltype = dict(g.attrs).get("reltype")
-                p_reltype = dict(p.attrs).get("reltype")
-                if g_reltype != p_reltype: continue
-                
-                matched_gold.add(g)
-                matched_pred.add(p)
-                tp_pairs.append({'gold': str(_relation_key(g, "strict")), 'predicted': str(_relation_key(p, "strict"))})
-                break
-                
-        tp = len(matched_gold)
-        fp = len(predicted_relations) - tp
-        fn = len(gold_relations) - tp
-        
-        # Prepare examples format
-        unmatched_gold = [str(_relation_key(g, "strict")) for g in gold_relations if g not in matched_gold]
-        unmatched_pred = [str(_relation_key(p, "strict")) for p in predicted_relations if p not in matched_pred]
-        
+    else:  # Relaxed mode
+        # Relaxed relation matching must use TLINK-canonicalized direction semantics
+        # (same as strict keys) and deterministic candidate ordering.
+        def _relaxed_view(rel: Relation) -> Tuple[str, str, TokenSpan, str, TokenSpan, str]:
+            kind, src_kind, src_span, tgt_kind, tgt_span, attrs = _relation_key(rel, "relaxed")
+            attrs_map = dict(attrs)
+            return (
+                str(kind),
+                str(src_kind),
+                tuple(src_span),
+                str(tgt_kind),
+                tuple(tgt_span),
+                str(attrs_map.get("reltype") or ""),
+            )
+
+        gold_ordered = sorted(gold_relations, key=lambda r: str(_relation_key(r, "strict")))
+        pred_ordered = sorted(predicted_relations, key=lambda r: str(_relation_key(r, "strict")))
+        gold_view = [_relaxed_view(r) for r in gold_ordered]
+        pred_view = [_relaxed_view(r) for r in pred_ordered]
+
+        # Candidate match score: maximize endpoint overlap while preserving deterministic ties.
+        candidates: List[Tuple[float, float, str, str, int, int]] = []
+        for gi, gv in enumerate(gold_view):
+            g_kind, g_src_kind, g_src_span, g_tgt_kind, g_tgt_span, g_reltype = gv
+            for pi, pv in enumerate(pred_view):
+                p_kind, p_src_kind, p_src_span, p_tgt_kind, p_tgt_span, p_reltype = pv
+
+                if g_kind != p_kind:
+                    continue
+                if g_src_kind != p_src_kind or g_tgt_kind != p_tgt_kind:
+                    continue
+                if g_reltype != p_reltype:
+                    continue
+
+                src_iou = _span_iou(g_src_span, p_src_span)
+                tgt_iou = _span_iou(g_tgt_span, p_tgt_span)
+                if src_iou == 0.0 or tgt_iou == 0.0:
+                    continue
+
+                # Score high overlap first, then deterministic key order.
+                candidates.append(
+                    (
+                        src_iou + tgt_iou,
+                        min(src_iou, tgt_iou),
+                        str(_relation_key(gold_ordered[gi], "strict")),
+                        str(_relation_key(pred_ordered[pi], "strict")),
+                        gi,
+                        pi,
+                    )
+                )
+
+        candidates.sort(key=lambda c: (-c[0], -c[1], c[2], c[3]))
+
+        used_gold_idx: Set[int] = set()
+        used_pred_idx: Set[int] = set()
+        tp_pairs: List[Dict[str, str]] = []
+        for _, _, gk, pk, gi, pi in candidates:
+            if gi in used_gold_idx or pi in used_pred_idx:
+                continue
+            used_gold_idx.add(gi)
+            used_pred_idx.add(pi)
+            tp_pairs.append({"gold": gk, "predicted": pk})
+
+        tp = len(used_gold_idx)
+        fp = len(pred_ordered) - tp
+        fn = len(gold_ordered) - tp
+
+        unmatched_gold = [
+            str(_relation_key(gold_ordered[gi], "strict"))
+            for gi in range(len(gold_ordered))
+            if gi not in used_gold_idx
+        ]
+        unmatched_pred = [
+            str(_relation_key(pred_ordered[pi], "strict"))
+            for pi in range(len(pred_ordered))
+            if pi not in used_pred_idx
+        ]
+
+        if max_examples:
+            shown_tp_pairs = tp_pairs[:max_examples]
+            shown_missing = unmatched_gold[:max_examples]
+            shown_spurious = unmatched_pred[:max_examples]
+        else:
+            shown_tp_pairs = tp_pairs
+            shown_missing = unmatched_gold
+            shown_spurious = unmatched_pred
+
         out = precision_recall_f1(tp=tp, fp=fp, fn=fn)
         out["mode"] = "relaxed"
-        out["errors"] = {"relaxed_mismatch": fp}
+        out["errors"] = {
+            "relaxed_mismatch": fp,
+            "missing": fn,
+            "spurious": fp,
+        }
         out["examples"] = {
-            "matched_pairs": tp_pairs[:max_examples] if max_examples else tp_pairs,
-            "missing": [{"gold": g} for g in unmatched_gold[:max_examples] if max_examples] if max_examples else [{"gold": g} for g in unmatched_gold],
-            "spurious": [{"predicted": p} for p in unmatched_pred[:max_examples] if max_examples] if max_examples else [{"predicted": p} for p in unmatched_pred]
+            "matched_pairs": shown_tp_pairs,
+            "missing": [{"gold": g} for g in shown_missing],
+            "spurious": [{"predicted": p} for p in shown_spurious],
         }
         return out
 
