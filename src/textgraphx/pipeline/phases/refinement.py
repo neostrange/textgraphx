@@ -2783,7 +2783,7 @@ if __name__ == '__main__':
         marker_q = """
         MERGE (r:RefinementRun {id: $id})
         SET r.timestamp = $ts, r.passes = $passes
-        RETURN id(r) as result
+        RETURN elementId(r) as result
         """
         tp.graph.run(marker_q, {"id": run_id, "ts": run_id, "passes": passes}).data()
         logger.info("Recorded RefinementRun %s with %d passes", run_id, len(passes))
@@ -2860,7 +2860,7 @@ if __name__ == '__main__':
 # 2nd step where we set the labels for the non-core fa arguments
 # MATCH (fa:FrameArgument)
 # WHERE fa.argumentType is not NULL
-# CALL apoc.create.addLabels(id(fa), [fa.argumentType]) YIELD node
+# CALL apoc.create.addLabels(elementId(fa), [fa.argumentType]) YIELD node
 # RETURN node
 
 

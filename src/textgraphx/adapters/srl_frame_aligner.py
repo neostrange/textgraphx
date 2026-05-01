@@ -111,7 +111,7 @@ def maybe_align_frames(
     FOREACH (_ IN CASE WHEN $is_light_verb THEN [1] ELSE [] END |
         SET vf.is_light_verb_host = true
     )
-    RETURN id(r) AS rel_id
+    RETURN elementId(r) AS rel_id
     """
     params = {
         "verbal_id": verbal_frame_id,

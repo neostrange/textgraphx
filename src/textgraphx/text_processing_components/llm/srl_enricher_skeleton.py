@@ -111,7 +111,7 @@ class SRLEnricher(GraphDBBase):
 
                 query = f"""
                 MATCH (n)
-                WHERE id(n) = {participant_id}
+                WHERE elementId(n) = {participant_id}
                 SET n:{entity_label}
                 """
                 queries.append(query)
@@ -125,7 +125,7 @@ class SRLEnricher(GraphDBBase):
 
         event_query = f"""
         MATCH (e)
-        WHERE id(e) = {event_id}
+        WHERE elementId(e) = {event_id}
         SET e:{event_type}
         """
         queries.append(event_query)

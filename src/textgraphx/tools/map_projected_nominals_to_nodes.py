@@ -17,7 +17,7 @@ MATCH (m)
 WHERE (m.start_tok = $start AND m.end_tok = $end AND (m.doc_id = $doc_id OR EXISTS {
     MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:IN_MENTION]->(m)
 }))
-RETURN id(m) AS node_id, labels(m) AS labels, properties(m) AS props
+RETURN elementId(m) AS node_id, labels(m) AS labels, properties(m) AS props
 LIMIT 5
 """
 

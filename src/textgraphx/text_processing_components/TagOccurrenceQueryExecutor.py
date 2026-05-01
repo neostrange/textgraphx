@@ -23,7 +23,7 @@ class TagOccurrenceQueryExecutor:
 
     def get_tag_occurrence_query(self, store_tag):
         if store_tag:
-            return """MATCH (sentence:Sentence) WHERE id(sentence) = $sentence_id
+            return """MATCH (sentence:Sentence) WHERE elementId(sentence) = $sentence_id
                 WITH sentence, $tag_occurrences as tags
                 FOREACH ( idx IN range(0,size(tags)-2) |
                 MERGE (tagOccurrence1:TagOccurrence {id: tags[idx].id})
@@ -35,10 +35,10 @@ class TagOccurrenceQueryExecutor:
                 MERGE (tagOccurrence1)-[r:HAS_NEXT {sentence: sentence.id}]->(tagOccurrence2))
                 FOREACH (tagItem in [tag_occurrence IN $tag_occurrences WHERE tag_occurrence.is_stop = False] | 
                 MERGE (tag:Tag {id: tagItem.lemma}) MERGE (tagOccurrence:TagOccurrence {id: tagItem.id}) MERGE (tag)<-[:HAS_LEMMA]-(tagOccurrence))
-                RETURN id(sentence) as result
+                RETURN elementId(sentence) as result
             """
         else:
-            return """MATCH (sentence:Sentence) WHERE id(sentence) = $sentence_id
+            return """MATCH (sentence:Sentence) WHERE elementId(sentence) = $sentence_id
             WITH sentence, $tag_occurrences as tags
             FOREACH ( idx IN range(0,size(tags)-2) |
             MERGE (tagOccurrence1:TagOccurrence {id: tags[idx].id})
@@ -48,5 +48,5 @@ class TagOccurrenceQueryExecutor:
             SET tagOccurrence2 = tags[idx + 1]
             MERGE (sentence)-[:HAS_TOKEN]->(tagOccurrence2)
             MERGE (tagOccurrence1)-[r:HAS_NEXT {sentence: sentence.id}]->(tagOccurrence2))
-            RETURN id(sentence) as result
+            RETURN elementId(sentence) as result
         """

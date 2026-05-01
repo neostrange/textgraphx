@@ -77,7 +77,7 @@ class SRLProcessor:
         FOREACH (_ IN CASE WHEN $sense_conf IS NULL THEN [] ELSE [1] END |
             SET f.sense_conf = $sense_conf
         )
-        RETURN id(f) as frame_node_id
+        RETURN elementId(f) as frame_node_id
         """
         params = {
             "frame_id": frame_id,
@@ -145,7 +145,7 @@ class SRLProcessor:
         SET a.head = $head, a.headTokenIndex = $head_index, a.type = $arg_type, a.text = $text,
             a.start_tok = $start, a.end_tok = $end,
             a.startIndex = $start, a.endIndex = $end
-        RETURN id(a) as arg_node_id
+        RETURN elementId(a) as arg_node_id
         """
         params = {"arg_id": arg_id, "head": head, "head_index": head_index, "arg_type": arg_type, "text": text, "start": start, "end": end}
         self.graph.run(query, params)
@@ -172,7 +172,7 @@ class SRLProcessor:
         FOREACH (_ IN CASE WHEN $predicative      THEN [1] ELSE [] END | SET r.predicative      = true)
         MERGE (a)-[cr:HAS_FRAME_ARGUMENT]->(f)
         SET cr.type = $canonical, cr.raw_role = $raw
-        RETURN id(r)
+        RETURN elementId(r)
         """
         params = {
             "arg_id": arg_id,

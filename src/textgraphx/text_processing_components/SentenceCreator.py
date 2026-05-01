@@ -12,7 +12,7 @@ class SentenceCreator:
             MERGE (sentence:Sentence {id: $sentence_unique_id})
             SET sentence.text = $text
             MERGE (ann)-[:CONTAINS_SENTENCE]->(sentence)
-            RETURN id(sentence) as result
+            RETURN elementId(sentence) as result
         """
         params = {"ann_id": annotated_text, "text": sentence.text, "sentence_unique_id": str(text_id) + "_" + str(sentence_id)}
         logger.debug("Creating sentence node for text_id=%s sentence_id=%s", text_id, sentence_id)

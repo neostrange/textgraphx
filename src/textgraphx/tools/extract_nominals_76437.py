@@ -19,7 +19,7 @@ QUERY = r"""
 MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok:TagOccurrence)-[:IN_MENTION]->(m)
 WHERE toLower(coalesce(m.syntactic_type, m.syntacticType, '')) IN ['nom','nominal']
 WITH DISTINCT m
-RETURN id(m) AS node_id,
+RETURN elementId(m) AS node_id,
        labels(m) AS labels,
        coalesce(m.value, m.text, '') AS value,
        coalesce(m.head, '') AS head,

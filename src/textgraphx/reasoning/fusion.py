@@ -28,7 +28,7 @@ def fuse_entities_cross_sentence(
     MATCH (s)-[:HAS_TOKEN]->(to1:TagOccurrence)-[:IN_MENTION]->(ne1:NamedEntity)-[:REFERS_TO]->(e1:Entity)
     MATCH (s)-[:HAS_TOKEN]->(to2:TagOccurrence)-[:IN_MENTION]->(ne2:NamedEntity)-[:REFERS_TO]->(e2:Entity)
     WHERE e1 <> e2
-      AND id(e1) < id(e2)
+      AND elementId(e1) < elementId(e2)
       AND ($doc_id IS NULL OR d.id = $doc_id)
     MERGE (e1)-[r:CO_OCCURS_WITH]->(e2)
     ON CREATE SET
@@ -70,7 +70,7 @@ def fuse_entities_cross_document(
             -[:IN_MENTION]->(:NamedEntity)-[:REFERS_TO]->(e2:Entity)
     WHERE d1.id <> d2.id
       AND e1 <> e2
-      AND id(e1) < id(e2)
+      AND elementId(e1) < elementId(e2)
       AND e1.kb_id IS NOT NULL
       AND e1.kb_id <> ""
       AND e1.kb_id = e2.kb_id
@@ -125,7 +125,7 @@ def propagate_coreference_identity_cross_document(
                 -[:IN_MENTION]->(m2)-[:REFERS_TO]->(e2:Entity)
     WHERE d1.id <> d2.id
       AND e1 <> e2
-      AND id(e1) < id(e2)
+      AND elementId(e1) < elementId(e2)
       AND (m1:NamedEntity OR m1:CorefMention OR m1:Antecedent)
       AND (m2:NamedEntity OR m2:CorefMention OR m2:Antecedent)
     WITH e1, e2,

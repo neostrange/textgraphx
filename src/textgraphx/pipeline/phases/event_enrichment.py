@@ -196,7 +196,7 @@ class EventEnrichmentPhase():
         query = f"""
         MATCH (em:EventMention)-[:REFERS_TO]->(te:TEvent)
         WHERE em.{field_name} IS NOT NULL
-        RETURN id(te) AS te_id,
+        RETURN elementId(te) AS te_id,
                te.{field_name} AS existing_value,
                em.{field_name} AS incoming_value,
                te.{field_name}Source AS existing_source,
@@ -234,7 +234,7 @@ class EventEnrichmentPhase():
             resolved = item["resolved"]
             update_query = f"""
             MATCH (te:TEvent)
-            WHERE id(te) = $te_id
+            WHERE elementId(te) = $te_id
             SET te.{field_name} = $value,
                 te.{field_name}Source = $source,
                 te.{field_name}Confidence = $confidence,
@@ -815,7 +815,7 @@ class EventEnrichmentPhase():
           AND coalesce(f_secondary.provisional, false) = false
         MATCH (f_canonical)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_canonical:TEvent)
         MATCH (f_secondary)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_secondary:TEvent)
-        WHERE id(e_canonical) <> id(e_secondary)
+        WHERE elementId(e_canonical) <> elementId(e_secondary)
           AND coalesce(e_secondary.merged, false) = false
         WITH e_canonical, e_secondary
         MATCH (em:EventMention)-[:REFERS_TO]->(e_secondary)
@@ -844,11 +844,11 @@ class EventEnrichmentPhase():
         WHERE coalesce(aw.sense_conflict, false) = false
         MATCH (f_canonical)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_canonical:TEvent)
         MATCH (f_secondary)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_secondary:TEvent)
-        WHERE id(e_canonical) <> id(e_secondary)
+        WHERE elementId(e_canonical) <> elementId(e_secondary)
           AND coalesce(e_secondary.merged, false) = false
         WITH e_canonical, e_secondary
         MATCH (e_secondary)-[tl:TLINK]->(other)
-        WHERE id(other) <> id(e_canonical)
+        WHERE elementId(other) <> elementId(e_canonical)
           AND coalesce(tl.suppressed, false) = false
         MERGE (e_canonical)-[new_tl:TLINK {relType: coalesce(tl.relTypeCanonical, tl.relType, 'VAGUE')}]->(other)
         ON CREATE SET
@@ -876,11 +876,11 @@ class EventEnrichmentPhase():
         WHERE coalesce(aw.sense_conflict, false) = false
         MATCH (f_canonical)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_canonical:TEvent)
         MATCH (f_secondary)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_secondary:TEvent)
-        WHERE id(e_canonical) <> id(e_secondary)
+        WHERE elementId(e_canonical) <> elementId(e_secondary)
           AND coalesce(e_secondary.merged, false) = false
         WITH e_canonical, e_secondary
         MATCH (other)-[tl:TLINK]->(e_secondary)
-        WHERE id(other) <> id(e_canonical)
+        WHERE elementId(other) <> elementId(e_canonical)
           AND coalesce(tl.suppressed, false) = false
         MERGE (other)-[new_tl:TLINK {relType: coalesce(tl.relTypeCanonical, tl.relType, 'VAGUE')}]->(e_canonical)
         ON CREATE SET
@@ -908,7 +908,7 @@ class EventEnrichmentPhase():
         WHERE coalesce(aw.sense_conflict, false) = false
         MATCH (f_canonical)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_canonical:TEvent)
         MATCH (f_secondary)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_secondary:TEvent)
-        WHERE id(e_canonical) <> id(e_secondary)
+        WHERE elementId(e_canonical) <> elementId(e_secondary)
           AND coalesce(e_secondary.merged, false) = false
         WITH e_canonical, e_secondary
         SET e_secondary.merged      = true,
