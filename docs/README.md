@@ -29,6 +29,12 @@ The repo-level entry point is [../DOCUMENTATION.md](../DOCUMENTATION.md) (gatewa
 - [MEANTIME_GAP_ANALYSIS.md](MEANTIME_GAP_ANALYSIS.md)
 - [EVALUATION_ARTIFACT_RETENTION_POLICY.md](EVALUATION_ARTIFACT_RETENTION_POLICY.md)
 
+## NLP Components
+
+- [SRL_FRAMEWORKS.md](SRL_FRAMEWORKS.md) — PropBank (verbal) and NomBank (nominal) SRL, role normalization, `ALIGNS_WITH`
+- [COREF_POLICY.md](COREF_POLICY.md) — Coreference backend decision; maverick-coref deprecation
+- [nombank_integration.md](nombank_integration.md) — CogComp SRL-English integration notes
+
 ## Architecture & Governance
 
 - [schema-evolution-plan.md](schema-evolution-plan.md)

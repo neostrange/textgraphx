@@ -5,6 +5,24 @@ planned removal timeline.
 
 ---
 
+## Active Deprecations (current release)
+
+### maverick-coref integration
+
+| Item | Replacement |
+|------|-------------|
+| `MAVERICK_COREF_URL` env-var | Remove; use spacy-experimental-coref (no env-var needed) |
+| `TEXTGRAPHX_MAVERICK_COREF_URL` env-var | Remove; same as above |
+
+**Reason:** maverick-coref was evaluated and rejected due to CPU cost.
+Setting either env-var triggers a `DeprecationWarning` at config load time.
+See [docs/COREF_POLICY.md](docs/COREF_POLICY.md) for re-evaluation criteria.
+
+**Removal target:** v1.1.0 — env-var detection code will be removed; any scripts
+setting these vars will silently do nothing.
+
+---
+
 ## v2.0.0 Removals (scheduled)
 
 The following methods emit `DeprecationWarning` at runtime as of the current

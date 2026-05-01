@@ -43,6 +43,9 @@ textgraphx distinguishes itself from generic NLP-to-graph stacks (e.g., spaCy + 
 | Scheduling | APScheduler | ≥ 3.10 |
 | Logging | python-json-logger | ≥ 2.0 |
 | Testing | pytest + pytest-asyncio + pytest-cov + pytest-mock | ≥ 7.0 |
+| Verbal SRL | transformer-srl 2.4.6 | Port 8010 (`/predict`) |
+| Nominal SRL | CogComp SRL-English (NomBank) | Port 8011 (`/predict_nom`) |
+| Coreference | spacy-experimental-coref | In-process spaCy component |
 
 License posture: **open source, permissively licensed** components preferred. See [pyproject.toml](../pyproject.toml) for the authoritative dependency list.
 
@@ -128,13 +131,40 @@ When schema statements conflict, the higher-precedence source wins:
 
 **Node labels.** `AnnotatedText`, `Sentence`, `TagOccurrence`, `NamedEntity`, `Entity`, `TimexMention`, `TIMEX`, `TEvent`, `EventMention`, `Frame`, `FrameArgument`.
 
-**Relationships.** `HAS_TOKEN`, `HAS_NEXT`, `IS_DEPENDENT`, `REFERS_TO`, `EVENT_PARTICIPANT`, `INSTANTIATES`, `TLINK`, `HAS_LEMMA`.
+**Relationships.** `HAS_TOKEN`, `HAS_NEXT`, `IS_DEPENDENT`, `REFERS_TO`, `EVENT_PARTICIPANT`, `INSTANTIATES`, `TLINK`, `HAS_LEMMA`, `ALIGNS_WITH`.
 
 **Required properties.** `doc_id`, `start_tok`, `end_tok`, `text`, `lemma`, `confidence`, `source`.
 
 ### 5.7 Mention vs Canonical Layer
 
 The mention layer is explicitly separated from the canonical layer wherever feasible: e.g., `NamedEntity` (mention surface form) is distinct from `Entity` (canonical referent). Coreference and entity linking populate the `REFERS_TO` bridge.
+
+### 5.8 Semantic Role Labeling (SRL) Frameworks
+
+textgraphx ingests evidence from two SRL frameworks. Both are first-class but must be persisted with explicit framework attribution.
+
+| Framework | Service | Port | Predicates | Sense field |
+|-----------|---------|------|------------|-------------|
+| PROPBANK | transformer-srl 2.4.6 | 8010 | Verbal | `frame` (e.g., `attack.01`) |
+| NOMBANK | CogComp SRL-English | 8011 | Nominal | `sense` (e.g., `attack.01`) |
+
+**Rules for all SRL code:**
+
+- Every `Frame` node **must** carry `framework ∈ {PROPBANK, NOMBANK}`. Default `PROPBANK` is permitted only for the verbal writer path.
+- `sense` and `sense_conf` are advisory-tier properties; they are mandatory when the upstream service supplies them, otherwise omitted (never `null`).
+- `provisional = true` is set on frames whose `sense_conf` is below `config.ingestion.frame_confidence_min` (default 0.50).
+- Argument labels are **normalized at ingestion**: `C-`/`R-` prefixes become edge properties (`is_continuation`, `is_relative`); `-PRD` suffix becomes `predicative=true`. The original label is preserved as `raw_role` on the edge.
+- Verbal and nominal frames describing the same situation (same headword lemma, head token within `TOKEN_WINDOW=5`) are linked with `(:Frame)-[:ALIGNS_WITH]->(:Frame)`. The higher-confidence frame is the canonical `INSTANTIATES` target.
+- Light-verb constructions (make/give/take/have/do/get…) set `is_light_verb_host=true` on the verbal frame; the nominal frame carries the event.
+- The SRL service URL defaults are: `srl_url=http://localhost:8010/predict`, `nom_srl_url=http://localhost:8011/predict_nom`. Override with `TEXTGRAPHX_SRL_URL` / `TEXTGRAPHX_NOM_SRL_URL`. An empty `nom_srl_url` disables the nominal pass.
+- A legacy-schema warning is emitted (as `WARNING`) when the SRL service returns AllenNLP-style responses (no `frame` field). See `adapters/rest_caller.py::_detect_legacy_srl_schema`.
+
+### 5.9 Coreference Backend Policy
+
+- **Canonical backend:** `spacy-experimental-coref` (in-process spaCy component).
+- maverick-coref is **deprecated** due to CPU cost. Setting `MAVERICK_COREF_URL` or `TEXTGRAPHX_MAVERICK_COREF_URL` triggers a `DeprecationWarning` at config load. See [docs/COREF_POLICY.md](../docs/COREF_POLICY.md).
+- Every `REFERS_TO` edge written from coref must carry `source='spacy-experimental-coref'` and a deterministic `cluster_id`.
+- Do **not** add code paths that depend on maverick-coref without first updating `COREF_POLICY.md` and meeting all re-evaluation criteria defined there.
 
 ---
 

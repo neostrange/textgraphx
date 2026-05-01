@@ -852,6 +852,8 @@ class EventEnrichmentPhaseWrapper:
                 # Run all enrichment steps
                 enrichment_steps = [
                     ("Linking frame arguments to events", enricher.link_frameArgument_to_event),
+                    ("Promoting NOMBANK frames to TEvents (D2)", enricher.promote_nombank_frames_to_tevents),
+                    ("Merging ALIGNS_WITH event clusters (D-Refinement)", enricher.merge_aligns_with_event_clusters),
                     ("Adding core participants to events", enricher.add_core_participants_to_event),
                     ("Adding non-core participants to events", enricher.add_non_core_participants_to_event),
                     ("Adding labels to non-core frame arguments", enricher.add_label_to_non_core_fa),
@@ -1588,6 +1590,8 @@ class TlinksRecognizerWrapper:
                     (5, recognizer.create_tlinks_case5, "Case 5: Special Cases"),
                     (6, recognizer.create_tlinks_case6, "Case 6: Final TLINK Patterns"),
                     (7, recognizer.create_tlinks_case7, "Case 7: Clause/Scope Connective TLINKs"),
+                    (8, recognizer.create_tlinks_case8, "Case 8: NOMBANK Event–DCT Anchors"),
+                    (9, recognizer.create_tlinks_case9, "Case 9: NOMBANK Event–Sentence TIMEX"),
                 ]
                 
                 self.logger.info(f"Starting {len(tlink_cases)} TLINK recognition cases")

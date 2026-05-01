@@ -48,13 +48,17 @@ class ServicesConfig:
     wsd_url: str = "http://localhost:81/api/model"
     # Optional external coreference service.
     # Keep empty to prefer spaCy/pipe-provided coreference clusters.
+    # Canonical coref backend: spacy-experimental-coref (see docs/COREF_POLICY.md).
     coref_url: str = ""
     temporal_url: str = "http://localhost:5050/annotate"
     heideltime_url: str = "http://localhost:5000/annotate"
-    srl_url: str = "http://localhost:8000/predict"
-    # Optional nominal SRL service (CogComp/SRL-English nominal pipeline).
+    # transformer-srl 2.4.6 (PropBank verbal SRL). Port 8010.
+    # Set TEXTGRAPHX_SRL_URL or srl_url in config.ini to override.
+    srl_url: str = "http://localhost:8010/predict"
+    # CogComp nominal SRL (NomBank). Port 8011.
     # Empty string disables the nominal SRL extraction pass.
-    nom_srl_url: str = ""
+    # Set TEXTGRAPHX_NOM_SRL_URL or nom_srl_url in config.ini to override.
+    nom_srl_url: str = "http://localhost:8011/predict_nom"
     llm_url: str = "http://localhost:11434/api/generate"
     dbpedia_sparql_url: str = "https://dbpedia.org/sparql"
     dbpedia_spotlight_url: str = "https://api.dbpedia-spotlight.org/en/annotate"
@@ -87,6 +91,23 @@ class FeatureFlags:
 
 
 @dataclass
+class IngestionConfig:
+    """Confidence gating thresholds for SRL frame and argument ingestion.
+
+    Frames with sense_conf below ``frame_confidence_min`` are still stored but
+    are tagged ``provisional=True`` so downstream phases can filter them.
+    Arguments with confidence below ``argument_confidence_min`` are dropped
+    (not persisted) and the count is recorded in the phase completion marker.
+    """
+    # Minimum confidence for a Frame to be treated as non-provisional.
+    # Range [0.0, 1.0].  Set to 0.0 to disable gating.
+    frame_confidence_min: float = 0.50
+    # Minimum confidence for a FrameArgument to be persisted at all.
+    # Range [0.0, 1.0].  Set to 0.0 to persist all arguments.
+    argument_confidence_min: float = 0.40
+
+
+@dataclass
 class Config:
     neo4j: Neo4jConfig
     logging: LoggingConfig
@@ -95,10 +116,13 @@ class Config:
     features: FeatureFlags
     runtime: RuntimeConfig
     services: ServicesConfig = None
+    ingestion: IngestionConfig = None
 
     def __post_init__(self):
         if self.services is None:
             self.services = ServicesConfig()
+        if self.ingestion is None:
+            self.ingestion = IngestionConfig()
 
 
 _CACHED: Optional[Config] = None
@@ -450,6 +474,19 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
             or os.getenv('COREF_SERVICE_URL')
             or services.coref_url
         )
+        # Emit a deprecation warning if the discarded maverick-coref env-var is
+        # present.  maverick-coref was evaluated and rejected due to CPU cost;
+        # spacy-experimental-coref is the canonical backend.
+        if os.getenv('MAVERICK_COREF_URL') or os.getenv('TEXTGRAPHX_MAVERICK_COREF_URL'):
+            import warnings
+            warnings.warn(
+                "MAVERICK_COREF_URL / TEXTGRAPHX_MAVERICK_COREF_URL are set but "
+                "maverick-coref has been deprecated and is no longer supported. "
+                "The canonical coreference backend is spacy-experimental-coref. "
+                "See docs/COREF_POLICY.md for details.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         services.temporal_url = (
             os.getenv('TEXTGRAPHX_TEMPORAL_URL')
             or os.getenv('TEMPORAL_SERVICE_URL')
@@ -513,6 +550,62 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
             except Exception:
                 pass
 
+    ingestion = IngestionConfig()
+
+    # -- ingestion section (INI / TOML) and env-var overrides --
+    # The ingestion section is optional; defaults from IngestionConfig are used
+    # when absent.  Environment variables are checked after file parsing.
+    if file_cfg:
+        ext_lower = os.path.splitext(file_cfg)[1].lower()
+        if ext_lower in ('.ini', ''):
+            cp_existing = _read_ini(file_cfg)
+            if cp_existing.has_section('ingestion'):
+                try:
+                    ingestion.frame_confidence_min = float(
+                        cp_existing.get('ingestion', 'frame_confidence_min',
+                                        fallback=str(ingestion.frame_confidence_min))
+                    )
+                except Exception:
+                    pass
+                try:
+                    ingestion.argument_confidence_min = float(
+                        cp_existing.get('ingestion', 'argument_confidence_min',
+                                        fallback=str(ingestion.argument_confidence_min))
+                    )
+                except Exception:
+                    pass
+        else:
+            if file_cfg:
+                tom_existing = _read_toml(file_cfg)
+                ing_map = tom_existing.get('ingestion', {})
+                if ing_map:
+                    try:
+                        ingestion.frame_confidence_min = float(
+                            ing_map.get('frame_confidence_min', ingestion.frame_confidence_min)
+                        )
+                    except Exception:
+                        pass
+                    try:
+                        ingestion.argument_confidence_min = float(
+                            ing_map.get('argument_confidence_min', ingestion.argument_confidence_min)
+                        )
+                    except Exception:
+                        pass
+
+    if allow_env:
+        env_frame_min = os.getenv('TEXTGRAPHX_FRAME_CONFIDENCE_MIN')
+        if env_frame_min is not None:
+            try:
+                ingestion.frame_confidence_min = float(env_frame_min)
+            except Exception:
+                pass
+        env_arg_min = os.getenv('TEXTGRAPHX_ARGUMENT_CONFIDENCE_MIN')
+        if env_arg_min is not None:
+            try:
+                ingestion.argument_confidence_min = float(env_arg_min)
+            except Exception:
+                pass
+
     if runtime.mode not in {"production", "testing"}:
         raise ValueError("runtime.mode must be either 'production' or 'testing'")
     runtime.naf_sentence_mode = _coerce_naf_sentence_mode(runtime.naf_sentence_mode)
@@ -525,6 +618,7 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
         features=features,
         runtime=runtime,
         services=services,
+        ingestion=ingestion,
     )
     if path is None:
         _CACHED = cfg

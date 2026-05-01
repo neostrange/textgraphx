@@ -101,6 +101,27 @@ Run any combination of these phases in order:
 - Neo4j database running on `localhost:7687`
 - Credentials: neo4j / neo4j (default)
 
+### External NLP Services
+
+| Service | Port | Endpoint | Notes |
+|---------|------|----------|-------|
+| transformer-srl 2.4.6 (verbal PropBank) | 8010 | `POST /predict` | Required for verbal SRL |
+| CogComp SRL-English (nominal NomBank) | 8011 | `POST /predict_nom` | Optional; set `nom_srl_url = ""` to disable |
+
+Override the defaults via environment variables:
+
+```bash
+export TEXTGRAPHX_SRL_URL=http://localhost:8010/predict
+export TEXTGRAPHX_NOM_SRL_URL=http://localhost:8011/predict_nom  # set empty to disable
+```
+
+Health-check one-liner:
+
+```bash
+curl -sf http://localhost:8010/predict -d '{"sentence":"test"}' -H 'Content-Type: application/json' | python -m json.tool | head
+curl -sf http://localhost:8011/predict_nom -d '{"sentence":"test"}' -H 'Content-Type: application/json' | python -m json.tool | head
+```
+
 ## NAF Sentence Segmentation Mode
 
 Ingestion supports configurable NAF raw-text normalization before spaCy sentence splitting:

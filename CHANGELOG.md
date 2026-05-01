@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] — feature/new-features-2026-05-01
+
+### Added
+
+#### SRL dual-framework integration (Phases A–E, H)
+
+- **Config:** `srl_url` default updated to `http://localhost:8010/predict` (transformer-srl 2.4.6). `nom_srl_url` default updated to `http://localhost:8011/predict_nom` (CogComp SRL-English). Setting either to `""` disables that pass. New `IngestionConfig` dataclass with `frame_confidence_min=0.50` and `argument_confidence_min=0.40` gating thresholds. See [docs/SRL_FRAMEWORKS.md](docs/SRL_FRAMEWORKS.md).
+- **Legacy-schema detection:** `adapters/rest_caller.py::_detect_legacy_srl_schema()` — emits `WARNING` when the upstream SRL service returns AllenNLP-style responses (no `frame` field).
+- **Role normalization:** `adapters/srl_role_normalizer.py` — `normalize_role()` maps `C-`/`R-` prefixes and `-PRD` suffix to edge properties (`is_continuation`, `is_relative`, `predicative`). Raw label preserved as `raw_role`.
+- **Nominal SRL write path:** `SRLProcessor.process_nominal_srl()` and `_link_argument_to_frame()` integrate NomBank frames with `framework=NOMBANK`, normalized argument edges, `sense`/`sense_conf` advisory properties, and `provisional` flag.
+- **Confidence gating:** `Frame.provisional = true` when `sense_conf < frame_confidence_min`.
+- **Cross-framework alignment:** `adapters/srl_frame_aligner.py` — `run_cross_framework_alignment()` creates optional `ALIGNS_WITH` edges between PROPBANK and NOMBANK frames sharing headword and within `TOKEN_WINDOW=5`. Light-verb detection: sets `is_light_verb_host=true` on verbal frame.
+- **Migration 0028:** `schema/migrations/0028_frame_srl_framework_indexes.cypher` — indexes on `framework`, `sense`, `provisional`; PROPBANK backfill.
+- **Tests:** 42 new unit/contract tests covering role normalization, nominal writer path, config, and health-check.
+- **Coreference policy:** maverick-coref deprecated. `MAVERICK_COREF_URL` / `TEXTGRAPHX_MAVERICK_COREF_URL` trigger `DeprecationWarning` at config load. See [docs/COREF_POLICY.md](docs/COREF_POLICY.md) and [DEPRECATION.md](DEPRECATION.md).
+
+### Changed
+
+- `copilot-instructions.md` §2 tech stack table updated with SRL service port entries.
+- `copilot-instructions.md` §5.6 `ALIGNS_WITH` added to relationship vocabulary.
+- `copilot-instructions.md` §5.8 and §5.9 added (SRL Frameworks and Coref Backend Policy).
+- `docs/schema.md` — `ALIGNS_WITH` edge documented; `Frame` advisory properties updated.
+- `docs/RUNNING_PIPELINE.md` — service ports table and health-check commands added.
+- `DOCUMENTATION.md` and `docs/README.md` — NLP Components section added linking new docs.
+
+### Deprecated
+
+- maverick-coref integration. See [DEPRECATION.md](DEPRECATION.md) for removal timeline.
+
+---
+
 ## [0.1.0] — 2026-04-30
 
 ### Added
