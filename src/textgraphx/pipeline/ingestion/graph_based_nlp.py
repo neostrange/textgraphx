@@ -408,6 +408,24 @@ class GraphBasedNLP(GraphDBBase):
             # Process SRL tags from spacy doc and store them into neo4j
             #self.__text_processor.process_srl(doc)
             self.__text_processor.srl_processor.process_srl(doc)
+
+            # Optional: nominal SRL via the CogComp microservice. The call is a
+            # no-op when `services.nom_srl_url` is unset (callNominalSrlApi
+            # returns {} in that case), so this block is safe to leave in by
+            # default.
+            try:
+                from textgraphx.adapters.rest_caller import callNominalSrlApi
+                nom_results = []
+                for sent in doc.sents:
+                    resp = callNominalSrlApi(sent.text)
+                    if resp:
+                        nom_results.append((sent.start, resp))
+                if nom_results:
+                    self.__text_processor.srl_processor.process_nominal_srl(
+                        doc, nom_results,
+                    )
+            except Exception:  # pragma: no cover - service is advisory
+                logger.exception("Nominal SRL pass failed; continuing without it")
             # Define the rules for relationship extraction
             rules = [
                 {

@@ -46,10 +46,15 @@ class PathsConfig:
 class ServicesConfig:
     service_timeout_sec: int = 20
     wsd_url: str = "http://localhost:81/api/model"
-    coref_url: str = "http://localhost:9999/coreference_resolution"
+    # Optional external coreference service.
+    # Keep empty to prefer spaCy/pipe-provided coreference clusters.
+    coref_url: str = ""
     temporal_url: str = "http://localhost:5050/annotate"
     heideltime_url: str = "http://localhost:5000/annotate"
     srl_url: str = "http://localhost:8000/predict"
+    # Optional nominal SRL service (CogComp/SRL-English nominal pipeline).
+    # Empty string disables the nominal SRL extraction pass.
+    nom_srl_url: str = ""
     llm_url: str = "http://localhost:11434/api/generate"
     dbpedia_sparql_url: str = "https://dbpedia.org/sparql"
     dbpedia_spotlight_url: str = "https://api.dbpedia-spotlight.org/en/annotate"
@@ -257,6 +262,7 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
                 services.temporal_url = cp.get('services', 'temporal_url', fallback=services.temporal_url)
                 services.heideltime_url = cp.get('services', 'heideltime_url', fallback=services.heideltime_url)
                 services.srl_url = cp.get('services', 'srl_url', fallback=services.srl_url)
+                services.nom_srl_url = cp.get('services', 'nom_srl_url', fallback=services.nom_srl_url)
                 services.llm_url = cp.get('services', 'llm_url', fallback=services.llm_url)
                 services.dbpedia_sparql_url = cp.get('services', 'dbpedia_sparql_url', fallback=services.dbpedia_sparql_url)
                 services.dbpedia_spotlight_url = cp.get('services', 'dbpedia_spotlight_url', fallback=services.dbpedia_spotlight_url)
@@ -354,6 +360,7 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
             services.temporal_url = svc_map.get('temporal_url', services.temporal_url)
             services.heideltime_url = svc_map.get('heideltime_url', services.heideltime_url)
             services.srl_url = svc_map.get('srl_url', services.srl_url)
+            services.nom_srl_url = svc_map.get('nom_srl_url', services.nom_srl_url)
             services.llm_url = svc_map.get('llm_url', services.llm_url)
             services.dbpedia_sparql_url = svc_map.get('dbpedia_sparql_url', services.dbpedia_sparql_url)
             services.dbpedia_spotlight_url = svc_map.get('dbpedia_spotlight_url', services.dbpedia_spotlight_url)
@@ -457,6 +464,11 @@ def load_config(path: Optional[str] = None, allow_env: bool = True) -> Config:
             os.getenv('TEXTGRAPHX_SRL_URL')
             or os.getenv('SRL_SERVICE_URL')
             or services.srl_url
+        )
+        services.nom_srl_url = (
+            os.getenv('TEXTGRAPHX_NOM_SRL_URL')
+            or os.getenv('NOM_SRL_SERVICE_URL')
+            or services.nom_srl_url
         )
         services.llm_url = (
             os.getenv('TEXTGRAPHX_LLM_URL')

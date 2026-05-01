@@ -27,7 +27,8 @@ class SRLProcessor:
         # configuration is read from config.ini inside make_graph_from_config
         self.graph = make_graph_from_config()
 
-    def _merge_frame(self, doc_id, start, end, headword, head_index, text):
+    def _merge_frame(self, doc_id, start, end, headword, head_index, text,
+                      sense=None, sense_conf=None, framework="PROPBANK"):
         """Create (or merge) a Frame node.
 
         Args:
@@ -37,6 +38,15 @@ class SRLProcessor:
             headword: The lexical head string for the frame.
             head_index: Token index of the head token.
             text: Surface text of the frame span.
+            sense: Optional roleset sense id (e.g. ``"run.02"`` for PropBank or
+                ``"acquisition.01"`` for NomBank). Persisted as ``f.sense``
+                only when not ``None``. Advisory-tier property (per
+                ``docs/schema.md`` §5.5).
+            sense_conf: Optional float confidence for ``sense``. Persisted as
+                ``f.sense_conf`` only when not ``None``.
+            framework: Sense inventory the frame is anchored in. One of
+                ``"PROPBANK"`` (default, verb SRL) or ``"NOMBANK"`` (nominal
+                SRL via CogComp service).
 
         Returns:
             The generated frame id (string) used as the node's `id` property.
@@ -46,14 +56,33 @@ class SRLProcessor:
         query = """
         MERGE (f:Frame {id: $frame_id})
         SET f.headword = $headword, f.headTokenIndex = $head_index, f.text = $text,
-            f.framework = 'PROPBANK',
+            f.framework = $framework,
             f.start_tok = $start, f.end_tok = $end,
             f.startIndex = $start, f.endIndex = $end
+        FOREACH (_ IN CASE WHEN $sense IS NULL THEN [] ELSE [1] END |
+            SET f.sense = $sense
+        )
+        FOREACH (_ IN CASE WHEN $sense_conf IS NULL THEN [] ELSE [1] END |
+            SET f.sense_conf = $sense_conf
+        )
         RETURN id(f) as frame_node_id
         """
-        params = {"frame_id": frame_id, "headword": headword, "head_index": head_index, "text": text, "start": start, "end": end}
+        params = {
+            "frame_id": frame_id,
+            "headword": headword,
+            "head_index": head_index,
+            "text": text,
+            "start": start,
+            "end": end,
+            "framework": framework,
+            "sense": sense,
+            "sense_conf": sense_conf,
+        }
         self.graph.run(query, params)
-        logger.debug("_merge_frame created frame_id=%s for doc_id=%s span=%s-%s", frame_id, doc_id, start, end)
+        logger.debug(
+            "_merge_frame created frame_id=%s for doc_id=%s span=%s-%s framework=%s sense=%s",
+            frame_id, doc_id, start, end, framework, sense,
+        )
         return frame_id
 
     def _link_indices_to_node(self, doc_id, indices, node_label, node_id_prop, node_id):
@@ -124,7 +153,19 @@ class SRLProcessor:
             frameDict = {}
             sg_id = None
 
-            for x, indices_list in getattr(tok._, "SRL", {}).items():
+            srl_data = getattr(tok._, "SRL", {})
+            # Extract PropBank sense fields injected by extract_srl (transformer-srl service)
+            frame_sense = srl_data.get("__frame__")
+            frame_score = srl_data.get("__frame_score__")
+            try:
+                frame_score = float(frame_score) if frame_score is not None else None
+            except (TypeError, ValueError):
+                frame_score = None
+
+            for x, indices_list in srl_data.items():
+                if x.startswith("__"):
+                    # skip internal metadata keys like __frame__ / __frame_score__
+                    continue
                 for y in indices_list:
                     start = y[0]
                     end = y[-1]
@@ -132,8 +173,11 @@ class SRLProcessor:
                     token = span.root
 
                     if x == "V":
-                        # create/merge the Frame node
-                        sg_id = self._merge_frame(doc_id, start, end, token.text, token.i, span.text)
+                        # create/merge the Frame node, passing PropBank sense if available
+                        sg_id = self._merge_frame(
+                            doc_id, start, end, token.text, token.i, span.text,
+                            sense=frame_sense, sense_conf=frame_score, framework="PROPBANK",
+                        )
                         # link tag occurrences to the frame
                         indices = list(range(start, end + 1)) if len(y) == 2 else list(y)
                         self._link_indices_to_node(doc_id, indices, "Frame", "id", sg_id)
@@ -163,3 +207,113 @@ class SRLProcessor:
                         params = {"arg_id": arg_id, "frame_id": sg_id, "arg_type": arg_type}
                         self.graph.run(q, params)
                         logger.debug("Linked FrameArgument %s to Frame %s", arg_id, sg_id)
+
+    @staticmethod
+    def _bio_to_spans(tags):
+        """Convert a BIO tag sequence to a list of ``(label, start, end)``
+        triples with inclusive ``end``. Tags ``"O"`` and ``"B-V"`` are skipped
+        (the verb/predicate index is provided separately by the SRL service).
+        """
+        spans = []
+        cur_label = None
+        cur_start = None
+        for i, raw in enumerate(tags):
+            tag = str(raw or "O")
+            if tag == "O" or tag.endswith("-V"):
+                if cur_label is not None:
+                    spans.append((cur_label, cur_start, i - 1))
+                    cur_label, cur_start = None, None
+                continue
+            prefix, _, label = tag.partition("-")
+            if prefix == "B" or label != cur_label:
+                if cur_label is not None:
+                    spans.append((cur_label, cur_start, i - 1))
+                cur_label, cur_start = label, i
+        if cur_label is not None:
+            spans.append((cur_label, cur_start, len(tags) - 1))
+        return spans
+
+    def process_nominal_srl(self, doc, sentence_results):
+        """Persist nominal-SRL frames returned by the CogComp service.
+
+        Args:
+            doc: The spaCy ``Doc`` whose ``._.text_id`` identifies the document.
+            sentence_results: Iterable of ``(sentence_token_offset, response)``
+                tuples, one per sentence on which the nominal SRL service was
+                invoked. ``response`` is the JSON object returned by the
+                service ``/predict_nom`` endpoint, expected to contain
+                ``words`` and ``frames`` keys. Each frame contributes one
+                ``Frame`` node (``framework="NOMBANK"``) plus one
+                ``FrameArgument`` per non-V BIO span.
+
+        The method is a no-op if ``sentence_results`` is empty or if every
+        response is empty / missing frames -- this lets callers safely invoke
+        the service even when it is disabled or unavailable.
+        """
+        doc_id = getattr(doc._, "text_id", None)
+        if doc_id is None:
+            raise ValueError("Document must have ._.text_id set")
+        if not sentence_results:
+            return
+
+        for sent_offset, response in sentence_results:
+            if not response:
+                continue
+            words = response.get("words") or []
+            frames = response.get("frames") or []
+            if not frames:
+                continue
+            for fr in frames:
+                pred_idx_sent = fr.get("predicate_index")
+                if pred_idx_sent is None or not (0 <= pred_idx_sent < len(words)):
+                    continue
+                pred_idx_doc = sent_offset + pred_idx_sent
+                pred_text = str(fr.get("predicate") or words[pred_idx_sent])
+                sense = fr.get("sense")
+                sense_conf = fr.get("sense_score")
+                try:
+                    sense_conf = float(sense_conf) if sense_conf is not None else None
+                except (TypeError, ValueError):
+                    sense_conf = None
+
+                frame_id = self._merge_frame(
+                    doc_id, pred_idx_doc, pred_idx_doc, pred_text, pred_idx_doc,
+                    pred_text,
+                    sense=str(sense) if sense else None,
+                    sense_conf=sense_conf,
+                    framework="NOMBANK",
+                )
+                self._link_indices_to_node(
+                    doc_id, [pred_idx_doc], "Frame", "id", frame_id,
+                )
+
+                tags = fr.get("tags") or []
+                arg_spans = self._bio_to_spans(tags)
+                for label, s_sent, e_sent in arg_spans:
+                    s_doc = sent_offset + s_sent
+                    e_doc = sent_offset + e_sent
+                    span_text = " ".join(words[s_sent:e_sent + 1])
+                    head_text = str(words[e_sent])  # rightmost token as fallback head
+                    arg_id = self._merge_frame_argument(
+                        doc_id, s_doc, e_doc, head_text, e_doc, label, span_text,
+                    )
+                    self._link_indices_to_node(
+                        doc_id, list(range(s_doc, e_doc + 1)),
+                        "FrameArgument", "id", arg_id,
+                    )
+                    q = """
+                    MATCH (a:FrameArgument {id: $arg_id})
+                    MATCH (f:Frame {id: $frame_id})
+                    MERGE (a)-[r:PARTICIPANT]->(f)
+                    SET r.type = $arg_type
+                    MERGE (a)-[cr:HAS_FRAME_ARGUMENT]->(f)
+                    SET cr.type = $arg_type
+                    RETURN id(r)
+                    """
+                    self.graph.run(q, {
+                        "arg_id": arg_id, "frame_id": frame_id, "arg_type": label,
+                    })
+                logger.debug(
+                    "process_nominal_srl: doc=%s pred=%s sense=%s args=%d",
+                    doc_id, pred_text, sense, len(arg_spans),
+                )
