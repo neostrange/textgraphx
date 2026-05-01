@@ -1,14 +1,17 @@
 """CoreferenceResolver
 
-Create Antecedent and CorefMention nodes from an external coreference
-service output and link mention tokens to the created nodes. The
-implementation creates deterministic ids for nodes so other phases can
-reference them consistently.
+Create Antecedent and CorefMention nodes from either:
+1) an external coreference service output, or
+2) spaCy-provided coreference span groups (for example via
+    spacy-experimental components)
+
+and link mention tokens to the created nodes. The implementation creates
+deterministic ids for nodes so other phases can reference them consistently.
 """
 
 import requests
-import json
 from textgraphx.database.client import make_graph_from_config
+from textgraphx.infrastructure.config import get_config
 from textgraphx.utils.id_utils import make_coref_uid
 import logging
 
@@ -38,6 +41,51 @@ class CoreferenceResolver:
         self.coreference_service_endpoint = coreference_service_endpoint
         logger.debug("CoreferenceResolver initialized with endpoint=%s", coreference_service_endpoint)
 
+    @staticmethod
+    def _service_timeout_seconds() -> int:
+        """Return a bounded request timeout for external coref calls."""
+        try:
+            timeout = int(get_config().services.service_timeout_sec)
+        except Exception:
+            timeout = 20
+        return max(1, timeout)
+
+    def _extract_spacy_coref_clusters(self, doc):
+        """Extract coreference clusters from spaCy doc span groups.
+
+        This reads span groups with keys containing "coref" and returns a list
+        of clusters where each cluster is a list of inclusive token bounds
+        ``(start, end)``.
+        """
+        clusters = []
+        seen = set()
+        doc_length = len(doc)
+        span_groups = getattr(doc, "spans", {}) or {}
+
+        for key, span_group in span_groups.items():
+            if "coref" not in str(key).lower() or span_group is None:
+                continue
+
+            mentions = []
+            for span in span_group:
+                start = int(getattr(span, "start", -1))
+                end_exclusive = int(getattr(span, "end", -1))
+                if start < 0 or end_exclusive <= start or end_exclusive > doc_length:
+                    continue
+                mentions.append((start, end_exclusive - 1))
+
+            mentions = sorted(set(mentions), key=lambda item: (item[0], item[1]))
+            if len(mentions) < 2:
+                continue
+
+            key_tuple = tuple(mentions)
+            if key_tuple in seen:
+                continue
+            seen.add(key_tuple)
+            clusters.append(mentions)
+
+        return clusters
+
     def _find_named_entity_by_span(self, start_index, end_index, doc_id):
         """Return an existing NamedEntity id for an exact token span, if present.
 
@@ -49,6 +97,7 @@ class CoreferenceResolver:
         WHERE coalesce(ne.start_tok, ne.token_start, ne.index) = $start
           AND coalesce(ne.end_tok, ne.token_end, ne.end_index) = $end
         RETURN ne.id AS node_id
+            ORDER BY ne.uid, ne.id
         LIMIT 1
         """
         params = {"doc_id": doc_id, "start": start_index, "end": end_index}
@@ -81,6 +130,7 @@ class CoreferenceResolver:
                 query = """
                 MATCH (ne:NamedEntity {id: $node_id})
                 SET ne:CorefMention,
+                    ne:Mention,
                     ne.uid = coalesce(ne.uid, $node_uid),
                     ne.text = coalesce(ne.text, ne.value, $text),
                     ne.start_tok = coalesce(ne.start_tok, $start),
@@ -149,14 +199,44 @@ class CoreferenceResolver:
         logger.debug("connect_node_to_tag_occurrences: linking %d indices to node %s in doc %s", len(list(index_range)), node_id, doc_id)
         self.graph.run(query, params)
 
+    def _service_span_to_inclusive_bounds(self, span_token_indexes, doc_length):
+        """Normalize a service span to inclusive token boundaries.
+
+        The live coreference service returns two-value spans as half-open
+        `[start, end)` boundaries. Longer lists are treated as explicit token
+        indices and collapsed to their first/last index.
+        """
+        if doc_length <= 0:
+            raise ValueError("Cannot normalize coreference spans for an empty document")
+
+        values = [int(index) for index in span_token_indexes]
+        if not values:
+            raise ValueError("Coreference service returned an empty span")
+
+        if len(values) == 1:
+            start = end = values[0]
+        elif len(values) == 2:
+            start, end_exclusive = values
+            end = start if end_exclusive <= start else end_exclusive - 1
+        else:
+            start, end = values[0], values[-1]
+
+        if start < 0 or end < 0 or start >= doc_length or end >= doc_length or start > end:
+            raise ValueError(
+                f"Invalid coreference span {values!r} for document length {doc_length}"
+            )
+
+        return start, end
+
     def resolve_coreference(self, doc, text_id):
         """Resolve coreference clusters and persist nodes/relations in the graph.
 
         The method expects the external coreference service to return a JSON
         structure containing a `clusters` key whose value is a list of clusters.
-        Each cluster is a sequence of spans where a span is itself a list of
-        integer token indices. The first span in each cluster is treated as the
-        antecedent and subsequent spans are treated as mentions referring to it.
+        Each cluster is a sequence of spans where a span is either an explicit
+        list of token indices or a two-value half-open token range `[start, end)`.
+        The first span in each cluster is treated as the antecedent and
+        subsequent spans are treated as mentions referring to it.
 
         The function will create `Antecedent` and `CorefMention` nodes and
         connect TagOccurrence nodes to them. It also creates `COREF` relations
@@ -171,23 +251,60 @@ class CoreferenceResolver:
             keys `referent` and `antecedent` with the created node id strings.
         """
         logger.info("resolve_coreference: resolving coref for text_id=%s", text_id)
-        result = self.call_coreference_resolution_api(self.coreference_service_endpoint, doc.text)
-        if result is None:
-            logger.warning("resolve_coreference: coref service returned no result for text_id=%s", text_id)
-            return []
+
+        endpoint = (self.coreference_service_endpoint or "").strip()
+        if endpoint:
+            result = self.call_coreference_resolution_api(endpoint, doc.text)
+            if result is None:
+                logger.warning("resolve_coreference: external coref returned no result for text_id=%s", text_id)
+                return []
+            raw_clusters = result.get("clusters", [])
+        else:
+            spacy_clusters = self._extract_spacy_coref_clusters(doc)
+            if not spacy_clusters:
+                logger.info(
+                    "resolve_coreference: external coref disabled and no spaCy coref clusters found for text_id=%s",
+                    text_id,
+                )
+                return []
+            raw_clusters = [
+                [[start, end + 1] for start, end in cluster]
+                for cluster in spacy_clusters
+            ]
+            logger.info(
+                "resolve_coreference: using %d spaCy coref clusters for text_id=%s",
+                len(raw_clusters),
+                text_id,
+            )
 
         coref = []
-        for cluster in result.get("clusters", []):
+        for cluster in raw_clusters:
             if not cluster:
                 continue
             antecedent = cluster[0]
-            ant_start, ant_end = antecedent[0], antecedent[-1]
+            try:
+                ant_start, ant_end = self._service_span_to_inclusive_bounds(antecedent, len(doc))
+            except ValueError:
+                logger.warning(
+                    "resolve_coreference: skipping invalid antecedent span %r for text_id=%s",
+                    antecedent,
+                    text_id,
+                )
+                continue
             antecedent_node_id = self.create_node("Antecedent", doc[ant_start:ant_end+1].text, ant_start, ant_end, text_id)
             self.connect_node_to_tag_occurrences(antecedent_node_id, range(ant_start, ant_end + 1), text_id)
             logger.debug("Created antecedent %s for cluster size=%d", antecedent_node_id, len(cluster))
 
             for span_token_indexes in cluster[1:]:
-                start, end = span_token_indexes[0], span_token_indexes[-1]
+                try:
+                    start, end = self._service_span_to_inclusive_bounds(span_token_indexes, len(doc))
+                except ValueError:
+                    logger.warning(
+                        "resolve_coreference: skipping invalid mention span %r for text_id=%s",
+                        span_token_indexes,
+                        text_id,
+                    )
+                    continue
                 mention_node_id = self.create_node("CorefMention", doc[start:end+1].text, start, end, text_id)
                 self.connect_node_to_tag_occurrences(mention_node_id, range(start, end + 1), text_id)
                 # create COREF relation
@@ -214,7 +331,9 @@ class CoreferenceResolver:
         """
 
         # Define the API endpoint and headers
-        url = coreference_service_endpoint
+        url = (coreference_service_endpoint or "").strip()
+        if not url:
+            return None
         headers = {"Content-Type": "application/json"}
 
         # Prepare the payload
@@ -222,7 +341,12 @@ class CoreferenceResolver:
 
         try:
             # Send a POST request to the API
-            response = requests.post(url, headers=headers, json=payload)
+            response = requests.post(
+                url,
+                headers=headers,
+                json=payload,
+                timeout=self._service_timeout_seconds(),
+            )
 
             # Check if the request was successful
             response.raise_for_status()
@@ -231,11 +355,13 @@ class CoreferenceResolver:
             return response.json()
 
         except requests.exceptions.HTTPError as http_err:
-            # Handle HTTP errors
-            logger.exception("HTTP error occurred when calling coref service: %s", http_err)
+            logger.warning("Coref service HTTP error: %s", http_err)
+        except requests.exceptions.RequestException as req_err:
+            logger.warning("Coref service request error: %s", req_err)
+        except ValueError as decode_err:
+            logger.warning("Coref service returned invalid JSON: %s", decode_err)
         except Exception as err:
-            # Handle any other exceptions
-            logger.exception("An error occurred when calling coref service: %s", err)
+            logger.warning("Unexpected coref service error: %s", err)
 
         # If an error occurs, return None
         return None

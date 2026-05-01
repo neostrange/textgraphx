@@ -178,8 +178,8 @@ class TestMigrationManifest:
     def test_migration_manifest_covers_all_migration_files(self):
         manifest = _payload().get("migration_manifest", {})
         files = manifest.get("files", [])
-        assert len(files) == 23, (
-            f"migration_manifest.files must list exactly 23 migration files; found {len(files)}"
+        assert len(files) == 27, (
+            f"migration_manifest.files must list exactly 27 migration files; found {len(files)}"
         )
 
     def test_migration_manifest_files_are_ordered(self):
@@ -197,8 +197,8 @@ class TestMigrationManifest:
 
     def test_migration_manifest_ends_at_latest(self):
         files = _payload().get("migration_manifest", {}).get("files", [])
-        assert files and files[-1].startswith("0023"), (
-            "migration_manifest.files must end with the 0023 timexmention-constraints migration"
+        assert files and files[-1].startswith("0027"), (
+            "migration_manifest.files must end with the 0027 graph-native-edges migration"
         )
 
 
@@ -215,8 +215,8 @@ class TestMigrationFiles:
 
     def test_all_migration_files_exist(self):
         files = self._files()
-        assert len(files) == 23, (
-            f"Expected 23 .cypher migration files; found {len(files)}: {[f.name for f in files]}"
+        assert len(files) == 27, (
+            f"Expected 27 .cypher migration files; found {len(files)}: {[f.name for f in files]}"
         )
 
     def test_migration_files_are_non_empty(self):

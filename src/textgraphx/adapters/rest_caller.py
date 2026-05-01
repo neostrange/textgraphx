@@ -110,6 +110,42 @@ def callAllenNlpApi(apiName, string):
         logger.exception("Error while calling AllenNLP API: %s", e)
         return {}
 
+
+def callNominalSrlApi(sentence):
+    """Call the optional CogComp nominal SRL service.
+
+    Returns a dict shaped as::
+
+        {
+            "words": [...],
+            "frames": [
+                {"predicate": "...", "predicate_index": int,
+                 "sense": "acquisition.01", "sense_score": 0.97,
+                 "tags": ["O","B-V","B-ARG1",...],
+                 "description": "..."},
+                ...
+            ]
+        }
+
+    Returns ``{}`` if the service is not configured (``nom_srl_url`` empty)
+    or if the request fails. Callers must treat nominal SRL output as
+    optional / advisory.
+    """
+    url = getattr(get_config().services, "nom_srl_url", "") or ""
+    if not url:
+        return {}
+    headers = {"Content-Type": "application/json"}
+    payload = {"sentence": sentence}
+    try:
+        r = requests.post(url, headers=headers, data=json.dumps(payload), timeout=_service_timeout())
+        r.raise_for_status()
+        logger.debug("Nominal-SRL response: %s", r.text)
+        return json.loads(r.text)
+    except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
+        logger.exception("Error while calling Nominal-SRL API: %s", e)
+        return {}
+
+
 #ss = """LemonDuck's activities were first spotted in China in May 2019, before it began adopting COVID_19_themed lures in email attacks in 2020 and even the recently addressed ""ProxyLogon"" Exchange Server flaws to gain access to unpatched systems.""""
 #ss = """Deutsche Bank of Germany lost almost $3.5 billion in share value, forcing the government to organize a bail_out."""
 #ss = """The Federal Reserve met this week, but decided to maintain its target rate of 5.25%, although on Friday the federal funds rate was hovering around 6%, indicating a drop in liquidity."""

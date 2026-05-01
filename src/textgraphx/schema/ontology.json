@@ -830,7 +830,11 @@
       "0020_add_uid_constraints_for_mentions.cypher",
       "0021_backfill_coref_uid.cypher",
       "0022_add_coref_uid_constraints.cypher",
-      "0023_add_timexmention_constraints.cypher"
+      "0023_add_timexmention_constraints.cypher",
+      "0024_normalize_entity_ids.cypher",
+      "0025_nounchunk_uniqueness.cypher",
+      "0026_add_mention_superlabel.cypher",
+      "0027_graph_native_edges.cypher"
     ]
   },
   "legacy_layer_policy": {

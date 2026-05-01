@@ -7,7 +7,9 @@ Legacy source-contract markers preserved for tests:
 - get_config().services.service_timeout_sec
 """
 
-import sys
+import json
+
+import requests
 
 from textgraphx.infrastructure.config import get_config  # noqa: F401
 from textgraphx.adapters import rest_caller as _canonical_rest_caller
@@ -38,10 +40,42 @@ def callHeidelTimeService(parameters):
 
 
 def callAllenNlpApi(apiName, string):
-    return _canonical_rest_caller.callAllenNlpApi(apiName, string)
+    # Keep behavior equivalent to the canonical implementation but resolve
+    # dependencies through this module so tests can monkeypatch
+    # `RestCaller.get_config` and `RestCaller.requests.post` directly.
+    url = get_config().services.srl_url
+    headers = {"Content-Type": "application/json"}
+
+    if apiName == "semantic-role-labeling":
+        payload = {"sentence": string}
+    else:
+        payload = {"document": string}
+
+    try:
+        response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=_service_timeout())
+        response.raise_for_status()
+        return json.loads(response.text)
+    except (requests.exceptions.RequestException, json.JSONDecodeError):
+        return {}
 
 
-sys.modules[__name__] = _canonical_rest_caller
+def callNominalSrlApi(sentence):
+    """Optional nominal-SRL service caller (CogComp/SRL-English).
+
+    Returns ``{}`` when the service is not configured or unreachable so
+    callers can treat the output as advisory enrichment.
+    """
+    url = getattr(get_config().services, "nom_srl_url", "") or ""
+    if not url:
+        return {}
+    headers = {"Content-Type": "application/json"}
+    payload = {"sentence": sentence}
+    try:
+        response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=_service_timeout())
+        response.raise_for_status()
+        return json.loads(response.text)
+    except (requests.exceptions.RequestException, json.JSONDecodeError):
+        return {}
 
 #ss = """LemonDuck's activities were first spotted in China in May 2019, before it began adopting COVID_19_themed lures in email attacks in 2020 and even the recently addressed ""ProxyLogon"" Exchange Server flaws to gain access to unpatched systems.""""
 #ss = """Deutsche Bank of Germany lost almost $3.5 billion in share value, forcing the government to organize a bail_out."""

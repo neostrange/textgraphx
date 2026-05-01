@@ -67,6 +67,9 @@ def test_evaluate_batch_xml_mode_does_not_import_neo4j(tmp_path, monkeypatch):
         "entity_filter": "none",
         "event_filter": "none",
         "relation_scope": ["has_participant", "tlink"],
+        "participant_scope": "core-only",
+        "non_core_participant_role_mode": "disabled",
+        "non_core_participant_roles": [],
         "nominal_profile_mode": "all",
         "gold_like_nominal_filter": False,
         "nominal_precision_filters": False,
@@ -130,6 +133,9 @@ def test_evaluate_single_includes_evaluation_scope_default_false(tmp_path):
         "entity_filter": "none",
         "event_filter": "none",
         "relation_scope": ["has_participant", "tlink"],
+        "participant_scope": "core-only",
+        "non_core_participant_role_mode": "disabled",
+        "non_core_participant_roles": [],
         "nominal_profile_mode": "all",
         "gold_like_nominal_filter": False,
         "nominal_precision_filters": False,
@@ -163,6 +169,9 @@ def test_evaluate_single_includes_evaluation_scope_discourse_true(tmp_path):
         "entity_filter": "DiscourseEntity label",
         "event_filter": "none",
         "relation_scope": ["has_participant", "tlink"],
+        "participant_scope": "core-only",
+        "non_core_participant_role_mode": "disabled",
+        "non_core_participant_roles": [],
         "nominal_profile_mode": "all",
         "gold_like_nominal_filter": False,
         "nominal_precision_filters": False,
@@ -287,16 +296,23 @@ def test_evaluate_batch_neo4j_includes_nominal_scope_fields(tmp_path, monkeypatc
         normalize_nominal_boundaries=True,
         gold_like_nominal_filter=True,
         nominal_profile_mode="candidate-gold",
+        include_non_core_participants=True,
+        non_core_participant_roles="Arg1, arg0",
     )
 
     report = evaluate_meantime._evaluate_batch(args, EvaluationMapping())
 
     assert captured.get("nominal_profile_mode") == "candidate-gold"
+    assert captured.get("include_non_core_participants") is True
+    assert captured.get("non_core_participant_roles") == ("ARG0", "ARG1")
     assert report["evaluation_scope"] == {
         "discourse_only": True,
         "entity_filter": "DiscourseEntity label",
         "event_filter": "none",
         "relation_scope": ["has_participant", "tlink"],
+        "participant_scope": "core+non-core",
+        "non_core_participant_role_mode": "allowlist",
+        "non_core_participant_roles": ["ARG0", "ARG1"],
         "nominal_profile_mode": "candidate-gold",
         "gold_like_nominal_filter": True,
         "nominal_precision_filters": False,

@@ -72,11 +72,17 @@ class NounChunkProcessor:
         """
         # Precompute ids
         for item in ncs:
-            item['id'] = make_nounchunk_id(document_id, item['start_index'])
+            item['id'] = make_nounchunk_id(
+                document_id,
+                item['start_index'],
+                end=item['end_index'],
+                head_tok=item['head_token_index'],
+            )
 
         nc_query = """
             UNWIND $ncs as item
             MERGE (nc:NounChunk {id: item.id})
+                        SET nc:Mention
             SET nc.type = item.type, nc.value = item.value,
                 nc.start_tok = item.start_index, nc.end_tok = item.end_index,
                 nc.index = item.start_index,

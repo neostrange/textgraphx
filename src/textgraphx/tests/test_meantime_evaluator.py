@@ -246,6 +246,79 @@ def test_render_markdown_report_contains_key_sections():
     assert "## Per-Document Diagnostics" in md
 
 
+def test_render_markdown_report_renders_batch_determinism_correctly():
+    """Batch reports use 'all_stable'; markdown must read that, not the per-doc 'deterministic' field."""
+    report = {
+        "mode": "batch",
+        "documents_evaluated": 2,
+        "aggregate": {},
+        "diagnostics": {},
+        "reports": [],
+        "projection_determinism": {
+            "all_stable": True,
+            "documents_checked": 2,
+            "stable_documents": 2,
+            "unstable_documents": 0,
+            "runs": 2,
+            "by_doc": {
+                "doc1": {"deterministic": True, "runs": 2, "mismatch_runs": []},
+                "doc2": {"deterministic": True, "runs": 2, "mismatch_runs": []},
+            },
+        },
+    }
+    md = render_markdown_report(report)
+    assert "## Projection Determinism" in md
+    assert "- Deterministic: True" in md
+    assert "- Documents: 2/2 stable" in md
+    assert "- Runs: 2" in md
+    assert "Unstable docs:" not in md
+
+
+def test_render_markdown_report_renders_batch_determinism_with_unstable_docs():
+    report = {
+        "mode": "batch",
+        "documents_evaluated": 2,
+        "aggregate": {},
+        "diagnostics": {},
+        "reports": [],
+        "projection_determinism": {
+            "all_stable": False,
+            "documents_checked": 2,
+            "stable_documents": 1,
+            "unstable_documents": 1,
+            "runs": 3,
+            "by_doc": {
+                "stable_doc": {"deterministic": True, "runs": 3, "mismatch_runs": []},
+                "flaky_doc": {"deterministic": False, "runs": 3, "mismatch_runs": [1, 2]},
+            },
+        },
+    }
+    md = render_markdown_report(report)
+    assert "- Deterministic: False" in md
+    assert "- Documents: 1/2 stable, 1 unstable" in md
+    assert "- Unstable docs: flaky_doc" in md
+
+
+def test_render_markdown_report_renders_singledoc_determinism():
+    """Single-doc reports use the 'deterministic' field; preserve legacy rendering."""
+    report = {
+        "mode": "single",
+        "documents_evaluated": 1,
+        "aggregate": {},
+        "diagnostics": {},
+        "reports": [],
+        "projection_determinism": {
+            "deterministic": True,
+            "runs": 2,
+            "mismatch_runs": [],
+        },
+    }
+    md = render_markdown_report(report)
+    assert "- Deterministic: True" in md
+    assert "- Runs: 2" in md
+    assert "- Mismatch runs: none" in md
+
+
 def test_relation_error_bucket_detects_type_mismatch():
     gold = {
         Relation(
@@ -380,6 +453,42 @@ def test_relation_scoring_uses_kind_specific_attr_keys_for_participant_roles():
     )
     assert out["tp"] == 0
     assert out["errors"]["type_mismatch"] == 1
+
+
+def test_relaxed_relation_scoring_canonicalizes_tlink_direction_and_reltype():
+    """Relaxed matching should canonicalize TLINK orientation the same way as strict.
+
+    Gold uses TIMEX->EVENT BEFORE while prediction uses EVENT->TIMEX AFTER,
+    which are semantically equivalent under TLINK inversion rules.
+    """
+    gold = {
+        Relation(
+            kind="tlink",
+            source_kind="timex",
+            source_span=(30,),
+            target_kind="event",
+            target_span=(20,),
+            attrs=(("reltype", "BEFORE"),),
+        )
+    }
+    pred = {
+        Relation(
+            kind="tlink",
+            source_kind="event",
+            source_span=(20,),
+            target_kind="timex",
+            target_span=(30,),
+            attrs=(("reltype", "AFTER"),),
+        )
+    }
+
+    strict = score_relation_layer(gold, pred, mode="strict")
+    relaxed = score_relation_layer(gold, pred, mode="relaxed")
+
+    assert strict["tp"] == 1
+    assert relaxed["tp"] == 1
+    assert relaxed["fp"] == 0
+    assert relaxed["fn"] == 0
 
 
 def test_canonicalize_event_attrs_defaults_meantime_fields_for_verbal_events():

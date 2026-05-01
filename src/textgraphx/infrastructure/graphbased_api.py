@@ -1,3 +1,5 @@
+import os
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -20,7 +22,9 @@ app.add_middleware(
 
 
 # Initialize the GraphBasedNLP object with the predefined directory path
-dataset_directory = r'/../home/neo/environments/text2graphs/textgraphx/dataset'
+# Use environment variable with fallback to canonical datastore location
+_default_dataset = str(Path(__file__).parent.parent / 'datastore' / 'dataset')
+dataset_directory = os.getenv('TEXTGRAPHX_DATASET_DIR', _default_dataset)
 nlp = GraphBasedNLP([dataset_directory])
 
 

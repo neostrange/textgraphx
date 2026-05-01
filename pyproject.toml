@@ -55,6 +55,7 @@ addopts = "-v --tb=short --strict-markers"
 markers = [
     "unit: Unit tests for individual components",
     "integration: Integration tests across components",
+    "contract: Schema and phase contract invariants",
     "regression: Regression tests that capture existing behaviour",
     "scenario: Scenario tests covering end-to-end orchestration behavior",
     "slow: Tests that take a long time to run",

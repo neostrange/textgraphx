@@ -6,10 +6,11 @@ Legacy source-contract markers preserved for tests:
 - get_config().services.service_timeout_sec
 """
 
-import sys
+import json
+
+import requests
 
 from textgraphx.infrastructure.config import get_config  # noqa: F401
-from textgraphx.adapters import allen_nlp_coref as _canonical_allen_nlp_coref
 
 
 def _service_timeout() -> int:
@@ -21,10 +22,20 @@ def _service_timeout() -> int:
 
 
 def callAllenNlpCoref(apiName, string):
-    return _canonical_allen_nlp_coref.callAllenNlpCoref(apiName, string)
+    url = get_config().services.coref_url
+    headers = {"Content-Type": "application/json"}
 
+    if apiName == "semantic-role-labeling":
+        payload = {"sentence": string}
+    else:
+        payload = {"document": string}
 
-sys.modules[__name__] = _canonical_allen_nlp_coref
+    try:
+        response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=_service_timeout())
+        response.raise_for_status()
+        return json.loads(response.text)
+    except (requests.exceptions.RequestException, json.JSONDecodeError):
+        return {}
 
 # ss = """The Bank of America Corporation, the second-largest bank in the United States, has announced that it lost US$2.24 billion in the third quarter of this year, mainly due to increases in loan losses.
 

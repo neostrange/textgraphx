@@ -2,6 +2,7 @@
 
 import sys
 import types
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -55,7 +56,10 @@ def test_srl_frame_writer_sets_canonical_and_legacy_token_span_fields():
     assert "f.end_tok = $end" in query
     assert "f.startIndex = $start" in query
     assert "f.endIndex = $end" in query
-    assert "f.framework = 'PROPBANK'" in query
+    # Framework is now parameterised (PropBank for verb SRL, NomBank for
+    # nominal SRL). Default still PropBank.
+    assert "f.framework = $framework" in query
+    assert params["framework"] == "PROPBANK"
     assert params["start"] == 3
     assert params["end"] == 8
 
@@ -265,14 +269,82 @@ def test_coreference_writer_dual_writes_participation_and_in_mention_edges():
     assert params["doc_id"] == 1
 
 
+@pytest.mark.unit
+def test_coreference_resolver_treats_two_value_service_spans_as_half_open_ranges():
+    nlp = spacy.blank("en")
+    doc = nlp("Alice saw Bob. She greeted him.")
+    graph = _FakeGraph()
+    resolver = CoreferenceResolver.__new__(CoreferenceResolver)
+    resolver.graph = graph
+    resolver.coreference_service_endpoint = "http://coref"
+    resolver.call_coreference_resolution_api = MagicMock(return_value={
+        "clusters": [
+            [[0, 1], [4, 5]],
+            [[2, 3], [6, 7]],
+        ]
+    })
+    resolver.create_node = MagicMock(side_effect=["ant_1", "mention_1", "ant_2", "mention_2"])
+    resolver.connect_node_to_tag_occurrences = MagicMock()
+
+    links = resolver.resolve_coreference(doc, 99)
+
+    assert links == [
+        {"referent": "mention_1", "antecedent": "ant_1"},
+        {"referent": "mention_2", "antecedent": "ant_2"},
+    ]
+    create_calls = resolver.create_node.call_args_list
+    assert create_calls[0].args == ("Antecedent", "Alice", 0, 0, 99)
+    assert create_calls[1].args == ("CorefMention", "She", 4, 4, 99)
+    assert create_calls[2].args == ("Antecedent", "Bob", 2, 2, 99)
+    assert create_calls[3].args == ("CorefMention", "him", 6, 6, 99)
+    connect_calls = resolver.connect_node_to_tag_occurrences.call_args_list
+    assert list(connect_calls[0].args[1]) == [0]
+    assert list(connect_calls[1].args[1]) == [4]
+    assert list(connect_calls[2].args[1]) == [2]
+    assert list(connect_calls[3].args[1]) == [6]
+
+
+@pytest.mark.unit
+def test_coreference_resolver_preserves_explicit_multi_index_spans():
+    nlp = spacy.blank("en")
+    doc = nlp("The New York team celebrated. It cheered.")
+    graph = _FakeGraph()
+    resolver = CoreferenceResolver.__new__(CoreferenceResolver)
+    resolver.graph = graph
+    resolver.coreference_service_endpoint = "http://coref"
+    resolver.call_coreference_resolution_api = MagicMock(return_value={
+        "clusters": [
+            [[0, 1, 2, 3], [6]],
+        ]
+    })
+    resolver.create_node = MagicMock(side_effect=["ant_1", "mention_1"])
+    resolver.connect_node_to_tag_occurrences = MagicMock()
+
+    resolver.resolve_coreference(doc, 7)
+
+    create_calls = resolver.create_node.call_args_list
+    assert create_calls[0].args == ("Antecedent", "The New York team", 0, 3, 7)
+    assert create_calls[1].args == ("CorefMention", "It", 6, 6, 7)
+    connect_calls = resolver.connect_node_to_tag_occurrences.call_args_list
+    assert list(connect_calls[0].args[1]) == [0, 1, 2, 3]
+    assert list(connect_calls[1].args[1]) == [6]
+
+
 def test_entity_processor_syntactic_type_prefers_valid_upstream_meantime_type():
     assert EntityProcessor._syntactic_type_from_tag("NN", raw_type="app") == "APP"
     assert EntityProcessor._syntactic_type_from_tag("NN", raw_type="NOMINAL") == "NOM"
 
 
 def test_entity_processor_syntactic_type_uses_dependency_rules_for_missing_categories():
-    assert EntityProcessor._syntactic_type_from_tag("NN", dep="appos") == "APP"
-    assert EntityProcessor._syntactic_type_from_tag("NN", dep="conj") == "CONJ"
+    # ENH-NAM-01 (2026-04): dep `appos`/`conj` on an entity head no longer
+    # rewrites the head's mention type. APP and CONJ are reserved for the
+    # wider enclosing mention materialized by a dedicated refinement pass.
+    # The inner head must keep its POS-derived NAM/NOM type so it can match
+    # the inner gold mention exactly (MEANTIME nested-mention semantics).
+    assert EntityProcessor._syntactic_type_from_tag("NN", dep="appos") == "NOM"
+    assert EntityProcessor._syntactic_type_from_tag("NNP", dep="appos") == "NAM"
+    assert EntityProcessor._syntactic_type_from_tag("NN", dep="conj") == "NOM"
+    assert EntityProcessor._syntactic_type_from_tag("NNP", dep="conj") == "NAM"
     assert EntityProcessor._syntactic_type_from_tag("NN", dep="acl:relcl") == "ARC"
     assert EntityProcessor._syntactic_type_from_tag("NN", dep="det") == "PTV"
     assert EntityProcessor._syntactic_type_from_tag("NN", dep="attr") == "PRE"

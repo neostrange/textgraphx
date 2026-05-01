@@ -685,7 +685,12 @@ class TemporalPhaseWrapper:
         with log_section(self.logger, "TEMPORAL PHASE - Temporal Entity & Relation Extraction"):
             try:
                 with log_subsection(self.logger, "Importing TemporalPhase"):
-                    from textgraphx.TemporalPhase import TemporalPhase
+                    try:
+                        # Preferred runtime import path (also easiest to monkeypatch in tests).
+                        from textgraphx.pipeline.temporal.extraction import TemporalPhase
+                    except Exception:
+                        # Backward-compatible fallback.
+                        from textgraphx.TemporalPhase import TemporalPhase
                     self.logger.debug("TemporalPhase imported successfully")
                 
                 with log_subsection(self.logger, "Initializing TemporalPhase"):
