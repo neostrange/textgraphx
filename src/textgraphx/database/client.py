@@ -70,13 +70,37 @@ def _safe_close_driver(driver: Optional[Driver]) -> None:
 
 
 class BoltGraphCompat:
-    """Compatibility wrapper exposing a ``.run(query, parameters).data()`` API."""
+    """Compatibility wrapper exposing a ``.run(query, parameters).data()`` API.
+
+    A single Neo4j session is opened lazily on the first ``.run()`` call and
+    reused for all subsequent calls on the same instance.  This eliminates the
+    per-query session-creation overhead that appeared as N+1 round-trips during
+    pipeline phases.  The session is closed (and the driver released) when
+    ``.close()`` is called or the object is garbage-collected.
+
+    The pipeline phases are single-threaded; sessions are **not** shared across
+    threads, so reuse is safe here.
+    """
 
     def __init__(self, driver: Driver):
         self._driver = driver
+        self._session = None  # opened lazily; reused across .run() calls
+
+    def _open_session(self):
+        """Return the live session, opening one if needed."""
+        if self._session is None:
+            self._session = self._driver.session()
+        return self._session
 
     def close(self) -> None:
-        """Close the underlying driver immediately."""
+        """Close the session and the underlying driver."""
+        if getattr(self, "_session", None) is not None:
+            try:
+                self._session.close()
+            except Exception:
+                pass
+            finally:
+                self._session = None
         if getattr(self, "_driver", None) is not None:
             try:
                 self._driver.close()
@@ -87,12 +111,21 @@ class BoltGraphCompat:
 
     def run(self, query: str, parameters: Optional[Dict[str, Any]] = None):
         """Execute a Cypher query and return a small wrapper exposing ``data()``."""
-        session = self._driver.session()
+        session = self._open_session()
         try:
             result = session.run(query, parameters)
             records = list(result)
-        finally:
-            session.close()
+        except Exception:
+            # Session may be broken (e.g. connection reset). Reset it and retry
+            # once with a fresh session before propagating the error.
+            try:
+                self._session.close()
+            except Exception:
+                pass
+            self._session = None
+            session = self._open_session()
+            result = session.run(query, parameters)
+            records = list(result)
 
         class ResultWrapper:
             def __init__(self, records):

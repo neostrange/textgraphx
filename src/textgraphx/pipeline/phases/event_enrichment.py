@@ -662,6 +662,10 @@ class EventEnrichmentPhase():
               -[:PARTICIPATES_IN]->(f:Frame {framework: 'NOMBANK'})
         WHERE coalesce(f.provisional, false) = false
           AND NOT exists((f)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(:TEvent))
+            AND exists {
+                MATCH (fa_core:FrameArgument)-[:HAS_FRAME_ARGUMENT|PARTICIPANT]->(f)
+                WHERE toUpper(coalesce(fa_core.type, '')) IN ['ARG0', 'ARG1', 'A0', 'A1']
+            }
         WITH f, a, tok
         ORDER BY tok.tok_index_doc
         WITH f, a, collect(DISTINCT tok)[0] AS head_tok,
@@ -705,7 +709,9 @@ class EventEnrichmentPhase():
                 event.source     = 'nombank_srl',
                 event.start_tok  = $min_tok,
                 event.end_tok    = $max_tok,
-                event.confidence = 0.70
+                event.confidence = 0.70,
+                event.is_timeml_core = true,
+                event.low_confidence = false
             WITH event
             MATCH (f:Frame {id: $frame_id})
             MERGE (f)-[:DESCRIBES]->(event)

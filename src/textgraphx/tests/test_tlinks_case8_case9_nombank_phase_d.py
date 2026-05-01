@@ -124,6 +124,12 @@ class TestCase8NombankDct:
         query = recognizer.graph.run.call_args[0][0]
         assert "nombank_srl" in query
 
+    def test_case8_excludes_low_confidence_events(self, method_src):
+        assert "coalesce(e.low_confidence, false) = false" in method_src
+
+    def test_case8_requires_timeml_core_events(self, method_src):
+        assert "coalesce(e.is_timeml_core, true) = true" in method_src
+
     def test_case6_exclusion_gap_addressed(self, tr_source):
         """case6 must NOT exclude NN-pos tokens; case8 fills that gap.
 
@@ -185,6 +191,10 @@ class TestCase9NombankSentenceTimex:
         """Sentence-proximity confidence must be lower than argument-structure cases."""
         assert "0.60" in method_src
 
+    def test_uses_sentence_token_distance_window(self, method_src):
+        """Must require local token proximity to avoid loose same-sentence matches."""
+        assert "abs(coalesce(tok_e.tok_index_doc, -1) - coalesce(tok_t.tok_index_doc, -1)) <= 15" in method_src
+
     def test_returns_count(self):
         recognizer = _make_recognizer([{"created": 5}])
         rows = recognizer.create_tlinks_case9()
@@ -202,11 +212,23 @@ class TestCase9NombankSentenceTimex:
         query = recognizer.graph.run.call_args[0][0]
         assert "Sentence" in query
 
+    def test_distance_window_in_executed_query(self):
+        recognizer = _make_recognizer()
+        recognizer.create_tlinks_case9()
+        query = recognizer.graph.run.call_args[0][0]
+        assert "<= 15" in query
+
     def test_srl_timex_exclusion_in_executed_query(self):
         recognizer = _make_recognizer()
         recognizer.create_tlinks_case9()
         query = recognizer.graph.run.call_args[0][0]
         assert "SRLTimexCandidate" in query
+
+    def test_case9_excludes_low_confidence_events(self, method_src):
+        assert "coalesce(e.low_confidence, false) = false" in method_src
+
+    def test_case9_requires_timeml_core_events(self, method_src):
+        assert "coalesce(e.is_timeml_core, true) = true" in method_src
 
 
 # ===========================================================================
@@ -254,3 +276,14 @@ class TestCase8Case9Wiring:
         """PhaseRun marker metadata must list case8 and case9."""
         assert "case8" in tr_source
         assert "case9" in tr_source
+
+    def test_case6_uses_explicit_tense_gate(self, tr_source):
+        """case6 should only anchor morphologically tensed events to DCT."""
+        case6_src = _extract_method(tr_source, "create_tlinks_case6")
+        assert "coalesce(e.tense, '') IN ['PAST', 'PRESENT', 'FUTURE']" in case6_src
+
+    def test_case6_excludes_low_confidence_or_noncore_events(self, tr_source):
+        """case6 should avoid anchoring low-confidence or non-TimeML-core events."""
+        case6_src = _extract_method(tr_source, "create_tlinks_case6")
+        assert "coalesce(e.low_confidence, false) = false" in case6_src
+        assert "coalesce(e.is_timeml_core, true) = true" in case6_src

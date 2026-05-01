@@ -70,6 +70,10 @@ class TlinksRecognizer:
             MATCH p= (e1:TEvent)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(f1:Frame)<-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(fa:FrameArgument {type: 'ARGM-TMP'})
                 <-[:IN_FRAME]-(et:TagOccurrence)-[:IN_FRAME]->(f2:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(e2:TEvent)
             WHERE fa.headTokenIndex = et.tok_index_doc AND fa.signal = 'after'
+              AND coalesce(e1.is_timeml_core, true) = true
+              AND coalesce(e2.is_timeml_core, true) = true
+              AND coalesce(e1.low_confidence, false) = false
+              AND coalesce(e2.low_confidence, false) = false
             WITH *
             MATCH (e1),(e2)
             MERGE (e1)-[tl:TLINK]-(e2)
@@ -85,6 +89,10 @@ class TlinksRecognizer:
             MATCH p= (e1:TEvent)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(f1:Frame)<-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(fa:FrameArgument {type: 'ARGM-TMP'})
                 <-[:IN_FRAME]-(et:TagOccurrence {pos: 'VBG'})-[:IN_FRAME]->(f2:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(e2:TEvent)
             WHERE fa.complement = et.text AND fa.syntacticType = 'EVENTIVE'
+              AND coalesce(e1.is_timeml_core, true) = true
+              AND coalesce(e2.is_timeml_core, true) = true
+              AND coalesce(e1.low_confidence, false) = false
+              AND coalesce(e2.low_confidence, false) = false
             WITH *
             MERGE (e1)-[tl:TLINK]-(e2)
             WITH *
@@ -103,6 +111,10 @@ class TlinksRecognizer:
         query = """ MATCH p= (e1:TEvent)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(f1:Frame)<-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(fa:FrameArgument where fa.type = 'ARGM-TMP')
                 <-[:IN_FRAME]-(et:TagOccurrence where et.pos = 'VBG')-[:IN_FRAME]->(f2:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(e2:TEvent)
                     where fa.headTokenIndex = et.tok_index_doc and fa.syntacticType = 'EVENTIVE'
+                    and coalesce(e1.is_timeml_core, true) = true
+                    and coalesce(e2.is_timeml_core, true) = true
+                    and coalesce(e1.low_confidence, false) = false
+                    and coalesce(e2.low_confidence, false) = false
                     with *
                     merge (e1)-[tl:TLINK]-(e2)
                     with *
@@ -124,6 +136,8 @@ class TlinksRecognizer:
                 (fa:FrameArgument {type: 'ARGM-TMP'})-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(f:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]->(e:TEvent)
             MATCH (h)-[:TRIGGERS]->(tm)
             WHERE (tm:TimexMention OR tm:TIMEX OR tm:Timex3)
+              AND coalesce(e.is_timeml_core, true) = true
+              AND coalesce(e.low_confidence, false) = false
             OPTIONAL MATCH (tm)-[:REFERS_TO]->(t_ref:TIMEX)
             WITH h, fa, e, coalesce(t_ref, CASE WHEN tm:TIMEX OR tm:Timex3 THEN tm ELSE NULL END) AS t
             WHERE fa.headTokenIndex = h.tok_index_doc AND t IS NOT NULL
@@ -142,6 +156,8 @@ class TlinksRecognizer:
                 (fa:FrameArgument {type: 'ARGM-TMP'})-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(f:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]->(e:TEvent)
             MATCH (pobj)-[:TRIGGERS]->(tm)
             WHERE (tm:TimexMention OR tm:TIMEX OR tm:Timex3)
+              AND coalesce(e.is_timeml_core, true) = true
+              AND coalesce(e.low_confidence, false) = false
             OPTIONAL MATCH (tm)-[:REFERS_TO]->(t_ref:TIMEX)
             WITH pobj, fa, e, coalesce(t_ref, CASE WHEN tm:TIMEX OR tm:Timex3 THEN tm ELSE NULL END) AS t,
                  toLower(coalesce(fa.head, '')) AS prep_head
@@ -174,6 +190,9 @@ class TlinksRecognizer:
         logger.debug("create_tlinks_case6")
         query = """ MATCH p = (e:TEvent)<-[:TRIGGERS]-(t:TagOccurrence)<-[:HAS_TOKEN]-(s:Sentence)<-[:CONTAINS_SENTENCE]-(ann:AnnotatedText)-[:CREATED_ON]->(dct)
                 WHERE dct:TIMEX OR dct:Timex3
+                AND coalesce(e.is_timeml_core, true) = true
+                AND coalesce(e.low_confidence, false) = false
+                AND coalesce(e.tense, '') IN ['PAST', 'PRESENT', 'FUTURE']
                 AND NOT (e.tense IN ['PRESPART', 'PASPART', 'INFINITIVE']) AND NOT (t.pos IN ['NNP', 'NNS', 'NN']) 
                     //AND NOT (e.tense IN ['PRESENT'] and e.aspect IN ['NONE'])
                     MERGE (e)-[tlink:TLINK]-(dct)
@@ -206,6 +225,10 @@ class TlinksRecognizer:
           AND toLower(coalesce(fa.signal, '')) IN ['before', 'after']
           AND toLower(coalesce(fa.complement, '')) = toLower(coalesce(tok_sub.text, ''))
           AND any(cue IN coalesce(em_sub.temporalCueHeads, []) WHERE cue IN ['before', 'after'])
+                    AND coalesce(e_main.is_timeml_core, true) = true
+                    AND coalesce(e_sub.is_timeml_core, true) = true
+                    AND coalesce(e_main.low_confidence, false) = false
+                    AND coalesce(e_sub.low_confidence, false) = false
         MERGE (e_main)-[tl:TLINK]->(e_sub)
         SET tl.source = 't2g',
             tl.confidence = 0.83,
@@ -239,6 +262,8 @@ class TlinksRecognizer:
                   <-[:HAS_TOKEN]-(s:Sentence)<-[:CONTAINS_SENTENCE]-(:AnnotatedText)
                   -[:CREATED_ON]->(dct)
             WHERE (dct:TIMEX OR dct:Timex3)
+              AND coalesce(e.is_timeml_core, true) = true
+              AND coalesce(e.low_confidence, false) = false
             MERGE (e)-[tl:TLINK]->(dct)
             ON CREATE SET
                 tl.source          = 't2g',
@@ -278,7 +303,10 @@ class TlinksRecognizer:
                   <-[:HAS_TOKEN]-(sent:Sentence)
                   -[:HAS_TOKEN]->(tok_t:TagOccurrence)-[:TRIGGERS]->(tm:TimexMention)
             WHERE id(tok_e) <> id(tok_t)
+              AND abs(coalesce(tok_e.tok_index_doc, -1) - coalesce(tok_t.tok_index_doc, -1)) <= 15
               AND NOT tm:SRLTimexCandidate
+              AND coalesce(e.is_timeml_core, true) = true
+              AND coalesce(e.low_confidence, false) = false
             OPTIONAL MATCH (tm)-[:REFERS_TO]->(t_ref:TIMEX)
             WITH e, coalesce(
                 t_ref,
