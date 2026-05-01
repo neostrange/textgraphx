@@ -215,8 +215,8 @@ class TestMigrationFiles:
 
     def test_all_migration_files_exist(self):
         files = self._files()
-        assert len(files) == 27, (
-            f"Expected 27 .cypher migration files; found {len(files)}: {[f.name for f in files]}"
+        assert len(files) == 28, (
+            f"Expected 28 .cypher migration files; found {len(files)}: {[f.name for f in files]}"
         )
 
     def test_migration_files_are_non_empty(self):

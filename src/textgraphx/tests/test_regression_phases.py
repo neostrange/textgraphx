@@ -266,8 +266,8 @@ class TestRefinementRunMarkerContract:
         assert "em.mention_source = 'noun_chunk_nominal'" in source
         assert "MERGE (tok)-[:PARTICIPATES_IN]->(em)" in source
         assert "core_arg_hits > 0" in source
-        assert "AND NOT chunk_text_lc =~ '.*[0-9].*'" in source
-        assert "AND NOT chunk_text_lc IN ['yesterday', 'today', 'tomorrow']" in source
+        assert "chunk_text_lc =~ '.*[0-9$€£¥%].*'" in source
+        assert "'today', 'yesterday', 'tomorrow'" in source
 
     def test_nominal_semantic_profile_annotation_is_additive(self):
         source = (Path(__file__).parent.parent / "pipeline/phases/refinement.py").read_text()

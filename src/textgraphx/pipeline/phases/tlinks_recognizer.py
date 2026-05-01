@@ -220,6 +220,90 @@ class TlinksRecognizer:
         """
         return self._run_query(query)
 
+    def create_tlinks_case8(self):
+        """D3 — Anchor NOMBANK-promoted nominal events to the Document Creation Time.
+
+        case6 explicitly excludes tokens with ``pos IN ['NN','NNS','NNP']``, which
+        blocks all NOMBANK-sourced TEvents (created by D2 with ``pos='NN'``) from
+        receiving a DCT anchor.  This case mirrors case6 for those nominal events:
+
+        - Only targets TEvents created by NOMBANK promotion (``source='nombank_srl'``).
+        - Does not attempt tense-based relType inference (nominals lack tense); defaults
+          to ``IS_INCLUDED`` as the conservative anchor relation.
+        - Guards on ``coalesce(f.provisional, false) = false`` via the DESCRIBES path
+          to avoid re-introducing provisional events that D2 already excluded.
+        """
+        logger.debug("create_tlinks_case8")
+        query = """
+            MATCH (e:TEvent {source: 'nombank_srl'})<-[:TRIGGERS]-(tok:TagOccurrence)
+                  <-[:HAS_TOKEN]-(s:Sentence)<-[:CONTAINS_SENTENCE]-(:AnnotatedText)
+                  -[:CREATED_ON]->(dct)
+            WHERE (dct:TIMEX OR dct:Timex3)
+            MERGE (e)-[tl:TLINK]->(dct)
+            ON CREATE SET
+                tl.source          = 't2g',
+                tl.relType         = 'IS_INCLUDED',
+                tl.relTypeCanonical = 'IS_INCLUDED',
+                tl.confidence      = 0.65,
+                tl.rule_id         = 'case8_nombank_dct',
+                tl.evidence_source = 'tlinks_recognizer'
+            ON MATCH SET
+                tl.relType          = coalesce(tl.relType, 'IS_INCLUDED'),
+                tl.relTypeCanonical = coalesce(tl.relTypeCanonical, 'IS_INCLUDED'),
+                tl.confidence       = coalesce(tl.confidence, 0.65),
+                tl.rule_id          = coalesce(tl.rule_id, 'case8_nombank_dct'),
+                tl.evidence_source  = coalesce(tl.evidence_source, 'tlinks_recognizer')
+            RETURN count(tl) AS created
+        """
+        return self._run_query(query)
+
+    def create_tlinks_case9(self):
+        """D3 — Link NOMBANK-promoted nominal events to sentence-local TIMEX3 nodes.
+
+        Cases 4 and 5 require the TIMEX to appear inside an ARGM-TMP FrameArgument
+        span, which misses TIMEX expressions that are syntactically disjoint from
+        the argument structure but co-occur in the same sentence.  This case
+        captures those proximity-based nominal-TIMEX pairings:
+
+        - Only targets NOMBANK-sourced TEvents (``source='nombank_srl'``).
+        - Finds canonical TIMEX nodes reachable from the same sentence via a non-SRL
+          TimexMention (``SRLTimexCandidate`` nodes are excluded to avoid circularity).
+        - Uses ``IS_INCLUDED`` as the conservative default; prepositional signals on
+          ARGM-TMP spans are not available here.
+        - Lower confidence (0.60) than structurally-grounded cases.
+        """
+        logger.debug("create_tlinks_case9")
+        query = """
+            MATCH (e:TEvent {source: 'nombank_srl'})<-[:TRIGGERS]-(tok_e:TagOccurrence)
+                  <-[:HAS_TOKEN]-(sent:Sentence)
+                  -[:HAS_TOKEN]->(tok_t:TagOccurrence)-[:TRIGGERS]->(tm:TimexMention)
+            WHERE id(tok_e) <> id(tok_t)
+              AND NOT tm:SRLTimexCandidate
+            OPTIONAL MATCH (tm)-[:REFERS_TO]->(t_ref:TIMEX)
+            WITH e, coalesce(
+                t_ref,
+                CASE WHEN tm:TIMEX OR tm:Timex3 THEN tm ELSE NULL END
+            ) AS t
+            WHERE t IS NOT NULL
+            WITH DISTINCT e, t
+            MERGE (e)-[tl:TLINK]->(t)
+            ON CREATE SET
+                tl.source          = 't2g',
+                tl.relType         = 'IS_INCLUDED',
+                tl.relTypeCanonical = 'IS_INCLUDED',
+                tl.confidence      = 0.60,
+                tl.rule_id         = 'case9_nombank_sentence_timex',
+                tl.evidence_source = 'tlinks_recognizer'
+            ON MATCH SET
+                tl.relType          = coalesce(tl.relType, 'IS_INCLUDED'),
+                tl.relTypeCanonical = coalesce(tl.relTypeCanonical, 'IS_INCLUDED'),
+                tl.confidence       = coalesce(tl.confidence, 0.60),
+                tl.rule_id          = coalesce(tl.rule_id, 'case9_nombank_sentence_timex'),
+                tl.evidence_source  = coalesce(tl.evidence_source, 'tlinks_recognizer')
+            RETURN count(tl) AS created
+        """
+        return self._run_query(query)
+
     def normalize_tlink_reltypes(self):
         """Normalize TLINK relType values to canonical TimeML inventory.
 
@@ -703,6 +787,8 @@ if __name__ == '__main__':
     tp.create_tlinks_case5()
     tp.create_tlinks_case6()
     tp.create_tlinks_case7()
+    tp.create_tlinks_case8()
+    tp.create_tlinks_case9()
     tp.normalize_tlink_reltypes()
     tp.apply_tlink_transitive_closure()
     tp.suppress_tlink_conflicts()
@@ -717,7 +803,7 @@ if __name__ == '__main__':
             phase_name="tlinks",
             duration_seconds=_phase_duration,
             metadata={
-                    "passes": "e2e,e2t,t2t,case1,case2,case3,case4,case5,case6"
+                    "passes": "e2e,e2t,t2t,case1,case2,case3,case4,case5,case6,case7,case8,case9"
             },
         )
     except Exception:
