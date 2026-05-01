@@ -1,5 +1,6 @@
 """Unit tests for TextProcessor modularization (Iteration 3 item 9)."""
 
+import importlib
 import pytest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -30,6 +31,13 @@ class TestTextProcessorFactoryWiring:
         )
 
     def test_constructor_uses_component_factory(self):
+        # Clear potential stale stubs left by wrapper tests that monkeypatch
+        # sys.modules without teardown.
+        for stale in ("textgraphx.TextProcessor", "textgraphx.pipeline.ingestion.text_processor"):
+            sys.modules.pop(stale, None)
+        importlib.import_module("textgraphx.pipeline.ingestion.text_processor")
+        importlib.import_module("textgraphx.TextProcessor")
+
         fake_components = self._fake_components()
         fake_driver = MagicMock()
         fake_nlp = MagicMock()
@@ -51,6 +59,11 @@ class TestTextProcessorFactoryWiring:
         assert tp.entity_disambiguator is fake_components.entity_disambiguator
 
     def test_do_wsd_delegates_to_component(self):
+        for stale in ("textgraphx.TextProcessor", "textgraphx.pipeline.ingestion.text_processor"):
+            sys.modules.pop(stale, None)
+        importlib.import_module("textgraphx.pipeline.ingestion.text_processor")
+        importlib.import_module("textgraphx.TextProcessor")
+
         fake_components = self._fake_components()
         fake_driver = MagicMock()
         fake_nlp = MagicMock()

@@ -108,9 +108,40 @@ def make_tagocc_id(doc_id: Union[str, int], sent_index: int, token_idx: int) -> 
     """Return a TagOccurrence id: <doc>_<sent>_<token_idx>"""
     return f"{_safe_str(doc_id)}_{sent_index}_{token_idx}"
 
-def make_nounchunk_id(doc_id: Union[str, int], start: int) -> str:
-    """Return a NounChunk id: <doc>_<start>"""
-    return f"{_safe_str(doc_id)}_{start}"
+def make_nounchunk_id(doc_id: Union[str, int], start: int, end: int = -1, head_tok: int = -1) -> str:
+    """Return a stable NounChunk id anchored on (doc, start, end, head_tok).
+
+    Including *end* and *head_tok* prevents id collisions when two chunks share
+    the same start position but have different extents or heads.
+
+    The *end* and *head_tok* parameters default to -1 for backward compatibility
+    with call sites that have not yet been updated, but callers should supply them
+    to guarantee uniqueness.
+    """
+    return f"nc_{_safe_str(doc_id)}_{start}_{end}_{head_tok}"
+
+
+def make_entity_id(doc_id: Union[str, int], kb_id_or_surface: Union[str, None], ne_type: str) -> str:
+    """Return a deterministic Entity id.
+
+    Two strategies:
+    - *kb_id* present  : id is derived from the KB URI fragment so that the same
+      real-world entity always resolves to the same node regardless of which
+      document introduced it.  The KB URI itself is stored on ``Entity.kb_id``.
+    - *kb_id* absent   : id is cross-document stable, anchored on (normalized
+      surface, type).  Entities with the same surface form and NE type are
+      treated as the same real-world referent across documents (same-surface
+      merging).  ``doc_id`` is accepted for API compatibility but not used in
+      the hash.
+    """
+    surface = kb_id_or_surface or ""
+    if surface and ("/" in surface or ":" in surface):
+        # Looks like a URI — derive a cross-doc stable fragment
+        fragment = surface.rsplit("/", 1)[-1].rsplit(":", 1)[-1]
+        return f"entity_{_short_hash([fragment, ne_type], length=24)}"
+    # Unresolved: cross-document stable by (normalized_surface, type)
+    base = [_normalize_surface_text(surface), ne_type.lower()]
+    return f"entity_{_short_hash(base, length=20)}"
 
 def make_event_mention_token_id(doc_id: Union[str, int], start: int, end: int) -> str:
     """Return a stable EventMention token_id: em_<doc>_<start>_<end>

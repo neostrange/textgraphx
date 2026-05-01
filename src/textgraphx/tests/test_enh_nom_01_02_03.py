@@ -454,6 +454,75 @@ class TestEnhNom03ProfileModeFiltering:
 
 
 # ===========================================================================
+# ENH-NOM-04: Noun-chunk precision-first materialization filters
+# ===========================================================================
+
+
+@pytest.mark.unit
+class TestEnhNom04NounChunkPrecisionFilters:
+    """Guardrails for precision-first noun-chunk nominal materialization."""
+
+    def test_filter_supports_runtime_toggle(self):
+        """ENH-NOM-04 filters must be togglable at runtime for A/B experiments."""
+        src = _ref_src()
+        assert "TEXTGRAPHX_ENH_NOM_04_STRICT_FILTERS" in src
+        assert "strict_nominal_filters" in src
+        assert "$strict_nominal_filters" in src
+
+    def test_filter_covers_nominal_alias(self):
+        """Filtering should treat NOMINAL synonym the same as NOM."""
+        src = _ref_src()
+        assert "['NOM', 'NOMINAL', 'APP', 'PRE.NOM']" in src
+
+    def test_filter_tracks_named_entity_token_overlap(self):
+        """Token-level NE overlap must be counted and dropped as overlap noise."""
+        src = _ref_src()
+        assert "count(DISTINCT overlap_ne) AS overlap_ne_count" in src
+        assert "drop_named_entity_token_overlap" in src
+        assert "$strict_nominal_filters AND overlap_ne_count > 0" in src
+
+    def test_filter_drops_numeric_chunks_without_salience(self):
+        """Numeric-shaped chunks should be dropped when they are not event/argument supported."""
+        src = _ref_src()
+        assert "drop_numeric_chunk" in src
+        assert "chunk_text_lc =~ '.*[0-9$€£¥%].*'" in src
+
+    def test_filter_drops_temporal_head_nominals_without_salience(self):
+        """Temporal head lemmas should be excluded from nominal mention materialization noise."""
+        src = _ref_src()
+        assert "drop_temporal_head_nominal" in src
+        assert "head_lemma IN [" in src
+        assert "'today'" in src
+        assert "'year'" in src
+
+    def test_low_salience_gate_uses_common_noun_and_three_token_max(self):
+        """Low-salience gate should target short common-noun chunks only."""
+        src = _ref_src()
+        assert "head_pos IN ['NN', 'NNS']" in src
+        assert "(max_tok - min_tok) <= 2" in src
+        assert "(NOT $strict_nominal_filters) AND (max_tok - min_tok) <= 1" in src
+
+    def test_materialization_upserts_entities_before_mentions(self):
+        """Kept noun-chunk candidates must create canonical Entity nodes before mention merge."""
+        src = _ref_src()
+        method_start = src.index("def materialize_nominal_mentions_from_noun_chunks(self):")
+        method_end = src.index("def link_frameArgument_to_entity_via_entity_mentions(self):")
+        method_src = src[method_start:method_end]
+        assert "MERGE (e:Entity {id: row.entity_id})" in method_src
+        assert "entities_materialized" in method_src
+
+    def test_materialization_marks_discourse_eligible_candidates(self):
+        """Event/argument-grounded noun-chunk mentions should be marked as DiscourseEntity."""
+        src = _ref_src()
+        method_start = src.index("def materialize_nominal_mentions_from_noun_chunks(self):")
+        method_end = src.index("def link_frameArgument_to_entity_via_entity_mentions(self):")
+        method_src = src[method_start:method_end]
+        assert "(fa_hits > 0 OR event_hits > 0) AS is_discourse_entity" in method_src
+        assert "SET e:DiscourseEntity" in method_src
+        assert "SET em:DiscourseEntity" in src
+
+
+# ===========================================================================
 # Integration: RULE_FAMILIES ordering and PhaseAssertions
 # ===========================================================================
 

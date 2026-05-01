@@ -201,11 +201,11 @@ class TextProcessor(object):
         return spans
 
     def store_sentence2(self, sentence, annotated_text, text_id, sentence_id, storeTag):
-        # sentence_query = """MATCH (ann:AnnotatedText) WHERE id(ann) = $ann_id
+        # sentence_query = """MATCH (ann:AnnotatedText) WHERE elementId(ann) = $ann_id
         #     MERGE (sentence:Sentence {id: $sentence_unique_id})
         #     SET sentence.text = $text
         #     MERGE (ann)-[:CONTAINS_SENTENCE]->(sentence)
-        #     RETURN id(sentence) as result
+        #     RETURN elementId(sentence) as result
         # """
 
 
@@ -213,10 +213,10 @@ class TextProcessor(object):
             MERGE (sentence:Sentence {id: $sentence_unique_id})
             SET sentence.text = $text
             MERGE (ann)-[:CONTAINS_SENTENCE]->(sentence)
-            RETURN id(sentence) as result
+            RETURN elementId(sentence) as result
         """
 
-        tag_occurrence_query = """MATCH (sentence:Sentence) WHERE id(sentence) = $sentence_id
+        tag_occurrence_query = """MATCH (sentence:Sentence) WHERE elementId(sentence) = $sentence_id
             WITH sentence, $tag_occurrences as tags
             FOREACH ( idx IN range(0,size(tags)-2) |
             MERGE (tagOccurrence1:TagOccurrence {id: tags[idx].id})
@@ -226,10 +226,10 @@ class TextProcessor(object):
             SET tagOccurrence2 = tags[idx + 1]
             MERGE (sentence)-[:HAS_TOKEN]->(tagOccurrence2)
             MERGE (tagOccurrence1)-[r:HAS_NEXT {sentence: sentence.id}]->(tagOccurrence2))
-            RETURN id(sentence) as result
+            RETURN elementId(sentence) as result
         """
 
-        tag_occurrence_with_tag_query = """MATCH (sentence:Sentence) WHERE id(sentence) = $sentence_id
+        tag_occurrence_with_tag_query = """MATCH (sentence:Sentence) WHERE elementId(sentence) = $sentence_id
             WITH sentence, $tag_occurrences as tags
             FOREACH ( idx IN range(0,size(tags)-2) |
             MERGE (tagOccurrence1:TagOccurrence {id: tags[idx].id})
@@ -241,7 +241,7 @@ class TextProcessor(object):
             MERGE (tagOccurrence1)-[r:HAS_NEXT {sentence: sentence.id}]->(tagOccurrence2))
             FOREACH (tagItem in [tag_occurrence IN $tag_occurrences WHERE tag_occurrence.is_stop = False] | 
             MERGE (tag:Tag {id: tagItem.lemma}) MERGE (tagOccurrence:TagOccurrence {id: tagItem.id}) MERGE (tag)<-[:HAS_LEMMA]-(tagOccurrence))
-            RETURN id(sentence) as result
+            RETURN elementId(sentence) as result
         """
 
         params = {"ann_id": annotated_text, "text": sentence.text,
@@ -497,7 +497,7 @@ class TextProcessor(object):
 
     # def create_annotated_text(self, doc, id):
     #     query = """MERGE (ann:AnnotatedText {id: $id})
-    #         RETURN id(ann) as result
+    #         RETURN elementId(ann) as result
     #     """
     #     params = {"id": id}
     #     results = self.execute_query(query, params)
@@ -598,8 +598,8 @@ class TextProcessor(object):
             WITH document
             MATCH (document)-[*2..3]->(ne1:NamedEntity)
             MATCH (entity1:Entity)<-[:REFERS_TO]-(ne1:NamedEntity)-[r:IS_RELATED_TO]->(ne2:NamedEntity)-[:REFERS_TO]->(entity2:Entity)
-            MERGE (evidence:Evidence {id: id(r), type:r.type})
-            MERGE (rel:Relationship {id: id(r), type:r.type})
+            MERGE (evidence:Evidence {id: elementId(r), type:r.type})
+            MERGE (rel:Relationship {id: elementId(r), type:r.type})
             MERGE (ne1)<-[:SOURCE]-(evidence)
             MERGE (ne2)<-[:DESTINATION]-(evidence)
             MERGE (rel)-[:HAS_EVIDENCE]->(evidence)
@@ -823,7 +823,7 @@ class Neo4jRepository:
 #             MERGE (sentence:Sentence {id: $sentence_unique_id})
 #             SET sentence.text = $text
 #             MERGE (ann)-[:CONTAINS_SENTENCE]->(sentence)
-#             RETURN id(sentence) as result
+#             RETURN elementId(sentence) as result
 #         """
 #         params = {"ann_id": annotated_text, "text": sentence.text, "sentence_unique_id": str(text_id) + "_" + str(sentence_id)}
 #         results = self.execute_query(sentence_query, params)
@@ -931,7 +931,7 @@ class Neo4jRepository:
 
 #     def get_tag_occurrence_query(self, store_tag):
 #         if store_tag:
-#             return """MATCH (sentence:Sentence) WHERE id(sentence) = $sentence_id
+#             return """MATCH (sentence:Sentence) WHERE elementId(sentence) = $sentence_id
 #                 WITH sentence, $tag_occurrences as tags
 #                 FOREACH ( idx IN range(0,size(tags)-2) |
 #                 MERGE (tagOccurrence1:TagOccurrence {id: tags[idx].id})
@@ -943,10 +943,10 @@ class Neo4jRepository:
 #                 MERGE (tagOccurrence1)-[r:HAS_NEXT {sentence: sentence.id}]->(tagOccurrence2))
 #                 FOREACH (tagItem in [tag_occurrence IN $tag_occurrences WHERE tag_occurrence.is_stop = False] | 
 #                 MERGE (tag:Tag {id: tagItem.lemma}) MERGE (tagOccurrence:TagOccurrence {id: tagItem.id}) MERGE (tag)<-[:REFERS_TO]-(tagOccurrence))
-#                 RETURN id(sentence) as result
+#                 RETURN elementId(sentence) as result
 #             """
 #         else:
-#             return """MATCH (sentence:Sentence) WHERE id(sentence) = $sentence_id
+#             return """MATCH (sentence:Sentence) WHERE elementId(sentence) = $sentence_id
 #             WITH sentence, $tag_occurrences as tags
 #             FOREACH ( idx IN range(0,size(tags)-2) |
 #             MERGE (tagOccurrence1:TagOccurrence {id: tags[idx].id})
@@ -956,5 +956,5 @@ class Neo4jRepository:
 #             SET tagOccurrence2 = tags[idx + 1]
 #             MERGE (sentence)-[:HAS_TOKEN]->(tagOccurrence2)
 #             MERGE (tagOccurrence1)-[r:HAS_NEXT {sentence: sentence.id}]->(tagOccurrence2))
-#             RETURN id(sentence) as result
+#             RETURN elementId(sentence) as result
 #         """

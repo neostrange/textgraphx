@@ -74,7 +74,7 @@ def suppress_bidirectional_same_rel_conflicts(graph: Any, shadow_only: bool = Fa
     """
     query_prefix = """
     MATCH (a)-[r1:TLINK]->(b), (b)-[r2:TLINK]->(a)
-    WHERE id(r1) < id(r2)
+    WHERE elementId(r1) < elementId(r2)
       AND coalesce(r1.suppressed, false) = false
       AND coalesce(r2.suppressed, false) = false
       AND coalesce(r1.relTypeCanonical, r1.relType, 'VAGUE')
@@ -88,7 +88,7 @@ def suppress_bidirectional_same_rel_conflicts(graph: Any, shadow_only: bool = Fa
          CASE
             WHEN c1 > c2 THEN r2
             WHEN c2 > c1 THEN r1
-            WHEN id(r1) < id(r2) THEN r2
+            WHEN elementId(r1) < elementId(r2) THEN r2
             ELSE r1
          END AS loser
     """

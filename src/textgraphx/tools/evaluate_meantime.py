@@ -139,6 +139,25 @@ def _build_parser() -> argparse.ArgumentParser:
             "Use 'all' to include all projected relations."
         ),
     )
+    parser.add_argument(
+        "--include-non-core-participants",
+        action="store_true",
+        default=False,
+        help=(
+            "Include non-core EVENT_PARTICIPANT/PARTICIPANT links in Neo4j projection. "
+            "Default behavior is core-only participant scoring."
+        ),
+    )
+    parser.add_argument(
+        "--non-core-participant-roles",
+        type=str,
+        default="",
+        help=(
+            "Optional comma-separated allowlist for non-core participant roles when "
+            "--include-non-core-participants is enabled (for example: ARG0,ARG1,ARGM-LOC). "
+            "Use 'all' or leave empty to include all non-core roles."
+        ),
+    )
     return parser
 
 
@@ -150,6 +169,19 @@ def _parse_relation_scope(raw: str | None) -> set[str] | None:
         return None
     parts = {p.strip().lower() for p in value.split(",") if p.strip()}
     return parts or None
+
+
+def _parse_non_core_participant_roles(raw: str | None) -> tuple[str, ...]:
+    """Parse non-core participant role allowlist from CLI option.
+
+    Returns uppercase roles (for example: ``("ARG0", "ARG1")``).
+    Empty tuple means no allowlist (include all non-core roles).
+    """
+    value = str(raw or "").strip()
+    if not value or value.lower() == "all":
+        return ()
+    roles = {part.strip().upper() for part in value.split(",") if part.strip()}
+    return tuple(sorted(roles))
 
 
 def _apply_relation_scope(doc: NormalizedDocument, allowed: set[str] | None) -> NormalizedDocument:
@@ -206,6 +238,10 @@ def _load_mapping(path: str | None) -> EvaluationMapping:
 def _evaluate_single(args: argparse.Namespace, mapping: EvaluationMapping) -> dict:
     gold_doc = parse_meantime_xml(args.gold)
     relation_scope = _parse_relation_scope(getattr(args, "relation_scope", None))
+    non_core_participant_roles = _parse_non_core_participant_roles(
+        getattr(args, "non_core_participant_roles", "")
+    )
+    include_non_core_participants = bool(getattr(args, "include_non_core_participants", False))
 
     if args.pred_xml:
         predicted_doc = parse_meantime_xml(args.pred_xml)
@@ -222,9 +258,11 @@ def _evaluate_single(args: argparse.Namespace, mapping: EvaluationMapping) -> di
                 doc_id=args.doc_id,
                 gold_token_sequence=gold_doc.token_sequence,
                 discourse_only=getattr(args, "discourse_only", False),
-                    normalize_nominal_boundaries=getattr(args, "normalize_nominal_boundaries", True),
-                    gold_like_nominal_filter=getattr(args, "gold_like_nominal_filter", False),
-                    nominal_profile_mode=getattr(args, "nominal_profile_mode", "all"),
+                normalize_nominal_boundaries=getattr(args, "normalize_nominal_boundaries", True),
+                gold_like_nominal_filter=getattr(args, "gold_like_nominal_filter", False),
+                nominal_profile_mode=getattr(args, "nominal_profile_mode", "all"),
+                include_non_core_participants=include_non_core_participants,
+                non_core_participant_roles=non_core_participant_roles,
             )
             projection_determinism = check_projection_determinism(
                 graph=graph,
@@ -235,6 +273,8 @@ def _evaluate_single(args: argparse.Namespace, mapping: EvaluationMapping) -> di
                 normalize_nominal_boundaries=getattr(args, "normalize_nominal_boundaries", True),
                 gold_like_nominal_filter=getattr(args, "gold_like_nominal_filter", False),
                 nominal_profile_mode=getattr(args, "nominal_profile_mode", "all"),
+                include_non_core_participants=include_non_core_participants,
+                non_core_participant_roles=non_core_participant_roles,
             )
         finally:
             if hasattr(graph, "close"):
@@ -265,6 +305,17 @@ def _evaluate_single(args: argparse.Namespace, mapping: EvaluationMapping) -> di
         "entity_filter": "DiscourseEntity label" if getattr(args, "discourse_only", False) else "none",
         "event_filter": "none",
         "relation_scope": "all" if relation_scope is None else sorted(relation_scope),
+        "participant_scope": (
+            "core+non-core"
+            if include_non_core_participants
+            else "core-only"
+        ),
+        "non_core_participant_role_mode": (
+            "disabled"
+            if not include_non_core_participants
+            else ("all" if not non_core_participant_roles else "allowlist")
+        ),
+        "non_core_participant_roles": list(non_core_participant_roles),
         "nominal_profile_mode": str(getattr(args, "nominal_profile_mode", "all")),
         "gold_like_nominal_filter": bool(getattr(args, "gold_like_nominal_filter", False)),
         "nominal_precision_filters": bool(getattr(args, "nominal_precision_filters", False)),
@@ -287,6 +338,10 @@ def _evaluate_batch(args: argparse.Namespace, mapping: EvaluationMapping) -> dic
 
         graph = make_graph_from_config()
     relation_scope = _parse_relation_scope(getattr(args, "relation_scope", None))
+    non_core_participant_roles = _parse_non_core_participant_roles(
+        getattr(args, "non_core_participant_roles", "")
+    )
+    include_non_core_participants = bool(getattr(args, "include_non_core_participants", False))
     try:
         for gold_path in gold_files:
             gold_doc = parse_meantime_xml(str(gold_path))
@@ -305,6 +360,8 @@ def _evaluate_batch(args: argparse.Namespace, mapping: EvaluationMapping) -> dic
                     normalize_nominal_boundaries=getattr(args, "normalize_nominal_boundaries", True),
                     gold_like_nominal_filter=getattr(args, "gold_like_nominal_filter", False),
                     nominal_profile_mode=getattr(args, "nominal_profile_mode", "all"),
+                    include_non_core_participants=include_non_core_participants,
+                    non_core_participant_roles=non_core_participant_roles,
                 )
                 if graph is not None and getattr(args, "projection_determinism_runs", None) is not None:
                     projection_determinism_by_doc[str(gold_doc.doc_id)] = check_projection_determinism(
@@ -316,6 +373,8 @@ def _evaluate_batch(args: argparse.Namespace, mapping: EvaluationMapping) -> dic
                         normalize_nominal_boundaries=getattr(args, "normalize_nominal_boundaries", True),
                         gold_like_nominal_filter=getattr(args, "gold_like_nominal_filter", False),
                         nominal_profile_mode=getattr(args, "nominal_profile_mode", "all"),
+                        include_non_core_participants=include_non_core_participants,
+                        non_core_participant_roles=non_core_participant_roles,
                     )
 
             gold_doc = _apply_relation_scope(gold_doc, relation_scope)
@@ -372,6 +431,17 @@ def _evaluate_batch(args: argparse.Namespace, mapping: EvaluationMapping) -> dic
             "entity_filter": "DiscourseEntity label" if getattr(args, "discourse_only", False) else "none",
             "event_filter": "none",
             "relation_scope": "all" if relation_scope is None else sorted(relation_scope),
+            "participant_scope": (
+                "core+non-core"
+                if include_non_core_participants
+                else "core-only"
+            ),
+            "non_core_participant_role_mode": (
+                "disabled"
+                if not include_non_core_participants
+                else ("all" if not non_core_participant_roles else "allowlist")
+            ),
+            "non_core_participant_roles": list(non_core_participant_roles),
             "nominal_profile_mode": str(getattr(args, "nominal_profile_mode", "all")),
             "gold_like_nominal_filter": bool(getattr(args, "gold_like_nominal_filter", False)),
             "nominal_precision_filters": bool(getattr(args, "nominal_precision_filters", False)),

@@ -1,6 +1,8 @@
 """Phase-0 tests for local service caller robustness and timeout configuration."""
 
+import importlib
 import json
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -19,9 +21,17 @@ class _FakeResponse:
         return json.loads(self.text)
 
 
+def _fresh_restcaller_module():
+    # Some legacy wrapper tests install stub modules directly into sys.modules
+    # and do not restore them. Ensure this test imports the real compatibility
+    # module from disk, not a stale fake.
+    sys.modules.pop("textgraphx.util.RestCaller", None)
+    return importlib.import_module("textgraphx.util.RestCaller")
+
+
 @pytest.mark.unit
 def test_call_allennlp_api_uses_configured_timeout(monkeypatch):
-    from textgraphx.util import RestCaller
+    RestCaller = _fresh_restcaller_module()
 
     fake_cfg = SimpleNamespace(services=SimpleNamespace(service_timeout_sec=9, srl_url="http://localhost:8000/predict"))
     seen = {}
@@ -42,7 +52,7 @@ def test_call_allennlp_api_uses_configured_timeout(monkeypatch):
 
 @pytest.mark.unit
 def test_call_allennlp_api_returns_empty_dict_on_invalid_json(monkeypatch):
-    from textgraphx.util import RestCaller
+    RestCaller = _fresh_restcaller_module()
 
     fake_cfg = SimpleNamespace(services=SimpleNamespace(service_timeout_sec=3, srl_url="http://localhost:8000/predict"))
 

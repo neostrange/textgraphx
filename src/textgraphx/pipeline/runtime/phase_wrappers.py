@@ -685,7 +685,12 @@ class TemporalPhaseWrapper:
         with log_section(self.logger, "TEMPORAL PHASE - Temporal Entity & Relation Extraction"):
             try:
                 with log_subsection(self.logger, "Importing TemporalPhase"):
-                    from textgraphx.TemporalPhase import TemporalPhase
+                    try:
+                        # Preferred runtime import path (also easiest to monkeypatch in tests).
+                        from textgraphx.pipeline.temporal.extraction import TemporalPhase
+                    except Exception:
+                        # Backward-compatible fallback.
+                        from textgraphx.TemporalPhase import TemporalPhase
                     self.logger.debug("TemporalPhase imported successfully")
                 
                 with log_subsection(self.logger, "Initializing TemporalPhase"):
@@ -847,6 +852,8 @@ class EventEnrichmentPhaseWrapper:
                 # Run all enrichment steps
                 enrichment_steps = [
                     ("Linking frame arguments to events", enricher.link_frameArgument_to_event),
+                    ("Promoting NOMBANK frames to TEvents (D2)", enricher.promote_nombank_frames_to_tevents),
+                    ("Merging ALIGNS_WITH event clusters (D-Refinement)", enricher.merge_aligns_with_event_clusters),
                     ("Adding core participants to events", enricher.add_core_participants_to_event),
                     ("Adding non-core participants to events", enricher.add_non_core_participants_to_event),
                     ("Adding labels to non-core frame arguments", enricher.add_label_to_non_core_fa),
@@ -1241,7 +1248,7 @@ class DBpediaEnrichmentPhaseWrapper:
         graph.run(
             """
             MATCH (n)
-            WHERE id(n) = $node_id
+            WHERE elementId(n) = $node_id
             OPTIONAL MATCH (n)-[:REFERS_TO]->(e:Entity)
             SET n.dbpedia_lookup_text = $lookup_text,
                 n.dbpedia_resolution_status = $resolution_status,
@@ -1288,7 +1295,7 @@ class DBpediaEnrichmentPhaseWrapper:
         graph.run(
             """
             MATCH (n)
-            WHERE id(n) = $node_id
+            WHERE elementId(n) = $node_id
             OPTIONAL MATCH (n)-[:REFERS_TO]->(e:Entity)
             SET n.dbpedia_source = 'dbpedia_sparql',
                 n.dbpedia_resource = $resource_uri,
@@ -1359,7 +1366,7 @@ class DBpediaEnrichmentPhaseWrapper:
                              max(tok.tok_index_doc) AS end_tok
                         RETURN d.id AS doc_id,
                                d.text AS document_text,
-                               id(n) AS element_id,
+                               elementId(n) AS element_id,
                                coalesce(n.type, '') AS entity_type,
                                coalesce(n.normal_term, n.value, n.head, n.kb_id, '') AS lookup_text,
                                n.value AS value,
@@ -1583,6 +1590,8 @@ class TlinksRecognizerWrapper:
                     (5, recognizer.create_tlinks_case5, "Case 5: Special Cases"),
                     (6, recognizer.create_tlinks_case6, "Case 6: Final TLINK Patterns"),
                     (7, recognizer.create_tlinks_case7, "Case 7: Clause/Scope Connective TLINKs"),
+                    (8, recognizer.create_tlinks_case8, "Case 8: NOMBANK Event–DCT Anchors"),
+                    (9, recognizer.create_tlinks_case9, "Case 9: NOMBANK Event–Sentence TIMEX"),
                 ]
                 
                 self.logger.info(f"Starting {len(tlink_cases)} TLINK recognition cases")

@@ -1,6 +1,8 @@
 import logging
 from textgraphx.database.client import make_graph_from_config
 from textgraphx.utils.id_utils import make_frame_id, make_fa_id
+from textgraphx.adapters.srl_role_normalizer import normalize_role
+from textgraphx.infrastructure.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -53,19 +55,29 @@ class SRLProcessor:
         """
 
         frame_id = make_frame_id(doc_id, start, end)
+        # Determine provisional flag: a frame is provisional when sense_conf is
+        # provided but falls below the configured gating threshold.
+        try:
+            threshold = get_config().ingestion.frame_confidence_min
+        except Exception:
+            threshold = 0.50
+        provisional = (
+            sense_conf is not None and sense_conf < threshold
+        )
         query = """
         MERGE (f:Frame {id: $frame_id})
         SET f.headword = $headword, f.headTokenIndex = $head_index, f.text = $text,
             f.framework = $framework,
             f.start_tok = $start, f.end_tok = $end,
-            f.startIndex = $start, f.endIndex = $end
+            f.startIndex = $start, f.endIndex = $end,
+            f.provisional = $provisional
         FOREACH (_ IN CASE WHEN $sense IS NULL THEN [] ELSE [1] END |
             SET f.sense = $sense
         )
         FOREACH (_ IN CASE WHEN $sense_conf IS NULL THEN [] ELSE [1] END |
             SET f.sense_conf = $sense_conf
         )
-        RETURN id(f) as frame_node_id
+        RETURN elementId(f) as frame_node_id
         """
         params = {
             "frame_id": frame_id,
@@ -77,6 +89,7 @@ class SRLProcessor:
             "framework": framework,
             "sense": sense,
             "sense_conf": sense_conf,
+            "provisional": provisional,
         }
         self.graph.run(query, params)
         logger.debug(
@@ -116,7 +129,10 @@ class SRLProcessor:
             end: End token index (inclusive).
             head: Surface text of the head token.
             head_index: Token index of the head token.
-            arg_type: SRL label for the argument (e.g., 'ARG0', 'ARGM-TMP').
+            arg_type: Canonical SRL label for the argument (e.g., 'ARG0',
+                'ARGM-TMP'). Continuation/relative/predicative prefixes/suffixes
+                must already have been stripped by the caller via
+                :func:`normalize_role`.
             text: Surface text of the argument span.
 
         Returns:
@@ -129,12 +145,49 @@ class SRLProcessor:
         SET a.head = $head, a.headTokenIndex = $head_index, a.type = $arg_type, a.text = $text,
             a.start_tok = $start, a.end_tok = $end,
             a.startIndex = $start, a.endIndex = $end
-        RETURN id(a) as arg_node_id
+        RETURN elementId(a) as arg_node_id
         """
         params = {"arg_id": arg_id, "head": head, "head_index": head_index, "arg_type": arg_type, "text": text, "start": start, "end": end}
         self.graph.run(query, params)
         logger.debug("_merge_frame_argument created arg_id=%s type=%s span=%s-%s", arg_id, arg_type, start, end)
         return arg_id
+
+    def _link_argument_to_frame(self, arg_id, frame_id, raw_label):
+        """Link a FrameArgument to its Frame via PARTICIPANT and HAS_FRAME_ARGUMENT.
+
+        Normalizes the raw label to strip continuation/relative/predicative
+        affixes and stores the result as ``r.type``.  The raw label is stored
+        as ``r.raw_role`` for provenance.  Extra normalization flags
+        (``is_continuation``, ``is_relative``, ``predicative``) are stored as
+        edge properties when truthy.
+        """
+        norm = normalize_role(raw_label)
+        q = """
+        MATCH (a:FrameArgument {id: $arg_id})
+        MATCH (f:Frame {id: $frame_id})
+        MERGE (a)-[r:PARTICIPANT]->(f)
+        SET r.type = $canonical, r.raw_role = $raw
+        FOREACH (_ IN CASE WHEN $is_continuation THEN [1] ELSE [] END | SET r.is_continuation = true)
+        FOREACH (_ IN CASE WHEN $is_relative     THEN [1] ELSE [] END | SET r.is_relative     = true)
+        FOREACH (_ IN CASE WHEN $predicative      THEN [1] ELSE [] END | SET r.predicative      = true)
+        MERGE (a)-[cr:HAS_FRAME_ARGUMENT]->(f)
+        SET cr.type = $canonical, cr.raw_role = $raw
+        RETURN elementId(r)
+        """
+        params = {
+            "arg_id": arg_id,
+            "frame_id": frame_id,
+            "canonical": norm.canonical,
+            "raw": norm.raw,
+            "is_continuation": norm.flags.get("is_continuation", False),
+            "is_relative": norm.flags.get("is_relative", False),
+            "predicative": norm.flags.get("predicative", False),
+        }
+        self.graph.run(q, params)
+        logger.debug(
+            "Linked FrameArgument %s to Frame %s canonical=%s raw=%s flags=%s",
+            arg_id, frame_id, norm.canonical, norm.raw, norm.flags,
+        )
 
     def process_srl(self, doc, flag_display=False):
         """Process SRL frames for a spaCy document and store frames and
@@ -195,17 +248,7 @@ class SRLProcessor:
             if sg_id is not None:
                 for arg_type, arg_ids in frameDict.items():
                     for arg_id in arg_ids:
-                        q = """
-                        MATCH (a:FrameArgument {id: $arg_id})
-                        MATCH (f:Frame {id: $frame_id})
-                        MERGE (a)-[r:PARTICIPANT]->(f)
-                        SET r.type = $arg_type
-                        MERGE (a)-[cr:HAS_FRAME_ARGUMENT]->(f)
-                        SET cr.type = $arg_type
-                        RETURN id(r)
-                        """
-                        params = {"arg_id": arg_id, "frame_id": sg_id, "arg_type": arg_type}
-                        self.graph.run(q, params)
+                        self._link_argument_to_frame(arg_id, sg_id, arg_type)
                         logger.debug("Linked FrameArgument %s to Frame %s", arg_id, sg_id)
 
     @staticmethod
@@ -301,18 +344,7 @@ class SRLProcessor:
                         doc_id, list(range(s_doc, e_doc + 1)),
                         "FrameArgument", "id", arg_id,
                     )
-                    q = """
-                    MATCH (a:FrameArgument {id: $arg_id})
-                    MATCH (f:Frame {id: $frame_id})
-                    MERGE (a)-[r:PARTICIPANT]->(f)
-                    SET r.type = $arg_type
-                    MERGE (a)-[cr:HAS_FRAME_ARGUMENT]->(f)
-                    SET cr.type = $arg_type
-                    RETURN id(r)
-                    """
-                    self.graph.run(q, {
-                        "arg_id": arg_id, "frame_id": frame_id, "arg_type": label,
-                    })
+                    self._link_argument_to_frame(arg_id, frame_id, label)
                 logger.debug(
                     "process_nominal_srl: doc=%s pred=%s sense=%s args=%d",
                     doc_id, pred_text, sense, len(arg_spans),

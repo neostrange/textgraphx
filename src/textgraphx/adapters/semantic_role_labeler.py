@@ -158,6 +158,13 @@ class SemanticRoleLabel:
                     else:
                         srl_tags[key] = value
 
+                # Capture PropBank sense and confidence from transformer-srl service
+                # (legacy AllenNLP does not provide these fields; they are ignored if absent)
+                if "frame" in frame_verb and frame_verb["frame"]:
+                    srl_tags["__frame__"] = frame_verb["frame"]
+                if "frame_score" in frame_verb and frame_verb["frame_score"] is not None:
+                    srl_tags["__frame_score__"] = frame_verb["frame_score"]
+
         return srl_tags
 
 

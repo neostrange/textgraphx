@@ -410,22 +410,44 @@ class GraphBasedNLP(GraphDBBase):
             self.__text_processor.srl_processor.process_srl(doc)
 
             # Optional: nominal SRL via the CogComp microservice. The call is a
-            # no-op when `services.nom_srl_url` is unset (callNominalSrlApi
-            # returns {} in that case), so this block is safe to leave in by
-            # default.
+            # no-op when `services.nom_srl_url` is unset (callNominalSrlApiBatch
+            # returns [] of empty dicts in that case), so this block is safe to
+            # leave in by default.
             try:
-                from textgraphx.adapters.rest_caller import callNominalSrlApi
-                nom_results = []
-                for sent in doc.sents:
-                    resp = callNominalSrlApi(sent.text)
-                    if resp:
-                        nom_results.append((sent.start, resp))
+                from textgraphx.adapters.rest_caller import callNominalSrlApiBatch
+                sents_list = list(doc.sents)
+                nom_responses = callNominalSrlApiBatch([s.text for s in sents_list])
+                nom_results = [
+                    (sents_list[i].start, nom_responses[i])
+                    for i in range(len(sents_list))
+                    if nom_responses[i]
+                ]
                 if nom_results:
                     self.__text_processor.srl_processor.process_nominal_srl(
                         doc, nom_results,
                     )
             except Exception:  # pragma: no cover - service is advisory
                 logger.exception("Nominal SRL pass failed; continuing without it")
+
+            # Cross-framework frame fusion: create ALIGNS_WITH edges between
+            # PROPBANK (verbal) and NOMBANK (nominal) frames that describe the
+            # same predicate situation.  This is an advisory-tier enrichment;
+            # failures must not abort the document.
+            try:
+                from textgraphx.adapters.srl_frame_aligner import (
+                    run_cross_framework_alignment,
+                )
+                _graph = self.__text_processor.srl_processor.graph
+                _aligned = run_cross_framework_alignment(_graph, text_id)
+                if _aligned:
+                    logger.debug(
+                        "Cross-framework alignment: %d ALIGNS_WITH edges for doc %s",
+                        _aligned, text_id,
+                    )
+            except Exception:  # pragma: no cover - advisory enrichment
+                logger.exception(
+                    "Cross-framework alignment failed for doc %s; continuing", text_id
+                )
             # Define the rules for relationship extraction
             rules = [
                 {

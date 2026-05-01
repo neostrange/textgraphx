@@ -29,6 +29,12 @@ Dense, link-only entry point. If you are not sure where to go, start here.
 - [docs/SCHEMA_REDESIGN_FOR_MEANTIME_PARITY.md](docs/SCHEMA_REDESIGN_FOR_MEANTIME_PARITY.md)
 - Machine-readable ontology: [src/textgraphx/schema/ontology.json](src/textgraphx/schema/ontology.json)
 
+## NLP Components
+
+- [docs/SRL_FRAMEWORKS.md](docs/SRL_FRAMEWORKS.md) — PropBank (verbal) and NomBank (nominal) SRL, role normalization, `ALIGNS_WITH`
+- [docs/COREF_POLICY.md](docs/COREF_POLICY.md) — Coreference backend decision; maverick-coref deprecation
+- [docs/nombank_integration.md](docs/nombank_integration.md) — CogComp SRL-English integration notes
+
 ## Evaluate
 
 - [docs/COMPREHENSIVE_EVALUATION_FRAMEWORK.md](docs/COMPREHENSIVE_EVALUATION_FRAMEWORK.md)

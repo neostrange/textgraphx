@@ -259,6 +259,26 @@ class TestParticipantReaderPreference:
         assert "e.type IN" in cypher
         assert "AND (e:Entity OR e:NUMERIC OR e:VALUE)" not in cypher
 
+    def test_add_core_participants_prefers_namedentity_when_available(self):
+        enricher, graph = _make_enricher()
+
+        enricher.add_core_participants_to_event()
+
+        cypher = graph.run.call_args_list[0][0][0]
+        assert "MATCH (fa)-[:REFERS_TO]->(ne_pref:NamedEntity)" in cypher
+        assert "WHERE NOT (coalesce(ne_pref.type, '') IN ['CARDINAL', 'ORDINAL', 'MONEY', 'QUANTITY', 'PERCENT'])" in cypher
+        assert "coalesce(e.syntactic_type, e.syntacticType, '') IN ['NAM', 'NOM', 'PRO', 'CONJ', 'PRE.NOM', 'APP', 'HLS']" in cypher
+
+    def test_add_core_participants_marks_eventmention_links_non_core(self):
+        enricher, graph = _make_enricher()
+
+        enricher.add_core_participants_to_event()
+
+        mention_cypher = graph.run.call_args_list[1][0][0]
+        assert "MATCH (f:Frame)-[:INSTANTIATES]->(em:EventMention)-[:REFERS_TO]->(event:TEvent)" in mention_cypher
+        assert "r.is_core = false" in mention_cypher
+        assert "nr.is_core = false" in mention_cypher
+
     def test_add_non_core_participants_uses_canonical_first_with_fallback(self):
         enricher, graph = _make_enricher()
 

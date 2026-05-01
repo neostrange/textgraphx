@@ -90,7 +90,7 @@
       ]
     },
     "Frame": {
-      "purpose": "SRL predicate frame",
+      "purpose": "SRL predicate frame anchored to a span in the token graph",
       "key_properties": [
         "id",
         "headword",
@@ -98,6 +98,24 @@
         "text",
         "startIndex",
         "endIndex"
+      ],
+      "optional_properties": [
+        "framework",
+        "sense",
+        "sense_conf",
+        "provisional",
+        "raw_role_count"
+      ],
+      "property_notes": {
+        "framework": "Sense inventory: PROPBANK (verbal, transformer-srl port 8010) or NOMBANK (nominal, CogComp port 8011). Required when written by an SRL pass.",
+        "sense": "Roleset sense id e.g. 'attack.01'. Advisory-tier; omitted when upstream service does not provide it.",
+        "sense_conf": "Float confidence for sense. Advisory-tier; omitted when not provided.",
+        "provisional": "Boolean flag set true when frame_confidence < ingestion gating threshold.",
+        "raw_role_count": "Number of raw (pre-normalization) argument labels stored on PARTICIPANT edges. Advisory."
+      },
+      "edges_out": [
+        {"type": "ALIGNS_WITH", "to": "Frame", "tier": "optional",
+         "note": "Links verbal (PROPBANK) and nominal (NOMBANK) frames that describe the same situation. Confidence-weighted."}
       ],
       "id_convention": "frame_<doc>_<start>_<end>"
     },
@@ -275,6 +293,7 @@
     "CREATED_ON": "AnnotatedText|PhaseRun|RefinementRun -> date/time literal (properties: date)",
     "FRAME_DESCRIBES_EVENT": "Frame -> TEvent (canonical replacement for DESCRIBES in this context)",
     "INSTANTIATES": "Frame -> EventMention (canonical frame-to-mention event instantiation)",
+    "ALIGNS_WITH": "Frame -> Frame (optional; links PROPBANK and NOMBANK frames that describe the same situation; properties: confidence, alignment_key)",
     "HAS_FRAME_ARGUMENT": "FrameArgument -> Frame (canonical replacement for PARTICIPANT in this context)",
     "EVENT_PARTICIPANT": "Entity|NUMERIC|FrameArgument|VALUE -> TEvent|EventMention (canonical replacement for PARTICIPANT in participant context)",
     "MODIFIES": "FrameArgument -> TEvent|EventMention (non-core semantic modifier relation)",
@@ -830,7 +849,11 @@
       "0020_add_uid_constraints_for_mentions.cypher",
       "0021_backfill_coref_uid.cypher",
       "0022_add_coref_uid_constraints.cypher",
-      "0023_add_timexmention_constraints.cypher"
+      "0023_add_timexmention_constraints.cypher",
+      "0024_normalize_entity_ids.cypher",
+      "0025_nounchunk_uniqueness.cypher",
+      "0026_add_mention_superlabel.cypher",
+      "0027_graph_native_edges.cypher"
     ]
   },
   "legacy_layer_policy": {

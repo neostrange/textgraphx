@@ -36,10 +36,15 @@ naf_sentence_mode = "auto"
 [services]
 # External NLP service endpoints (override with env vars WSD_API_URL, COREF_SERVICE_URL, etc.)
 wsd_url = "http://localhost:81/api/model"
-coref_url = "http://localhost:9999/coreference_resolution"
+# Optional external coreference service. Leave empty to use spaCy coref output
+# when available (for example, via spacy-experimental components in the active pipeline).
+coref_url = ""
 temporal_url = "http://localhost:5050/annotate"
 heideltime_url = "http://localhost:5000/annotate"
-srl_url = "http://localhost:8000/predict"
+# transformer-srl 2.4.6 (PropBank verbal SRL) — port 8010
+srl_url = "http://localhost:8010/predict"
+# CogComp nominal SRL (NomBank) — port 8011. Set to empty string to disable.
+nom_srl_url = "http://localhost:8011/predict_nom"
 llm_url = "http://localhost:11434/api/generate"
 # Optional DBpedia endpoint enrichment phase (enable via features.enable_dbpedia_enrichment)
 dbpedia_sparql_url = "https://dbpedia.org/sparql"

@@ -75,23 +75,41 @@ class EventEnrichmentPhase():
         return defaults.get(field_name, ("temporal_phase", 0.90))
 
     @staticmethod
-    def _participant_source_subquery(frame_argument_alias="fa", source_alias="participant", include_frame_argument=False):
+    def _participant_source_subquery(
+        frame_argument_alias="fa",
+        source_alias="participant",
+        include_frame_argument=False,
+        include_general_namedentity=False,
+        prefer_namedentity_over_entity=False,
+    ):
         """Return a Cypher subquery resolving participant sources with canonical preference.
 
         Resolution order is:
-        1. canonical `Entity`
+             1. canonical `Entity` (or fallback if no preferred NamedEntity)
         2. canonical `VALUE`
-        3. legacy fallback NamedEntity of numeric/value semantic type (CARDINAL, ORDINAL,
-           MONEY, QUANTITY, PERCENT) — independent of whether the transitional :NUMERIC
-           or :VALUE labels have been written.
+                 3. legacy fallback NamedEntity of numeric/value semantic type (CARDINAL,
+                     ORDINAL, MONEY, QUANTITY, PERCENT)
+                 4. optional guarded fallback to general NamedEntity when canonical
+                    Entity/VALUE is unavailable for the FrameArgument
 
         Some semantic-relation paths also allow `FrameArgument` as a direct
         source during the maintained transition period.
         """
+        if prefer_namedentity_over_entity:
+            entity_guard = (
+                "AND NOT EXISTS { "
+                f"MATCH ({frame_argument_alias})-[:REFERS_TO]->(ne_pref:NamedEntity) "
+                "WHERE NOT (coalesce(ne_pref.type, '') IN ['CARDINAL', 'ORDINAL', 'MONEY', 'QUANTITY', 'PERCENT']) "
+                "}"
+            )
+        else:
+            entity_guard = ""
+
         branches = [
             f"""
                     WITH {frame_argument_alias}
                     MATCH ({frame_argument_alias})-[:REFERS_TO]->({source_alias}:Entity)
+                    WHERE true {entity_guard}
                     RETURN {source_alias}
             """,
             f"""
@@ -106,6 +124,24 @@ class EventEnrichmentPhase():
                     RETURN {source_alias}
             """,
         ]
+        if include_general_namedentity:
+            if prefer_namedentity_over_entity:
+                general_namedentity_guard = ""
+            else:
+                general_namedentity_guard = (
+                    f"AND NOT EXISTS {{ MATCH ({frame_argument_alias})-[:REFERS_TO]->(:Entity) }}\n"
+                    f"                      AND NOT EXISTS {{ MATCH ({frame_argument_alias})-[:REFERS_TO]->(:VALUE) }}"
+                )
+            branches.append(
+                f"""
+                    WITH {frame_argument_alias}
+                    MATCH ({frame_argument_alias})-[:REFERS_TO]->({source_alias}:NamedEntity)
+                    WHERE NOT (coalesce({source_alias}.type, '') IN ['CARDINAL', 'ORDINAL', 'MONEY', 'QUANTITY', 'PERCENT'])
+                      AND coalesce({source_alias}.syntactic_type, {source_alias}.syntacticType, '') IN ['NAM', 'NOM', 'PRO', 'CONJ', 'PRE.NOM', 'APP', 'HLS']
+                      {general_namedentity_guard}
+                    RETURN {source_alias}
+                """
+            )
         if include_frame_argument:
             branches.append(
                 f"""
@@ -121,9 +157,7 @@ class EventEnrichmentPhase():
         """Return a Cypher subquery collecting participant-support sources with canonical preference.
 
         Support evidence is counted across canonical `Entity`, canonical `VALUE`,
-        and legacy fallback NamedEntity of numeric/value semantic type (CARDINAL, ORDINAL,
-        MONEY, QUANTITY, PERCENT) — independent of whether the transitional :NUMERIC
-        or :VALUE labels have been written.
+        and legacy fallback NamedEntity of numeric/value type.
         The subquery returns list batches so outer rows remain available even when
         an event has no participants.
         """
@@ -162,7 +196,7 @@ class EventEnrichmentPhase():
         query = f"""
         MATCH (em:EventMention)-[:REFERS_TO]->(te:TEvent)
         WHERE em.{field_name} IS NOT NULL
-        RETURN id(te) AS te_id,
+        RETURN elementId(te) AS te_id,
                te.{field_name} AS existing_value,
                em.{field_name} AS incoming_value,
                te.{field_name}Source AS existing_source,
@@ -200,7 +234,7 @@ class EventEnrichmentPhase():
             resolved = item["resolved"]
             update_query = f"""
             MATCH (te:TEvent)
-            WHERE id(te) = $te_id
+            WHERE elementId(te) = $te_id
             SET te.{field_name} = $value,
                 te.{field_name}Source = $source,
                 te.{field_name}Confidence = $confidence,
@@ -550,8 +584,11 @@ class EventEnrichmentPhase():
         linked = 0
 
         # Path 1: token directly participates in Frame and triggers TEvent
+        # Guard: skip provisional frames (low-confidence sense assignment) to avoid
+        # polluting the event layer with speculative SRL evidence.
         query_direct = """
             MATCH (f:Frame)<-[:PARTICIPATES_IN|IN_FRAME]-(t:TagOccurrence)-[:TRIGGERS]->(event:TEvent)
+            WHERE coalesce(f.provisional, false) = false
             MERGE (f)-[:DESCRIBES]->(event)
             MERGE (f)-[:FRAME_DESCRIBES_EVENT]->(event)
             RETURN count(*) AS linked
@@ -563,6 +600,7 @@ class EventEnrichmentPhase():
         # Path 2: token participates in FrameArgument whose Frame triggers TEvent
         query_via_arg = """
             MATCH (f:Frame)<-[:PARTICIPANT]-(fa:FrameArgument)
+            WHERE coalesce(f.provisional, false) = false
             MATCH (fa)<-[:PARTICIPATES_IN|IN_FRAME]-(t:TagOccurrence)-[:TRIGGERS]->(event:TEvent)
             MERGE (f)-[:DESCRIBES]->(event)
             MERGE (f)-[:FRAME_DESCRIBES_EVENT]->(event)
@@ -590,6 +628,306 @@ class EventEnrichmentPhase():
         return linked
 
 
+    def promote_nombank_frames_to_tevents(self):
+        """Promote eventive-nominal NOMBANK frames to TEvent nodes (D2).
+
+        NOMBANK captures event semantics expressed through nouns (e.g., "the acquisition",
+        "the merger", "his resignation").  Standard ``materialize_tevents()`` skips NOMBANK
+        frames because it focuses on verbal predicates.  This method bridges the gap:
+
+        1. Find NOMBANK Frame nodes that pass the eventive-nominal filter (re-uses
+           ``TemporalPhase._is_eventive_nominal``).
+        2. For each qualifying frame that does *not* yet have a ``DESCRIBES``/
+           ``FRAME_DESCRIBES_EVENT`` edge to any ``TEvent``, create a new ``TEvent``
+           and wire it.
+        3. Link head tokens via ``TRIGGERS``.
+
+        Non-fatal: any exception is logged and the method returns 0 without re-raising.
+        """
+        logger.debug("promote_nombank_frames_to_tevents")
+
+        try:
+            from textgraphx.pipeline.phases.temporal import TemporalPhase as _TP
+            _is_eventive = _TP._is_eventive_nominal
+        except Exception:
+            logger.warning(
+                "promote_nombank_frames_to_tevents: could not import _is_eventive_nominal; skipping"
+            )
+            return 0
+
+        # Pull all NOMBANK frames not yet linked to a TEvent.
+        candidate_query = """
+        MATCH (a:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)
+              -[:HAS_TOKEN]->(tok:TagOccurrence)
+              -[:PARTICIPATES_IN]->(f:Frame {framework: 'NOMBANK'})
+        WHERE coalesce(f.provisional, false) = false
+          AND NOT exists((f)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(:TEvent))
+            AND exists {
+                MATCH (fa_core:FrameArgument)-[:HAS_FRAME_ARGUMENT|PARTICIPANT]->(f)
+                WHERE toUpper(coalesce(fa_core.type, '')) IN ['ARG0', 'ARG1', 'A0', 'A1']
+            }
+        WITH f, a, tok
+        ORDER BY tok.tok_index_doc
+        WITH f, a, collect(DISTINCT tok)[0] AS head_tok,
+             min(tok.tok_index_doc) AS min_tok,
+             max(tok.tok_index_doc) AS max_tok
+        RETURN f.id AS frame_id,
+               coalesce(f.predicate, f.frame) AS headword,
+               a.id AS doc_id,
+               head_tok.id AS head_tok_id,
+               min_tok, max_tok
+        """
+        try:
+            rows = self.graph.run(candidate_query).data()
+        except Exception:
+            logger.exception("promote_nombank_frames_to_tevents: candidate query failed")
+            return 0
+
+        promoted = 0
+        import hashlib as _hashlib
+        for row in rows:
+            headword = (row.get("headword") or "").strip().lower()
+            if not headword:
+                continue
+            if not _is_eventive(headword):
+                continue
+
+            frame_id = row["frame_id"]
+            doc_id = row["doc_id"]
+            min_tok = row["min_tok"]
+            max_tok = row["max_tok"]
+            # Deterministic TEvent id: same scheme as materialize_tevents fallback
+            raw = f"nombank:{doc_id}:{min_tok}:{max_tok}:{headword}"
+            event_id = int(_hashlib.md5(raw.encode()).hexdigest(), 16) % (10 ** 9)
+
+            upsert_query = """
+            MERGE (event:TEvent {id: $event_id, doc_id: toInteger($doc_id)})
+            ON CREATE SET
+                event.text       = $headword,
+                event.class      = 'OCCURRENCE',
+                event.pos        = 'NN',
+                event.source     = 'nombank_srl',
+                event.start_tok  = $min_tok,
+                event.end_tok    = $max_tok,
+                event.confidence = 0.70,
+                event.is_timeml_core = true,
+                event.low_confidence = false
+            WITH event
+            MATCH (f:Frame {id: $frame_id})
+            MERGE (f)-[:DESCRIBES]->(event)
+            MERGE (f)-[:FRAME_DESCRIBES_EVENT]->(event)
+            WITH event, f
+            MATCH (tok:TagOccurrence {id: $head_tok_id})
+            MERGE (tok)-[:TRIGGERS]->(event)
+            RETURN event.id AS eid
+            """
+            try:
+                self.graph.run(
+                    upsert_query,
+                    parameters={
+                        "event_id": event_id,
+                        "doc_id": doc_id,
+                        "headword": headword,
+                        "min_tok": min_tok,
+                        "max_tok": max_tok,
+                        "frame_id": frame_id,
+                        "head_tok_id": row.get("head_tok_id"),
+                    },
+                )
+                promoted += 1
+            except Exception:
+                logger.exception(
+                    "promote_nombank_frames_to_tevents: upsert failed for frame_id=%s", frame_id
+                )
+
+        logger.info(
+            "promote_nombank_frames_to_tevents: %d nominal TEvent nodes created", promoted
+        )
+        return promoted
+
+
+    def merge_aligns_with_event_clusters(self):
+        """Consolidate TEvent pairs that represent the same predication via ALIGNS_WITH.
+
+        When Phase C (cross-framework alignment) creates ``ALIGNS_WITH`` edges between
+        a PROPBANK frame (verbal) and a NOMBANK frame (nominal), and D2 has promoted the
+        NOMBANK frame's headword to a TEvent, the graph can contain two separate TEvent
+        nodes for the same real-world predication.  This method collapses that duplication:
+
+        Pass 1 — Sense-conflict marking
+            ALIGNS_WITH pairs whose frames carry non-null, *different* senses are flagged
+            with ``sense_conflict=true`` on the ALIGNS_WITH edge.  They are never merged
+            (conflicting sense evidence means the two frames likely describe distinct
+            events that happen to share a surface form).
+
+        Pass 2 — EventMention REFERS_TO redirect
+            For sense-compatible pairs, any EventMention that currently points to the
+            secondary (lower-confidence / NOMBANK) TEvent is redirected to point to the
+            canonical (higher-confidence / PROPBANK) TEvent via a new ``REFERS_TO`` edge.
+
+        Pass 3 — TLINK transfer (both directions)
+            TLINKs anchored at the secondary TEvent are re-created with the canonical TEvent
+            as the endpoint.  Confidence is scaled by 0.9 to reflect the extra inference
+            hop.  Already-existing TLINKs are left unchanged (``ON CREATE SET`` only).
+
+        Pass 4 — Secondary TEvent marked as merged
+            ``merged=true`` and ``merged_into=<canonical_id>`` are set on the secondary TEvent
+            so it is excluded from future merge passes and is visible in diagnostics.
+
+        Non-fatal: each pass is individually wrapped; a failure in one pass does not
+        prevent subsequent passes from running.
+        """
+        logger.debug("merge_aligns_with_event_clusters")
+        graph = self.graph
+
+        # ------------------------------------------------------------------
+        # Pass 1: flag ALIGNS_WITH pairs with sense-contradicting frames
+        # ------------------------------------------------------------------
+        sense_conflict_query = """
+        MATCH (f_canonical:Frame)-[aw:ALIGNS_WITH]->(f_secondary:Frame)
+        WITH f_canonical, f_secondary, aw,
+             coalesce(f_canonical.sense, '') AS s1,
+             coalesce(f_secondary.sense, '') AS s2
+        WHERE s1 <> '' AND s2 <> '' AND s1 <> s2
+        SET aw.sense_conflict   = true,
+            aw.sense_canonical  = s1,
+            aw.sense_secondary  = s2
+        RETURN count(aw) AS conflicts
+        """
+        try:
+            rows = graph.run(sense_conflict_query).data()
+            conflicts = rows[0].get("conflicts", 0) if rows else 0
+            if conflicts:
+                logger.info(
+                    "merge_aligns_with_event_clusters: %d ALIGNS_WITH pairs have sense conflicts (skipped)",
+                    conflicts,
+                )
+        except Exception:
+            logger.exception("merge_aligns_with_event_clusters: sense-conflict pass failed")
+
+        # ------------------------------------------------------------------
+        # Pass 2: redirect EventMention REFERS_TO from secondary → canonical
+        # ------------------------------------------------------------------
+        redirect_query = """
+        MATCH (f_canonical:Frame)-[aw:ALIGNS_WITH]->(f_secondary:Frame)
+        WHERE coalesce(aw.sense_conflict, false) = false
+          AND coalesce(f_canonical.provisional, false) = false
+          AND coalesce(f_secondary.provisional, false) = false
+        MATCH (f_canonical)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_canonical:TEvent)
+        MATCH (f_secondary)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_secondary:TEvent)
+        WHERE elementId(e_canonical) <> elementId(e_secondary)
+          AND coalesce(e_secondary.merged, false) = false
+        WITH e_canonical, e_secondary
+        MATCH (em:EventMention)-[:REFERS_TO]->(e_secondary)
+        MERGE (em)-[new_ref:REFERS_TO {source: 'aligns_with_merge'}]->(e_canonical)
+        ON CREATE SET
+            new_ref.merged_from = e_secondary.id,
+            new_ref.confidence  = 0.80
+        RETURN count(em) AS redirected
+        """
+        redirected = 0
+        try:
+            rows = graph.run(redirect_query).data()
+            redirected = rows[0].get("redirected", 0) if rows else 0
+            logger.info(
+                "merge_aligns_with_event_clusters: %d EventMention REFERS_TO edges redirected",
+                redirected,
+            )
+        except Exception:
+            logger.exception("merge_aligns_with_event_clusters: EventMention redirect pass failed")
+
+        # ------------------------------------------------------------------
+        # Pass 3a: transfer outbound TLINKs (secondary → X) to canonical
+        # ------------------------------------------------------------------
+        tlink_out_query = """
+        MATCH (f_canonical:Frame)-[aw:ALIGNS_WITH]->(f_secondary:Frame)
+        WHERE coalesce(aw.sense_conflict, false) = false
+        MATCH (f_canonical)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_canonical:TEvent)
+        MATCH (f_secondary)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_secondary:TEvent)
+        WHERE elementId(e_canonical) <> elementId(e_secondary)
+          AND coalesce(e_secondary.merged, false) = false
+        WITH e_canonical, e_secondary
+        MATCH (e_secondary)-[tl:TLINK]->(other)
+        WHERE elementId(other) <> elementId(e_canonical)
+          AND coalesce(tl.suppressed, false) = false
+        MERGE (e_canonical)-[new_tl:TLINK {relType: coalesce(tl.relTypeCanonical, tl.relType, 'VAGUE')}]->(other)
+        ON CREATE SET
+            new_tl.relTypeCanonical = coalesce(tl.relTypeCanonical, tl.relType, 'VAGUE'),
+            new_tl.confidence       = round(coalesce(tl.confidence, 0.5) * 0.9, 3),
+            new_tl.source           = 'aligns_with_transfer',
+            new_tl.rule_id          = coalesce(tl.rule_id, 'unknown') + '_merged',
+            new_tl.evidence_source  = 'event_enrichment'
+        RETURN count(new_tl) AS transferred
+        """
+        try:
+            rows = graph.run(tlink_out_query).data()
+            t_out = rows[0].get("transferred", 0) if rows else 0
+            logger.info(
+                "merge_aligns_with_event_clusters: %d outbound TLINKs transferred", t_out
+            )
+        except Exception:
+            logger.exception("merge_aligns_with_event_clusters: TLINK outbound transfer failed")
+
+        # ------------------------------------------------------------------
+        # Pass 3b: transfer inbound TLINKs (X → secondary) to canonical
+        # ------------------------------------------------------------------
+        tlink_in_query = """
+        MATCH (f_canonical:Frame)-[aw:ALIGNS_WITH]->(f_secondary:Frame)
+        WHERE coalesce(aw.sense_conflict, false) = false
+        MATCH (f_canonical)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_canonical:TEvent)
+        MATCH (f_secondary)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_secondary:TEvent)
+        WHERE elementId(e_canonical) <> elementId(e_secondary)
+          AND coalesce(e_secondary.merged, false) = false
+        WITH e_canonical, e_secondary
+        MATCH (other)-[tl:TLINK]->(e_secondary)
+        WHERE elementId(other) <> elementId(e_canonical)
+          AND coalesce(tl.suppressed, false) = false
+        MERGE (other)-[new_tl:TLINK {relType: coalesce(tl.relTypeCanonical, tl.relType, 'VAGUE')}]->(e_canonical)
+        ON CREATE SET
+            new_tl.relTypeCanonical = coalesce(tl.relTypeCanonical, tl.relType, 'VAGUE'),
+            new_tl.confidence       = round(coalesce(tl.confidence, 0.5) * 0.9, 3),
+            new_tl.source           = 'aligns_with_transfer',
+            new_tl.rule_id          = coalesce(tl.rule_id, 'unknown') + '_merged',
+            new_tl.evidence_source  = 'event_enrichment'
+        RETURN count(new_tl) AS transferred
+        """
+        try:
+            rows = graph.run(tlink_in_query).data()
+            t_in = rows[0].get("transferred", 0) if rows else 0
+            logger.info(
+                "merge_aligns_with_event_clusters: %d inbound TLINKs transferred", t_in
+            )
+        except Exception:
+            logger.exception("merge_aligns_with_event_clusters: TLINK inbound transfer failed")
+
+        # ------------------------------------------------------------------
+        # Pass 4: mark secondary TEvents as merged
+        # ------------------------------------------------------------------
+        mark_query = """
+        MATCH (f_canonical:Frame)-[aw:ALIGNS_WITH]->(f_secondary:Frame)
+        WHERE coalesce(aw.sense_conflict, false) = false
+        MATCH (f_canonical)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_canonical:TEvent)
+        MATCH (f_secondary)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_secondary:TEvent)
+        WHERE elementId(e_canonical) <> elementId(e_secondary)
+          AND coalesce(e_secondary.merged, false) = false
+        WITH e_canonical, e_secondary
+        SET e_secondary.merged      = true,
+            e_secondary.merged_into = e_canonical.id,
+            e_secondary.merged_by   = 'merge_aligns_with_event_clusters'
+        RETURN count(e_secondary) AS marked
+        """
+        merged_count = 0
+        try:
+            rows = graph.run(mark_query).data()
+            merged_count = rows[0].get("marked", 0) if rows else 0
+            logger.info(
+                "merge_aligns_with_event_clusters: %d secondary TEvents marked as merged",
+                merged_count,
+            )
+        except Exception:
+            logger.exception("merge_aligns_with_event_clusters: mark-merged pass failed")
+
+        return merged_count
 
 
     #// PURPOSE: To add/link core-participants to an Event object. Core-Participants include ['ARG0','ARG1','ARG2','ARG3','ARG4']
@@ -603,7 +941,12 @@ class EventEnrichmentPhase():
     def add_core_participants_to_event(self):
         logger.debug("add_core_participants_to_event")
         graph = self.graph
-        participant_source_subquery = self._participant_source_subquery("fa", "e")
+        participant_source_subquery = self._participant_source_subquery(
+            "fa",
+            "e",
+            include_general_namedentity=True,
+            prefer_namedentity_over_entity=True,
+        )
 
         # Original query: Link canonical Entity/VALUE or legacy NamedEntity:NUMERIC|VALUE to canonical TEvent.
         query = f"""    
@@ -625,7 +968,8 @@ class EventEnrichmentPhase():
                                              ) AS distance
                                         ORDER BY rel_priority ASC, distance ASC
                                         WITH fa, e, head(collect(event)) AS event
-                                        WHERE event IS NOT NULL
+                                                                                WHERE event IS NOT NULL
+                                                                                    AND coalesce(e.doc_id, event.doc_id) = event.doc_id
                     merge (e)-[r:PARTICIPANT]->(event)
                     set r.type = fa.type,
                         r.prep = CASE WHEN fa.syntacticType IN ['IN'] THEN fa.head ELSE r.prep END,
@@ -636,7 +980,6 @@ class EventEnrichmentPhase():
                         r.source_kind = 'rule',
                         r.conflict_policy = 'additive',
                         r.created_at = coalesce(r.created_at, datetime().epochMillis),
-                        r.is_core = true,
                         r.is_core = true
                     merge (e)-[nr:EVENT_PARTICIPANT]->(event)
                     set nr.type = fa.type,
@@ -662,6 +1005,7 @@ class EventEnrichmentPhase():
                                         {participant_source_subquery}
                                         WITH f, em, event, fa, e
                                         WHERE fa.type IN ['ARG0','ARG1','ARG2','ARG3','ARG4']
+                                                                                    AND coalesce(e.doc_id, em.doc_id, event.doc_id) = event.doc_id
                                         WITH DISTINCT f, em, event, fa, e
                     merge (e)-[r:PARTICIPANT]->(em)
                     set r.type = fa.type,
@@ -673,7 +1017,7 @@ class EventEnrichmentPhase():
                         r.source_kind = 'rule',
                         r.conflict_policy = 'additive',
                         r.created_at = coalesce(r.created_at, datetime().epochMillis),
-                        r.is_core = true
+                        r.is_core = false
                     merge (e)-[nr:EVENT_PARTICIPANT]->(em)
                     set nr.type = fa.type,
                         nr.prep = CASE WHEN fa.syntacticType IN ['IN'] THEN fa.head ELSE nr.prep END,
@@ -684,7 +1028,7 @@ class EventEnrichmentPhase():
                         nr.source_kind = 'rule',
                         nr.conflict_policy = 'additive',
                         nr.created_at = coalesce(nr.created_at, datetime().epochMillis),
-                        nr.is_core = true
+                        nr.is_core = false
                                         return count(*) AS linked_mention
         """
         data_mention = graph.run(query_mention).data()
@@ -1271,6 +1615,8 @@ if __name__ == '__main__':
 
     _phase_start = _time.time()
     tp.link_frameArgument_to_event()
+    tp.promote_nombank_frames_to_tevents()
+    tp.merge_aligns_with_event_clusters()
     tp.add_core_participants_to_event()
     tp.add_non_core_participants_to_event()
     tp.add_label_to_non_core_fa()
@@ -1286,7 +1632,7 @@ if __name__ == '__main__':
             tp.graph,
             phase_name="event_enrichment",
             duration_seconds=_phase_duration,
-            metadata={"passes": "link,core_participants,non_core_participants,label_non_core,derive_clinks,derive_slinks,enrich_mentions"},
+            metadata={"passes": "link,promote_nombank,merge_aligns_with,core_participants,non_core_participants,label_non_core,derive_clinks,derive_slinks,enrich_mentions"},
         )
     except Exception:
         logger.exception("Failed to write EventEnrichmentRun marker (non-fatal)")

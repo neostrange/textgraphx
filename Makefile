@@ -1,4 +1,4 @@
-.PHONY: review strict-gate baseline quality-gate uid-preflight uid-smoke
+.PHONY: review strict-gate baseline quality-gate participant-benchmark nominal-filter-ab uid-preflight uid-smoke
 
 PYTHON310 ?= /home/neo/environments/textgraphx/.venv310/bin/python
 UID_DOCS ?= 112579
@@ -25,6 +25,16 @@ quality-gate:
 		--max-participation-in-frame-missing 0 \
 		--max-participation-in-mention-missing 0 \
 		--verbose
+
+# Run 3-way participant-scope benchmark:
+#   core-only vs constrained non-core (ARG0/ARG1) vs full non-core.
+participant-benchmark:
+	$(PYTHON310) scripts/run_participant_scope_benchmark.py --python-bin $(PYTHON310)
+
+# Run 2-way ENH-NOM-04 benchmark:
+#   legacy noun-chunk filter vs strict ENH-NOM-04 filter.
+nominal-filter-ab:
+	PYTHONPATH=src $(PYTHON310) scripts/run_nominal_filter_ab.py --python-bin $(PYTHON310)
 
 uid-preflight:
 	$(PYTHON310) -m textgraphx.tools.uid_smoke_preflight --preflight-only

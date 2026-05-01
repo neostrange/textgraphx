@@ -7,7 +7,7 @@ Q = """
 MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok:TagOccurrence)-[:IN_MENTION]->(m)
 WHERE (m:EntityMention OR m:NamedEntity OR m:CorefMention)
 WITH m, min(tok.tok_index_doc) AS start_tok, max(tok.tok_index_doc) AS end_tok, head(collect(tok)) AS head_tok
-RETURN DISTINCT id(m) AS node_id, labels(m) AS labels, coalesce(m.syntactic_type, m.syntacticType) AS syntactic_type, start_tok, end_tok
+RETURN DISTINCT elementId(m) AS node_id, labels(m) AS labels, coalesce(m.syntactic_type, m.syntacticType) AS syntactic_type, start_tok, end_tok
 ORDER BY start_tok, end_tok
 """
 

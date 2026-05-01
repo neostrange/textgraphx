@@ -334,7 +334,9 @@ The pipeline assumes a running Neo4j instance and several external NLP services:
 
 - spaCy models for tokenization, dependency parsing, and NER
 - AMuSE-WSD at `http://localhost:81/api/model`
-- Coreference service at `http://localhost:9999/coreference_resolution`
+- Optional external coreference service at `http://localhost:9999/coreference_resolution`
+    (disabled by default; when unset, the pipeline uses spaCy-provided coreference
+    span groups if present, for example from spacy-experimental components)
 - Temporal annotation service at `http://localhost:5050/annotate`
 - Neo4j APOC procedures for XML parsing and migration utilities
 - NLTK WordNet data for token enrichment and disambiguation

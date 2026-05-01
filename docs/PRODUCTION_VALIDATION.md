@@ -22,7 +22,9 @@ Before a production run:
 [ ] Neo4j is running and reachable at the configured bolt URL.
 [ ] Config file has runtime.mode = production (or env TEXTGRAPHX_RUNTIME_MODE=production).
 [ ] Graph is clean (or you deliberately intend to append to an existing corpus).
-[ ] All required external services are reachable (temporal, SRL/coref/NER URLs).
+[ ] All required external services are reachable (temporal, SRL, WSD/NER URLs).
+[ ] If using external coreference, verify coref_url endpoint is reachable; otherwise
+    keep coref_url unset and ensure the spaCy pipeline provides coref span groups.
 [ ] Python 3.10 venv (.venv310) is active — spaCy requires CPython stdlib extensions
     (_ctypes, _sqlite3) that are absent from some Python 3.13 builds.
 [ ] Dataset directory is populated (at least one .xml or .naf file).

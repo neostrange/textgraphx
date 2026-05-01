@@ -70,6 +70,10 @@ class TlinksRecognizer:
             MATCH p= (e1:TEvent)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(f1:Frame)<-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(fa:FrameArgument {type: 'ARGM-TMP'})
                 <-[:IN_FRAME]-(et:TagOccurrence)-[:IN_FRAME]->(f2:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(e2:TEvent)
             WHERE fa.headTokenIndex = et.tok_index_doc AND fa.signal = 'after'
+              AND coalesce(e1.is_timeml_core, true) = true
+              AND coalesce(e2.is_timeml_core, true) = true
+              AND coalesce(e1.low_confidence, false) = false
+              AND coalesce(e2.low_confidence, false) = false
             WITH *
             MATCH (e1),(e2)
             MERGE (e1)-[tl:TLINK]-(e2)
@@ -85,6 +89,10 @@ class TlinksRecognizer:
             MATCH p= (e1:TEvent)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(f1:Frame)<-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(fa:FrameArgument {type: 'ARGM-TMP'})
                 <-[:IN_FRAME]-(et:TagOccurrence {pos: 'VBG'})-[:IN_FRAME]->(f2:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(e2:TEvent)
             WHERE fa.complement = et.text AND fa.syntacticType = 'EVENTIVE'
+              AND coalesce(e1.is_timeml_core, true) = true
+              AND coalesce(e2.is_timeml_core, true) = true
+              AND coalesce(e1.low_confidence, false) = false
+              AND coalesce(e2.low_confidence, false) = false
             WITH *
             MERGE (e1)-[tl:TLINK]-(e2)
             WITH *
@@ -103,6 +111,10 @@ class TlinksRecognizer:
         query = """ MATCH p= (e1:TEvent)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(f1:Frame)<-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(fa:FrameArgument where fa.type = 'ARGM-TMP')
                 <-[:IN_FRAME]-(et:TagOccurrence where et.pos = 'VBG')-[:IN_FRAME]->(f2:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]-(e2:TEvent)
                     where fa.headTokenIndex = et.tok_index_doc and fa.syntacticType = 'EVENTIVE'
+                    and coalesce(e1.is_timeml_core, true) = true
+                    and coalesce(e2.is_timeml_core, true) = true
+                    and coalesce(e1.low_confidence, false) = false
+                    and coalesce(e2.low_confidence, false) = false
                     with *
                     merge (e1)-[tl:TLINK]-(e2)
                     with *
@@ -124,6 +136,8 @@ class TlinksRecognizer:
                 (fa:FrameArgument {type: 'ARGM-TMP'})-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(f:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]->(e:TEvent)
             MATCH (h)-[:TRIGGERS]->(tm)
             WHERE (tm:TimexMention OR tm:TIMEX OR tm:Timex3)
+              AND coalesce(e.is_timeml_core, true) = true
+              AND coalesce(e.low_confidence, false) = false
             OPTIONAL MATCH (tm)-[:REFERS_TO]->(t_ref:TIMEX)
             WITH h, fa, e, coalesce(t_ref, CASE WHEN tm:TIMEX OR tm:Timex3 THEN tm ELSE NULL END) AS t
             WHERE fa.headTokenIndex = h.tok_index_doc AND t IS NOT NULL
@@ -142,6 +156,8 @@ class TlinksRecognizer:
                 (fa:FrameArgument {type: 'ARGM-TMP'})-[:HAS_FRAME_ARGUMENT|PARTICIPANT]-(f:Frame)-[:FRAME_DESCRIBES_EVENT|DESCRIBES]->(e:TEvent)
             MATCH (pobj)-[:TRIGGERS]->(tm)
             WHERE (tm:TimexMention OR tm:TIMEX OR tm:Timex3)
+              AND coalesce(e.is_timeml_core, true) = true
+              AND coalesce(e.low_confidence, false) = false
             OPTIONAL MATCH (tm)-[:REFERS_TO]->(t_ref:TIMEX)
             WITH pobj, fa, e, coalesce(t_ref, CASE WHEN tm:TIMEX OR tm:Timex3 THEN tm ELSE NULL END) AS t,
                  toLower(coalesce(fa.head, '')) AS prep_head
@@ -174,6 +190,9 @@ class TlinksRecognizer:
         logger.debug("create_tlinks_case6")
         query = """ MATCH p = (e:TEvent)<-[:TRIGGERS]-(t:TagOccurrence)<-[:HAS_TOKEN]-(s:Sentence)<-[:CONTAINS_SENTENCE]-(ann:AnnotatedText)-[:CREATED_ON]->(dct)
                 WHERE dct:TIMEX OR dct:Timex3
+                AND coalesce(e.is_timeml_core, true) = true
+                AND coalesce(e.low_confidence, false) = false
+                AND coalesce(e.tense, '') IN ['PAST', 'PRESENT', 'FUTURE']
                 AND NOT (e.tense IN ['PRESPART', 'PASPART', 'INFINITIVE']) AND NOT (t.pos IN ['NNP', 'NNS', 'NN']) 
                     //AND NOT (e.tense IN ['PRESENT'] and e.aspect IN ['NONE'])
                     MERGE (e)-[tlink:TLINK]-(dct)
@@ -199,13 +218,17 @@ class TlinksRecognizer:
         MATCH (fa:FrameArgument {type: 'ARGM-TMP'})-[:HAS_FRAME_ARGUMENT|PARTICIPANT]->(f_main)
         MATCH (f_sub:Frame)-[:INSTANTIATES]->(em_sub:EventMention)-[:REFERS_TO]->(e_sub:TEvent)
         MATCH (e_sub)<-[:TRIGGERS]-(tok_sub:TagOccurrence)
-        WHERE id(e_main) <> id(e_sub)
+        WHERE elementId(e_main) <> elementId(e_sub)
           AND em_sub.clauseType IN ['SUBORDINATE', 'COMPLEMENT']
           AND em_sub.scopeType IN ['TEMPORAL_SCOPE', 'LOCAL_SCOPE']
           AND fa.syntacticType = 'EVENTIVE'
           AND toLower(coalesce(fa.signal, '')) IN ['before', 'after']
           AND toLower(coalesce(fa.complement, '')) = toLower(coalesce(tok_sub.text, ''))
           AND any(cue IN coalesce(em_sub.temporalCueHeads, []) WHERE cue IN ['before', 'after'])
+                    AND coalesce(e_main.is_timeml_core, true) = true
+                    AND coalesce(e_sub.is_timeml_core, true) = true
+                    AND coalesce(e_main.low_confidence, false) = false
+                    AND coalesce(e_sub.low_confidence, false) = false
         MERGE (e_main)-[tl:TLINK]->(e_sub)
         SET tl.source = 't2g',
             tl.confidence = 0.83,
@@ -217,6 +240,95 @@ class TlinksRecognizer:
                 ELSE coalesce(tl.relType, 'VAGUE')
             END
         RETURN count(tl) AS created
+        """
+        return self._run_query(query)
+
+    def create_tlinks_case8(self):
+        """D3 — Anchor NOMBANK-promoted nominal events to the Document Creation Time.
+
+        case6 explicitly excludes tokens with ``pos IN ['NN','NNS','NNP']``, which
+        blocks all NOMBANK-sourced TEvents (created by D2 with ``pos='NN'``) from
+        receiving a DCT anchor.  This case mirrors case6 for those nominal events:
+
+        - Only targets TEvents created by NOMBANK promotion (``source='nombank_srl'``).
+        - Does not attempt tense-based relType inference (nominals lack tense); defaults
+          to ``IS_INCLUDED`` as the conservative anchor relation.
+        - Guards on ``coalesce(f.provisional, false) = false`` via the DESCRIBES path
+          to avoid re-introducing provisional events that D2 already excluded.
+        """
+        logger.debug("create_tlinks_case8")
+        query = """
+            MATCH (e:TEvent {source: 'nombank_srl'})<-[:TRIGGERS]-(tok:TagOccurrence)
+                  <-[:HAS_TOKEN]-(s:Sentence)<-[:CONTAINS_SENTENCE]-(:AnnotatedText)
+                  -[:CREATED_ON]->(dct)
+            WHERE (dct:TIMEX OR dct:Timex3)
+              AND coalesce(e.is_timeml_core, true) = true
+              AND coalesce(e.low_confidence, false) = false
+            MERGE (e)-[tl:TLINK]->(dct)
+            ON CREATE SET
+                tl.source          = 't2g',
+                tl.relType         = 'IS_INCLUDED',
+                tl.relTypeCanonical = 'IS_INCLUDED',
+                tl.confidence      = 0.65,
+                tl.rule_id         = 'case8_nombank_dct',
+                tl.evidence_source = 'tlinks_recognizer'
+            ON MATCH SET
+                tl.relType          = coalesce(tl.relType, 'IS_INCLUDED'),
+                tl.relTypeCanonical = coalesce(tl.relTypeCanonical, 'IS_INCLUDED'),
+                tl.confidence       = coalesce(tl.confidence, 0.65),
+                tl.rule_id          = coalesce(tl.rule_id, 'case8_nombank_dct'),
+                tl.evidence_source  = coalesce(tl.evidence_source, 'tlinks_recognizer')
+            RETURN count(tl) AS created
+        """
+        return self._run_query(query)
+
+    def create_tlinks_case9(self):
+        """D3 — Link NOMBANK-promoted nominal events to sentence-local TIMEX3 nodes.
+
+        Cases 4 and 5 require the TIMEX to appear inside an ARGM-TMP FrameArgument
+        span, which misses TIMEX expressions that are syntactically disjoint from
+        the argument structure but co-occur in the same sentence.  This case
+        captures those proximity-based nominal-TIMEX pairings:
+
+        - Only targets NOMBANK-sourced TEvents (``source='nombank_srl'``).
+        - Finds canonical TIMEX nodes reachable from the same sentence via a non-SRL
+          TimexMention (``SRLTimexCandidate`` nodes are excluded to avoid circularity).
+        - Uses ``IS_INCLUDED`` as the conservative default; prepositional signals on
+          ARGM-TMP spans are not available here.
+        - Lower confidence (0.60) than structurally-grounded cases.
+        """
+        logger.debug("create_tlinks_case9")
+        query = """
+            MATCH (e:TEvent {source: 'nombank_srl'})<-[:TRIGGERS]-(tok_e:TagOccurrence)
+                  <-[:HAS_TOKEN]-(sent:Sentence)
+                  -[:HAS_TOKEN]->(tok_t:TagOccurrence)-[:TRIGGERS]->(tm:TimexMention)
+            WHERE elementId(tok_e) <> elementId(tok_t)
+              AND abs(coalesce(tok_e.tok_index_doc, -1) - coalesce(tok_t.tok_index_doc, -1)) <= 15
+              AND NOT tm:SRLTimexCandidate
+              AND coalesce(e.is_timeml_core, true) = true
+              AND coalesce(e.low_confidence, false) = false
+            OPTIONAL MATCH (tm)-[:REFERS_TO]->(t_ref:TIMEX)
+            WITH e, coalesce(
+                t_ref,
+                CASE WHEN tm:TIMEX OR tm:Timex3 THEN tm ELSE NULL END
+            ) AS t
+            WHERE t IS NOT NULL
+            WITH DISTINCT e, t
+            MERGE (e)-[tl:TLINK]->(t)
+            ON CREATE SET
+                tl.source          = 't2g',
+                tl.relType         = 'IS_INCLUDED',
+                tl.relTypeCanonical = 'IS_INCLUDED',
+                tl.confidence      = 0.60,
+                tl.rule_id         = 'case9_nombank_sentence_timex',
+                tl.evidence_source = 'tlinks_recognizer'
+            ON MATCH SET
+                tl.relType          = coalesce(tl.relType, 'IS_INCLUDED'),
+                tl.relTypeCanonical = coalesce(tl.relTypeCanonical, 'IS_INCLUDED'),
+                tl.confidence       = coalesce(tl.confidence, 0.60),
+                tl.rule_id          = coalesce(tl.rule_id, 'case9_nombank_sentence_timex'),
+                tl.evidence_source  = coalesce(tl.evidence_source, 'tlinks_recognizer')
+            RETURN count(tl) AS created
         """
         return self._run_query(query)
 
@@ -264,7 +376,7 @@ class TlinksRecognizer:
         logger.debug("suppress_tlink_conflicts")
         query_prefix = """
         MATCH (a)-[r1:TLINK]->(b), (a)-[r2:TLINK]->(b)
-        WHERE id(r1) < id(r2)
+        WHERE elementId(r1) < elementId(r2)
           AND coalesce(r1.suppressed, false) = false
           AND coalesce(r2.suppressed, false) = false
         WITH r1, r2,
@@ -286,18 +398,18 @@ class TlinksRecognizer:
              CASE
                 WHEN c1 > c2 THEN r2
                 WHEN c2 > c1 THEN r1
-                WHEN id(r1) < id(r2) THEN r2
+                WHEN elementId(r1) < elementId(r2) THEN r2
                 ELSE r1
              END AS loser,
              CASE
                 WHEN c1 > c2 THEN r1
                 WHEN c2 > c1 THEN r2
-                WHEN id(r1) < id(r2) THEN r1
+                WHEN elementId(r1) < elementId(r2) THEN r1
                 ELSE r2
              END AS winner
         WITH r1, loser, winner, t1, t2,
-             CASE WHEN id(loser) = id(r1) THEN t1 ELSE t2 END AS loser_type,
-             CASE WHEN id(winner) = id(r1) THEN t1 ELSE t2 END AS winner_type
+             CASE WHEN elementId(loser) = elementId(r1) THEN t1 ELSE t2 END AS loser_type,
+             CASE WHEN elementId(winner) = elementId(r1) THEN t1 ELSE t2 END AS winner_type
         """
         if shadow_only:
             query = (
@@ -426,7 +538,7 @@ class TlinksRecognizer:
                      WHEN dst:TIMEX OR dst:Timex3 THEN 'TIMEX'
                 ELSE 'OTHER'
              END AS target_anchor_type,
-             CASE WHEN id(src) = id(dst) THEN true ELSE false END AS is_self_link,
+             CASE WHEN elementId(src) = elementId(dst) THEN true ELSE false END AS is_self_link,
                  CASE WHEN (src:TEvent OR src:TIMEX OR src:Timex3) AND (dst:TEvent OR dst:TIMEX OR dst:Timex3) THEN true ELSE false END AS endpoint_contract_ok
         WITH src, dst, r, source_anchor_type, target_anchor_type, is_self_link, endpoint_contract_ok,
              (NOT endpoint_contract_ok OR is_self_link) AS inconsistent
@@ -703,6 +815,8 @@ if __name__ == '__main__':
     tp.create_tlinks_case5()
     tp.create_tlinks_case6()
     tp.create_tlinks_case7()
+    tp.create_tlinks_case8()
+    tp.create_tlinks_case9()
     tp.normalize_tlink_reltypes()
     tp.apply_tlink_transitive_closure()
     tp.suppress_tlink_conflicts()
@@ -717,7 +831,7 @@ if __name__ == '__main__':
             phase_name="tlinks",
             duration_seconds=_phase_duration,
             metadata={
-                    "passes": "e2e,e2t,t2t,case1,case2,case3,case4,case5,case6"
+                    "passes": "e2e,e2t,t2t,case1,case2,case3,case4,case5,case6,case7,case8,case9"
             },
         )
     except Exception:

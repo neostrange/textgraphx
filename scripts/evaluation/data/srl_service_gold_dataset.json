@@ -1,0 +1,358 @@
+{
+  "metadata": {
+    "description": "Comprehensive complex SRL evaluation set for transformer-srl (verbal) and CogComp nominal SRL",
+    "notes": "Targets encode required roles for strict and normalized evaluation."
+  },
+  "verbal": [
+    {
+      "id": "v01_passive_dative",
+      "sentence": "Mary was given a book by John on Tuesday.",
+      "targets": [
+        {
+          "surface": "given",
+          "required_roles": ["ARG0", "ARG1", "ARG2", "ARGM-TMP"]
+        }
+      ]
+    },
+    {
+      "id": "v02_control_infinitive",
+      "sentence": "Alice promised Bob to leave early.",
+      "targets": [
+        {
+          "surface": "promised",
+          "required_roles": ["ARG0", "ARG1"]
+        },
+        {
+          "surface": "leave",
+          "required_roles": ["ARG0", "ARGM-TMP"]
+        }
+      ]
+    },
+    {
+      "id": "v03_coordination",
+      "sentence": "The committee approved and published the report yesterday.",
+      "targets": [
+        {
+          "surface": "approved",
+          "required_roles": ["ARG0", "ARG1"]
+        },
+        {
+          "surface": "published",
+          "required_roles": ["ARG0", "ARG1", "ARGM-TMP"]
+        }
+      ]
+    },
+    {
+      "id": "v04_negation_modal",
+      "sentence": "They might not accept the proposal.",
+      "targets": [
+        {
+          "surface": "accept",
+          "required_roles": ["ARG0", "ARG1", "ARGM-MOD", "ARGM-NEG"]
+        }
+      ]
+    },
+    {
+      "id": "v05_embedded_clause",
+      "sentence": "The CEO said the board rejected the merger.",
+      "targets": [
+        {
+          "surface": "said",
+          "required_roles": ["ARG0", "ARG1"]
+        },
+        {
+          "surface": "rejected",
+          "required_roles": ["ARG0", "ARG1"]
+        }
+      ]
+    },
+    {
+      "id": "v06_pp_arguments",
+      "sentence": "John ran the company in Paris for three years.",
+      "targets": [
+        {
+          "surface": "ran",
+          "required_roles": ["ARG0", "ARG1", "ARGM-LOC", "ARGM-TMP"]
+        }
+      ]
+    },
+    {
+      "id": "v07_conditional_modal",
+      "sentence": "If the auditors had warned investors earlier, the board might have avoided the collapse.",
+      "targets": [
+        {
+          "surface": "warned",
+          "required_roles": ["ARG0", "ARG1", "ARG2", "ARGM-TMP"]
+        },
+        {
+          "surface": "avoided",
+          "required_roles": ["ARG0", "ARG1", "ARGM-MOD"]
+        }
+      ]
+    },
+    {
+      "id": "v08_relative_clause",
+      "sentence": "The scientist who discovered the anomaly published her findings in Nature.",
+      "targets": [
+        {
+          "surface": "discovered",
+          "required_roles": ["ARG0", "ARG1"]
+        },
+        {
+          "surface": "published",
+          "required_roles": ["ARG0", "ARG1", "ARGM-LOC"]
+        }
+      ]
+    },
+    {
+      "id": "v09_belief_clause",
+      "sentence": "Analysts believe the market will recover by Q4.",
+      "targets": [
+        {
+          "surface": "believe",
+          "required_roles": ["ARG0", "ARG1"]
+        },
+        {
+          "surface": "recover",
+          "required_roles": ["ARG1", "ARGM-TMP"]
+        }
+      ]
+    },
+    {
+      "id": "v10_causative",
+      "sentence": "The storm forced residents to evacuate immediately.",
+      "targets": [
+        {
+          "surface": "forced",
+          "required_roles": ["ARG0", "ARG1", "ARG2"]
+        },
+        {
+          "surface": "evacuate",
+          "required_roles": ["ARG0", "ARGM-TMP"]
+        }
+      ]
+    },
+    {
+      "id": "v11_phrasal_like",
+      "sentence": "She turned down the offer despite financial pressure.",
+      "targets": [
+        {
+          "surface": "turned",
+          "required_roles": ["ARG0", "ARG1", "ARGM-ADV"]
+        }
+      ]
+    },
+    {
+      "id": "v12_discourse_chain",
+      "sentence": "After reviewing the evidence, the judge dismissed the case but allowed an appeal.",
+      "targets": [
+        {
+          "surface": "reviewing",
+          "required_roles": ["ARG0", "ARG1"]
+        },
+        {
+          "surface": "dismissed",
+          "required_roles": ["ARG0", "ARG1"]
+        },
+        {
+          "surface": "allowed",
+          "required_roles": ["ARG0", "ARG1"]
+        }
+      ]
+    },
+    {
+      "id": "v13_purpose_clause",
+      "sentence": "They opened the corridor to facilitate emergency access.",
+      "targets": [
+        {
+          "surface": "opened",
+          "required_roles": ["ARG0", "ARG1"]
+        },
+        {
+          "surface": "facilitate",
+          "required_roles": ["ARG0", "ARG1"]
+        }
+      ]
+    },
+    {
+      "id": "v14_nested_reporting",
+      "sentence": "Witnesses claimed that officials tried to conceal the evidence.",
+      "targets": [
+        {
+          "surface": "claimed",
+          "required_roles": ["ARG0", "ARG1"]
+        },
+        {
+          "surface": "tried",
+          "required_roles": ["ARG0", "ARG1"]
+        },
+        {
+          "surface": "conceal",
+          "required_roles": ["ARG0", "ARG1"]
+        }
+      ]
+    },
+    {
+      "id": "v15_passive_neg",
+      "sentence": "No data were leaked during the incident.",
+      "targets": [
+        {
+          "surface": "leaked",
+          "required_roles": ["ARG1", "ARGM-TMP", "ARGM-NEG"]
+        }
+      ]
+    }
+  ],
+  "nominal": [
+    {
+      "id": "n01_resignation",
+      "sentence": "His resignation from the board surprised everyone.",
+      "targets": [
+        {
+          "surface": "resignation",
+          "required_roles": ["ARG0", "ARG2"]
+        }
+      ]
+    },
+    {
+      "id": "n02_acquisition",
+      "sentence": "The acquisition of Acme by BigCo was announced yesterday.",
+      "targets": [
+        {
+          "surface": "acquisition",
+          "required_roles": ["ARG1", "ARG0"]
+        }
+      ]
+    },
+    {
+      "id": "n03_refusal",
+      "sentence": "Their refusal to cooperate delayed the project.",
+      "targets": [
+        {
+          "surface": "refusal",
+          "required_roles": ["ARG0", "ARG1"]
+        }
+      ]
+    },
+    {
+      "id": "n04_arrival",
+      "sentence": "The arrival of the delegates in Geneva eased tensions.",
+      "targets": [
+        {
+          "surface": "arrival",
+          "required_roles": ["ARG1", "ARGM-LOC"]
+        }
+      ]
+    },
+    {
+      "id": "n05_decision",
+      "sentence": "The committee's decision to postpone the vote sparked criticism.",
+      "targets": [
+        {
+          "surface": "decision",
+          "required_roles": ["ARG0", "ARG1"]
+        }
+      ]
+    },
+    {
+      "id": "n06_investigation",
+      "sentence": "An investigation into the fraud by federal prosecutors is underway.",
+      "targets": [
+        {
+          "surface": "investigation",
+          "required_roles": ["ARG1", "ARG0"]
+        }
+      ]
+    },
+    {
+      "id": "n07_destruction",
+      "sentence": "The destruction of the bridge by retreating troops disrupted supply lines.",
+      "targets": [
+        {
+          "surface": "destruction",
+          "required_roles": ["ARG1", "ARG0"]
+        }
+      ]
+    },
+    {
+      "id": "n08_approval",
+      "sentence": "Government approval of the vaccine for children accelerated distribution.",
+      "targets": [
+        {
+          "surface": "approval",
+          "required_roles": ["ARG0", "ARG1"]
+        }
+      ]
+    },
+    {
+      "id": "n09_appointment",
+      "sentence": "Her appointment as chief economist at the bank surprised investors.",
+      "targets": [
+        {
+          "surface": "appointment",
+          "required_roles": ["ARG0", "ARG1"]
+        }
+      ]
+    },
+    {
+      "id": "n10_merger",
+      "sentence": "The merger of the two carriers into a single operator reduced costs.",
+      "targets": [
+        {
+          "surface": "merger",
+          "required_roles": ["ARG1"]
+        }
+      ]
+    },
+    {
+      "id": "n11_nomination",
+      "sentence": "Their nomination of Lee for the award drew criticism.",
+      "targets": [
+        {
+          "surface": "nomination",
+          "required_roles": ["ARG0", "ARG1"]
+        }
+      ]
+    },
+    {
+      "id": "n12_withdrawal",
+      "sentence": "The sudden withdrawal of aid to rural clinics triggered protests.",
+      "targets": [
+        {
+          "surface": "withdrawal",
+          "required_roles": ["ARG1"]
+        }
+      ]
+    },
+    {
+      "id": "n13_expansion",
+      "sentence": "Company expansion into Southeast Asia increased revenue.",
+      "targets": [
+        {
+          "surface": "expansion",
+          "required_roles": ["ARG0", "ARGM-LOC"]
+        }
+      ]
+    },
+    {
+      "id": "n14_publication",
+      "sentence": "Publication of the report by independent experts clarified the timeline.",
+      "targets": [
+        {
+          "surface": "publication",
+          "required_roles": ["ARG1", "ARG0"]
+        }
+      ]
+    },
+    {
+      "id": "n15_failure",
+      "sentence": "The failure to disclose risks before the sale led to lawsuits.",
+      "targets": [
+        {
+          "surface": "failure",
+          "required_roles": ["ARG1"]
+        }
+      ]
+    }
+  ]
+}

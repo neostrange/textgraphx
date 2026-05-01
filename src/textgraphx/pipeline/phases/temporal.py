@@ -485,6 +485,115 @@ class TemporalPhase:
         except Exception:
             logger.exception("Failed TIMEX diagnostics logging for doc_id=%s", doc_id)
 
+    def promote_argm_tmp_to_timex_candidates(self, doc_id):
+        """Promote SRL ARGM-TMP spans to TimexMention candidates where HeidelTime has no coverage.
+
+        HeidelTime accurately identifies and values chronological expressions (e.g.,
+        "May 1st", "yesterday"), but it misses broader temporal frames expressed as
+        argument structure (e.g., "during the weeks following the acquisition").
+        ARGM-TMP FrameArgument spans capture those boundaries precisely.
+
+        Strategy
+        --------
+        1. Find ARGM-TMP FrameArgument spans belonging to non-provisional frames.
+        2. For each span, check whether any of its tokens already trigger a
+           HeidelTime-sourced TimexMention (overlap detection).
+        3. For spans with no overlap, create a ``TimexMention:SRLTimexCandidate``
+           node with deterministic id, ``source='srl_argm_tmp'``, ``confidence=0.65``.
+        4. Wire span tokens to the new mention via ``TRIGGERS``.
+
+        The resulting nodes are advisory-tier; they carry ``needs_review=true``
+        and can be promoted to full TIMEX3 nodes by downstream quality passes.
+        """
+        logger.debug("promote_argm_tmp_to_timex_candidates doc_id=%s", doc_id)
+
+        # Find ARGM-TMP args with no overlapping HeidelTime TimexMention
+        candidate_query = """
+        MATCH (:AnnotatedText {id: toInteger($doc_id)})
+              -[:CONTAINS_SENTENCE]->(:Sentence)
+              -[:HAS_TOKEN]->(tok:TagOccurrence)
+              -[:IN_FRAME|PARTICIPATES_IN]->(fa:FrameArgument {type: 'ARGM-TMP'})
+              <-[:PARTICIPANT|HAS_FRAME_ARGUMENT]-(f:Frame)
+        WHERE coalesce(f.provisional, false) = false
+        WITH fa, collect(DISTINCT tok) AS span_toks,
+             min(tok.tok_index_doc) AS min_tok,
+             max(tok.tok_index_doc) AS max_tok,
+             min(tok.index)         AS min_char,
+             max(tok.end_index)     AS max_char
+        WHERE min_tok IS NOT NULL AND max_tok IS NOT NULL
+        // Overlap check: at least one span token must NOT already trigger a non-SRL TimexMention
+        WITH fa, span_toks, min_tok, max_tok, min_char, max_char
+        OPTIONAL MATCH (existing_tok:TagOccurrence)-[:TRIGGERS]->(existing_tm:TimexMention)
+        WHERE existing_tok IN span_toks
+          AND NOT existing_tm:SRLTimexCandidate
+        WITH fa, span_toks, min_tok, max_tok, min_char, max_char,
+             count(DISTINCT existing_tm) AS heideltime_overlap
+        WHERE heideltime_overlap = 0
+        RETURN fa.id AS fa_id,
+               fa.text AS fa_text,
+               [tok IN span_toks | tok.id] AS tok_ids,
+               min_tok, max_tok, min_char, max_char
+        """
+        try:
+            rows = self.graph.run(
+                candidate_query, parameters={"doc_id": doc_id}
+            ).data()
+        except Exception:
+            logger.exception(
+                "promote_argm_tmp_to_timex_candidates: candidate query failed for doc_id=%s",
+                doc_id,
+            )
+            return 0
+
+        promoted = 0
+        for row in rows:
+            fa_id = row.get("fa_id")
+            if not fa_id:
+                continue
+            tm_id = f"srl_tm_{doc_id}_{row['min_tok']}_{row['max_tok']}"
+            upsert_query = """
+            MERGE (tm:TimexMention:SRLTimexCandidate {id: $tm_id, doc_id: toInteger($doc_id)})
+            ON CREATE SET
+                tm.start_tok    = $min_tok,
+                tm.end_tok      = $max_tok,
+                tm.start_char   = $min_char,
+                tm.end_char     = $max_char,
+                tm.source       = 'srl_argm_tmp',
+                tm.confidence   = 0.65,
+                tm.needs_review = true,
+                tm.source_fa_id = $fa_id
+            WITH tm
+            MATCH (tok:TagOccurrence)
+            WHERE tok.id IN $tok_ids
+            MERGE (tok)-[:TRIGGERS]->(tm)
+            RETURN count(tok) AS wired
+            """
+            try:
+                self.graph.run(
+                    upsert_query,
+                    parameters={
+                        "tm_id": tm_id,
+                        "doc_id": doc_id,
+                        "min_tok": row["min_tok"],
+                        "max_tok": row["max_tok"],
+                        "min_char": row.get("min_char"),
+                        "max_char": row.get("max_char"),
+                        "fa_id": fa_id,
+                        "tok_ids": row.get("tok_ids", []),
+                    },
+                )
+                promoted += 1
+            except Exception:
+                logger.exception(
+                    "promote_argm_tmp_to_timex_candidates: upsert failed for fa_id=%s", fa_id
+                )
+
+        logger.info(
+            "promote_argm_tmp_to_timex_candidates doc=%s: %d SRLTimexCandidate mentions created",
+            doc_id, promoted,
+        )
+        return promoted
+
     def reconcile_spacy_timex_candidates(self, doc_id):
         """Cross-validate SpaCy DATE/TIME candidates against HeidelTime TIMEX output.
 
@@ -685,8 +794,8 @@ class TemporalPhase:
 
         if created == 0:
             fallback_query = """
-            MATCH (a:AnnotatedText {id: toInteger($doc_id)})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:PARTICIPATES_IN]->(f:Frame)
-            WITH DISTINCT f
+            MATCH (a:AnnotatedText {id: toInteger($doc_id)})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:PARTICIPATES_IN]->(f:Frame)            WHERE (f.framework IS NULL OR f.framework = 'PROPBANK')
+              AND coalesce(f.provisional, false) = false            WITH DISTINCT f
             WHERE f.start_tok IS NOT NULL AND f.end_tok IS NOT NULL
             WITH f, 'frame_' + toString(toInteger($doc_id)) + '_' + toString(f.start_tok) + '_' + toString(f.end_tok) AS fallback_eiid
             MERGE (event:TEvent {doc_id: toInteger($doc_id), eiid: fallback_eiid})
@@ -785,6 +894,7 @@ if __name__ == '__main__':
         phase.materialize_signals(doc_id)
         phase.materialize_timexes_fallback(doc_id)
         phase.reconcile_spacy_timex_candidates(doc_id)
+        phase.promote_argm_tmp_to_timex_candidates(doc_id)
         phase.materialize_glinks(doc_id)
 
     duration = _time.time() - start
