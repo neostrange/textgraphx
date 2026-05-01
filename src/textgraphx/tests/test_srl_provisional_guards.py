@@ -205,6 +205,11 @@ class TestPromoteNombankFramesToTevents:
         """Must skip frames that already have DESCRIBES/FRAME_DESCRIBES_EVENT to TEvent."""
         assert "NOT exists((f)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(:TEvent))" in method_src
 
+    def test_requires_core_argument_support(self, method_src):
+        """Must require ARG0/ARG1 evidence before promoting a nominal frame."""
+        assert "fa_core:FrameArgument" in method_src
+        assert "IN ['ARG0', 'ARG1', 'A0', 'A1']" in method_src
+
     def test_uses_is_eventive_filter(self, method_src):
         """Must call the eventive-nominal filter to avoid promoting non-events."""
         assert "_is_eventive" in method_src
@@ -212,6 +217,14 @@ class TestPromoteNombankFramesToTevents:
     def test_creates_tevent_with_nombank_source(self, method_src):
         """Created TEvent must carry source='nombank_srl'."""
         assert "nombank_srl" in method_src
+
+    def test_marks_promoted_event_as_timeml_core(self, method_src):
+        """Promoted nominal events should be marked as TimeML-core by default."""
+        assert "event.is_timeml_core = true" in method_src
+
+    def test_clears_low_confidence_for_promoted_events(self, method_src):
+        """Promotion path should initialize low_confidence=false."""
+        assert "event.low_confidence = false" in method_src
 
     def test_creates_tevent_class_occurrence(self, method_src):
         """Created TEvent must have class='OCCURRENCE'."""
