@@ -372,8 +372,8 @@ def test_graph_based_nlp__nominal_srl_uses_batch_caller():
     """Verify graph_based_nlp imports and calls callNominalSrlApiBatch (not the single-sentence variant)."""
     import ast
     import pathlib
-    src = pathlib.Path(
-        "/home/neo/environments/textgraphx/src/textgraphx/pipeline/ingestion/graph_based_nlp.py"
+    src = pathlib.Path(__file__).parent.parent.joinpath(
+        "pipeline/ingestion/graph_based_nlp.py"
     ).read_text()
     assert "callNominalSrlApiBatch" in src, "graph_based_nlp should use callNominalSrlApiBatch"
     assert "callNominalSrlApi(" not in src or src.count("callNominalSrlApi(") == 0, \
@@ -384,8 +384,8 @@ def test_graph_based_nlp__nominal_srl_uses_batch_caller():
 def test_graph_based_nlp__nominal_srl_no_per_sentence_loop():
     """Confirm the per-sentence loop over callNominalSrlApi is gone."""
     import pathlib
-    src = pathlib.Path(
-        "/home/neo/environments/textgraphx/src/textgraphx/pipeline/ingestion/graph_based_nlp.py"
+    src = pathlib.Path(__file__).parent.parent.joinpath(
+        "pipeline/ingestion/graph_based_nlp.py"
     ).read_text()
     # Old pattern: 'for sent in doc.sents:' immediately followed by callNominalSrlApi
     assert "callNominalSrlApiBatch" in src
