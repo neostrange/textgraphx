@@ -4,8 +4,8 @@
     "macro": {
       "relaxed": {
         "entity": {
-          "f1": 0.3462301587301588,
-          "precision": 0.31518831557622434,
+          "f1": 0.34720418470418474,
+          "precision": 0.3176883155762243,
           "recall": 0.40554507467520545
         },
         "event": {
@@ -26,8 +26,8 @@
       },
       "strict": {
         "entity": {
-          "f1": 0.30363961918839966,
-          "precision": 0.28296011963835094,
+          "f1": 0.3046136451624257,
+          "precision": 0.285460119638351,
           "recall": 0.34996003364124806
         },
         "event": {
@@ -50,10 +50,10 @@
     "micro": {
       "relaxed": {
         "entity": {
-          "f1": 0.34309623430962344,
+          "f1": 0.3445378151260505,
           "fn": 62,
-          "fp": 95,
-          "precision": 0.3014705882352941,
+          "fp": 94,
+          "precision": 0.3037037037037037,
           "recall": 0.39805825242718446,
           "tp": 41
         },
@@ -84,10 +84,10 @@
       },
       "strict": {
         "entity": {
-          "f1": 0.30578512396694213,
+          "f1": 0.3070539419087137,
           "fn": 69,
-          "fp": 99,
-          "precision": 0.27205882352941174,
+          "fp": 98,
+          "precision": 0.2740740740740741,
           "recall": 0.3490566037735849,
           "tp": 37
         },
@@ -161,7 +161,7 @@
   "diagnostics": {
     "documents": [
       {
-        "avg_f1": 0.2623076923076923,
+        "avg_f1": 0.2972916666666667,
         "doc_id": "112579",
         "layers": [
           {
@@ -513,7 +513,7 @@
               "endpoint_mismatch": 0,
               "missing": 15,
               "spurious": 38,
-              "type_mismatch": 3
+              "type_mismatch": 0
             },
             "examples": {
               "boundary_mismatch": [],
@@ -1384,103 +1384,15 @@
                   }
                 }
               ],
-              "type_mismatch": [
-                {
-                  "gold": {
-                    "attrs": {
-                      "aspect": "NONE",
-                      "pos": "NOUN",
-                      "pred": "performance",
-                      "tense": "NONE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      30
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "NOUN",
-                      "pred": "performance",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      30
-                    ]
-                  }
-                },
-                {
-                  "gold": {
-                    "attrs": {
-                      "aspect": "NONE",
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "NOUN",
-                      "pred": "rise",
-                      "tense": "PRESENT",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      69
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "NOUN",
-                      "pred": "rise",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      69
-                    ]
-                  }
-                },
-                {
-                  "gold": {
-                    "attrs": {
-                      "aspect": "NONE",
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "NOUN",
-                      "pred": "sale",
-                      "tense": "NONE",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      86
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "NOUN",
-                      "pred": "sale",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      86
-                    ]
-                  }
-                }
-              ]
+              "type_mismatch": []
             },
-            "f1": 0.21333333333333332,
-            "fn": 18,
-            "fp": 41,
+            "f1": 0.29333333333333333,
+            "fn": 15,
+            "fp": 38,
             "layer": "event",
-            "precision": 0.16326530612244897,
-            "recall": 0.3076923076923077,
-            "tp": 8
+            "precision": 0.22448979591836735,
+            "recall": 0.4230769230769231,
+            "tp": 11
           },
           {
             "errors": {
@@ -1488,7 +1400,7 @@
               "endpoint_mismatch": 0,
               "missing": 1,
               "spurious": 9,
-              "type_mismatch": 1
+              "type_mismatch": 0
             },
             "examples": {
               "boundary_mismatch": [],
@@ -1618,49 +1530,35 @@
                   }
                 }
               ],
-              "type_mismatch": [
-                {
-                  "gold": {
-                    "attrs": {
-                      "type": "DURATION",
-                      "value": "PY5"
-                    },
-                    "kind": "timex",
-                    "span": [
-                      125
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "type": "DURATION",
-                      "value": "P5Y"
-                    },
-                    "kind": "timex",
-                    "span": [
-                      125
-                    ]
-                  }
-                }
-              ]
+              "type_mismatch": []
             },
-            "f1": 0.4,
-            "fn": 2,
-            "fp": 10,
+            "f1": 0.5,
+            "fn": 1,
+            "fp": 9,
             "layer": "timex",
-            "precision": 0.2857142857142857,
-            "recall": 0.6666666666666666,
-            "tp": 4
+            "precision": 0.35714285714285715,
+            "recall": 0.8333333333333334,
+            "tp": 5
           },
           {
             "errors": {
               "boundary_mismatch": 0,
               "endpoint_mismatch": 0,
               "missing": 12,
-              "spurious": 23,
+              "spurious": 48,
               "type_mismatch": 0
             },
             "examples": {
-              "endpoint_mismatch": [],
+              "matched_pairs": [
+                {
+                  "gold": "('tlink', 'event', (107,), 'timex', (109, 110), (('reltype', 'IS_INCLUDED'),))",
+                  "predicted": "('tlink', 'event', (107,), 'timex', (109, 110), (('reltype', 'IS_INCLUDED'),))"
+                },
+                {
+                  "gold": "('tlink', 'event', (36,), 'timex', (43,), (('reltype', 'IS_INCLUDED'),))",
+                  "predicted": "('tlink', 'event', (36,), 'timex', (43,), (('reltype', 'IS_INCLUDED'),))"
+                }
+              ],
               "missing": [
                 {
                   "gold": "('tlink', 'event', (103,), 'timex', (104,), (('reltype', 'IS_INCLUDED'),))"
@@ -1691,17 +1589,20 @@
                 },
                 {
                   "gold": "('tlink', 'event', (73,), 'timex', (12, 13, 14, 15), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "gold": "('tlink', 'event', (73,), 'timex', (74,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "gold": "('tlink', 'event', (87,), 'timex', (12, 13, 14, 15), (('reltype', 'BEFORE'),))"
                 }
               ],
               "spurious": [
                 {
+                  "predicted": "('tlink', 'event', (107,), 'timex', (109, 110), (('reltype', 'IS_INCLUDED'),))"
+                },
+                {
                   "predicted": "('tlink', 'event', (183,), 'event', (211,), (('reltype', 'BEFORE'),))"
+                },
+                {
+                  "predicted": "('tlink', 'event', (183,), 'event', (211,), (('reltype', 'BEFORE'),))"
+                },
+                {
+                  "predicted": "('tlink', 'event', (183,), 'event', (223,), (('reltype', 'BEFORE'),))"
                 },
                 {
                   "predicted": "('tlink', 'event', (183,), 'event', (223,), (('reltype', 'BEFORE'),))"
@@ -1710,89 +1611,38 @@
                   "predicted": "('tlink', 'event', (183,), 'event', (239,), (('reltype', 'BEFORE'),))"
                 },
                 {
+                  "predicted": "('tlink', 'event', (183,), 'event', (239,), (('reltype', 'BEFORE'),))"
+                },
+                {
+                  "predicted": "('tlink', 'event', (183,), 'event', (245,), (('reltype', 'BEFORE'),))"
+                },
+                {
                   "predicted": "('tlink', 'event', (183,), 'event', (245,), (('reltype', 'BEFORE'),))"
                 },
                 {
                   "predicted": "('tlink', 'event', (183,), 'event', (262,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (198,), 'event', (203,), (('reltype', 'AFTER'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (211,), 'event', (223,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (211,), 'event', (239,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (211,), 'event', (245,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (211,), 'event', (262,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (223,), 'event', (239,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (223,), 'event', (245,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (223,), 'event', (262,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (239,), 'event', (245,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (239,), 'event', (262,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (245,), 'event', (262,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (28,), 'timex', (43,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (30,), 'timex', (43,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (332,), 'timex', (292,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (332,), 'timex', (334,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (337,), 'timex', (334,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (344,), 'timex', (334,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (69,), 'timex', (74,), (('reltype', 'IS_INCLUDED'),))"
                 }
-              ],
-              "type_mismatch": []
+              ]
             },
-            "f1": 0.10256410256410256,
+            "f1": 0.0625,
             "fn": 12,
-            "fp": 23,
+            "fp": 48,
             "layer": "relation",
-            "precision": 0.08,
+            "precision": 0.04,
             "recall": 0.14285714285714285,
             "tp": 2
           }
         ],
-        "mode": "strict",
+        "mode": "relaxed",
         "suggestions": [
           "entity: low F1 (0.333) - inspect extraction and matching rules for this layer.",
           "entity: precision is weaker than recall - investigate over-generation and filtering criteria.",
-          "event: low F1 (0.213) - inspect extraction and matching rules for this layer.",
+          "event: low F1 (0.293) - inspect extraction and matching rules for this layer.",
           "event: precision is weaker than recall - investigate over-generation and filtering criteria.",
-          "event: type mismatches detected - tune label/attribute mapping in mapping-config.",
-          "relation: low F1 (0.103) - inspect extraction and matching rules for this layer.",
+          "relation: low F1 (0.062) - inspect extraction and matching rules for this layer.",
           "relation: precision is weaker than recall - investigate over-generation and filtering criteria.",
-          "timex: low F1 (0.400) - inspect extraction and matching rules for this layer.",
-          "timex: precision is weaker than recall - investigate over-generation and filtering criteria.",
-          "timex: type mismatches detected - tune label/attribute mapping in mapping-config."
+          "timex: low F1 (0.500) - inspect extraction and matching rules for this layer.",
+          "timex: precision is weaker than recall - investigate over-generation and filtering criteria."
         ],
         "weak_layers": [
           "entity",
@@ -1802,67 +1652,19 @@
         ]
       },
       {
-        "avg_f1": 0.2263981645540866,
+        "avg_f1": 0.2638085877274129,
         "doc_id": "61327",
         "layers": [
           {
             "errors": {
-              "boundary_mismatch": 2,
+              "boundary_mismatch": 0,
               "endpoint_mismatch": 0,
-              "missing": 9,
+              "missing": 8,
               "spurious": 12,
               "type_mismatch": 0
             },
             "examples": {
-              "boundary_mismatch": [
-                {
-                  "gold": {
-                    "attrs": {
-                      "syntactic_type": "NAM"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      69,
-                      70
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "NAM"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      70
-                    ]
-                  }
-                },
-                {
-                  "gold": {
-                    "attrs": {
-                      "syntactic_type": "CONJ"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      69,
-                      70,
-                      71,
-                      72,
-                      73,
-                      74
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "NAM"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      72,
-                      73
-                    ]
-                  }
-                }
-              ],
+              "boundary_mismatch": [],
               "missing": [
                 {
                   "gold": {
@@ -1968,19 +1770,6 @@
                       63,
                       64,
                       65
-                    ]
-                  }
-                },
-                {
-                  "gold": {
-                    "attrs": {
-                      "syntactic_type": "NAM"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      72,
-                      73,
-                      74
                     ]
                   }
                 }
@@ -2131,13 +1920,13 @@
               ],
               "type_mismatch": []
             },
-            "f1": 0.2424242424242424,
-            "fn": 11,
-            "fp": 14,
+            "f1": 0.375,
+            "fn": 8,
+            "fp": 12,
             "layer": "entity",
-            "precision": 0.2222222222222222,
-            "recall": 0.26666666666666666,
-            "tp": 4
+            "precision": 0.3333333333333333,
+            "recall": 0.42857142857142855,
+            "tp": 6
           },
           {
             "errors": {
@@ -2145,7 +1934,7 @@
               "endpoint_mismatch": 0,
               "missing": 5,
               "spurious": 27,
-              "type_mismatch": 1
+              "type_mismatch": 0
             },
             "examples": {
               "boundary_mismatch": [],
@@ -2671,44 +2460,15 @@
                   }
                 }
               ],
-              "type_mismatch": [
-                {
-                  "gold": {
-                    "attrs": {
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "NOUN",
-                      "pred": "attacks",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      50
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "NOUN",
-                      "pred": "attack",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      50
-                    ]
-                  }
-                }
-              ]
+              "type_mismatch": []
             },
-            "f1": 0.2608695652173913,
-            "fn": 6,
-            "fp": 28,
+            "f1": 0.3043478260869565,
+            "fn": 5,
+            "fp": 27,
             "layer": "event",
-            "precision": 0.17647058823529413,
-            "recall": 0.5,
-            "tp": 6
+            "precision": 0.20588235294117646,
+            "recall": 0.5833333333333334,
+            "tp": 7
           },
           {
             "errors": {
@@ -2839,11 +2599,16 @@
               "boundary_mismatch": 0,
               "endpoint_mismatch": 0,
               "missing": 10,
-              "spurious": 17,
+              "spurious": 35,
               "type_mismatch": 0
             },
             "examples": {
-              "endpoint_mismatch": [],
+              "matched_pairs": [
+                {
+                  "gold": "('tlink', 'event', (22,), 'timex', (33,), (('reltype', 'IS_INCLUDED'),))",
+                  "predicted": "('tlink', 'event', (22,), 'timex', (33,), (('reltype', 'IS_INCLUDED'),))"
+                }
+              ],
               "missing": [
                 {
                   "gold": "('tlink', 'event', (22,), 'event', (76,), (('reltype', 'SIMULTANEOUS'),))"
@@ -2881,7 +2646,16 @@
                   "predicted": "('tlink', 'event', (159,), 'event', (255,), (('reltype', 'BEFORE'),))"
                 },
                 {
+                  "predicted": "('tlink', 'event', (159,), 'event', (255,), (('reltype', 'BEFORE'),))"
+                },
+                {
                   "predicted": "('tlink', 'event', (168,), 'timex', (161,), (('reltype', 'IS_INCLUDED'),))"
+                },
+                {
+                  "predicted": "('tlink', 'event', (168,), 'timex', (161,), (('reltype', 'IS_INCLUDED'),))"
+                },
+                {
+                  "predicted": "('tlink', 'event', (177,), 'timex', (161,), (('reltype', 'IS_INCLUDED'),))"
                 },
                 {
                   "predicted": "('tlink', 'event', (177,), 'timex', (161,), (('reltype', 'IS_INCLUDED'),))"
@@ -2890,65 +2664,32 @@
                   "predicted": "('tlink', 'event', (184,), 'timex', (161,), (('reltype', 'IS_INCLUDED'),))"
                 },
                 {
+                  "predicted": "('tlink', 'event', (184,), 'timex', (161,), (('reltype', 'IS_INCLUDED'),))"
+                },
+                {
                   "predicted": "('tlink', 'event', (184,), 'timex', (186,), (('reltype', 'IS_INCLUDED'),))"
                 },
                 {
-                  "predicted": "('tlink', 'event', (184,), 'timex', (47, 48), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (190,), 'timex', (161,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (190,), 'timex', (186,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (192,), 'timex', (161,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (192,), 'timex', (186,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (22,), 'event', (54,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (222,), 'timex', (161,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (222,), 'timex', (186,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (38,), 'timex', (33,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (50,), 'timex', (33,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (98,), 'event', (159,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (98,), 'event', (255,), (('reltype', 'BEFORE'),))"
+                  "predicted": "('tlink', 'event', (184,), 'timex', (186,), (('reltype', 'IS_INCLUDED'),))"
                 }
-              ],
-              "type_mismatch": []
+              ]
             },
-            "f1": 0.06896551724137931,
+            "f1": 0.0425531914893617,
             "fn": 10,
-            "fp": 17,
+            "fp": 35,
             "layer": "relation",
-            "precision": 0.05555555555555555,
+            "precision": 0.027777777777777776,
             "recall": 0.09090909090909091,
             "tp": 1
           }
         ],
-        "mode": "strict",
+        "mode": "relaxed",
         "suggestions": [
-          "entity: boundary mismatches detected - verify token span anchoring (`start_tok`, `end_tok`) and overlap threshold.",
-          "entity: low F1 (0.242) - inspect extraction and matching rules for this layer.",
+          "entity: low F1 (0.375) - inspect extraction and matching rules for this layer.",
           "entity: precision is weaker than recall - investigate over-generation and filtering criteria.",
-          "event: low F1 (0.261) - inspect extraction and matching rules for this layer.",
+          "event: low F1 (0.304) - inspect extraction and matching rules for this layer.",
           "event: precision is weaker than recall - investigate over-generation and filtering criteria.",
-          "event: type mismatches detected - tune label/attribute mapping in mapping-config.",
-          "relation: low F1 (0.069) - inspect extraction and matching rules for this layer.",
+          "relation: low F1 (0.043) - inspect extraction and matching rules for this layer.",
           "relation: precision is weaker than recall - investigate over-generation and filtering criteria.",
           "timex: low F1 (0.333) - inspect extraction and matching rules for this layer.",
           "timex: precision is weaker than recall - investigate over-generation and filtering criteria."
@@ -2961,7 +2702,7 @@
         ]
       },
       {
-        "avg_f1": 0.3672059744053415,
+        "avg_f1": 0.3629768965212003,
         "doc_id": "62405",
         "layers": [
           {
@@ -2969,7 +2710,7 @@
               "boundary_mismatch": 0,
               "endpoint_mismatch": 0,
               "missing": 22,
-              "spurious": 16,
+              "spurious": 15,
               "type_mismatch": 0
             },
             "examples": {
@@ -3314,17 +3055,6 @@
                 {
                   "predicted": {
                     "attrs": {
-                      "syntactic_type": "NOM"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      187
-                    ]
-                  }
-                },
-                {
-                  "predicted": {
-                    "attrs": {
                       "syntactic_type": "NAM"
                     },
                     "kind": "entity",
@@ -3468,11 +3198,11 @@
               ],
               "type_mismatch": []
             },
-            "f1": 0.3214285714285714,
+            "f1": 0.3272727272727273,
             "fn": 22,
-            "fp": 16,
+            "fp": 15,
             "layer": "entity",
-            "precision": 0.36,
+            "precision": 0.375,
             "recall": 0.2903225806451613,
             "tp": 9
           },
@@ -3482,7 +3212,7 @@
               "endpoint_mismatch": 0,
               "missing": 10,
               "spurious": 47,
-              "type_mismatch": 1
+              "type_mismatch": 0
             },
             "examples": {
               "boundary_mismatch": [],
@@ -4421,40 +4151,15 @@
                   }
                 }
               ],
-              "type_mismatch": [
-                {
-                  "gold": {
-                    "attrs": {},
-                    "kind": "event",
-                    "span": [
-                      84
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "aspect": "NONE",
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "VERB",
-                      "pred": "close",
-                      "tense": "PAST",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      84
-                    ]
-                  }
-                }
-              ]
+              "type_mismatch": []
             },
-            "f1": 0.25316455696202533,
-            "fn": 11,
-            "fp": 48,
+            "f1": 0.2784810126582279,
+            "fn": 10,
+            "fp": 47,
             "layer": "event",
-            "precision": 0.1724137931034483,
-            "recall": 0.47619047619047616,
-            "tp": 10
+            "precision": 0.1896551724137931,
+            "recall": 0.5238095238095238,
+            "tp": 11
           },
           {
             "errors": {
@@ -4519,16 +4224,20 @@
           {
             "errors": {
               "boundary_mismatch": 0,
-              "endpoint_mismatch": 1,
-              "missing": 9,
-              "spurious": 17,
+              "endpoint_mismatch": 0,
+              "missing": 10,
+              "spurious": 38,
               "type_mismatch": 0
             },
             "examples": {
-              "endpoint_mismatch": [
+              "matched_pairs": [
                 {
-                  "gold": "('tlink', 'event', (84, 85), 'event', (96,), (('reltype', 'AFTER'),))",
-                  "predicted": "('tlink', 'event', (84,), 'event', (96,), (('reltype', 'BEFORE'),))"
+                  "gold": "('tlink', 'event', (109,), 'timex', (111, 112, 113), (('reltype', 'IS_INCLUDED'),))",
+                  "predicted": "('tlink', 'event', (109,), 'timex', (111, 112, 113), (('reltype', 'IS_INCLUDED'),))"
+                },
+                {
+                  "gold": "('tlink', 'event', (96,), 'event', (109,), (('reltype', 'AFTER'),))",
+                  "predicted": "('tlink', 'event', (96,), 'event', (109,), (('reltype', 'AFTER'),))"
                 }
               ],
               "missing": [
@@ -4554,6 +4263,9 @@
                   "gold": "('tlink', 'event', (64,), 'timex', (66,), (('reltype', 'IS_INCLUDED'),))"
                 },
                 {
+                  "gold": "('tlink', 'event', (84, 85), 'event', (96,), (('reltype', 'AFTER'),))"
+                },
+                {
                   "gold": "('tlink', 'event', (84, 85), 'timex', (8, 9, 10, 11), (('reltype', 'IS_INCLUDED'),))"
                 },
                 {
@@ -4565,7 +4277,19 @@
                   "predicted": "('tlink', 'event', (104,), 'timex', (111, 112, 113), (('reltype', 'IS_INCLUDED'),))"
                 },
                 {
+                  "predicted": "('tlink', 'event', (104,), 'timex', (111, 112, 113), (('reltype', 'IS_INCLUDED'),))"
+                },
+                {
+                  "predicted": "('tlink', 'event', (109,), 'timex', (111, 112, 113), (('reltype', 'IS_INCLUDED'),))"
+                },
+                {
                   "predicted": "('tlink', 'event', (109,), 'timex', (13, 14), (('reltype', 'IS_INCLUDED'),))"
+                },
+                {
+                  "predicted": "('tlink', 'event', (109,), 'timex', (13, 14), (('reltype', 'IS_INCLUDED'),))"
+                },
+                {
+                  "predicted": "('tlink', 'event', (165,), 'event', (188,), (('reltype', 'AFTER'),))"
                 },
                 {
                   "predicted": "('tlink', 'event', (165,), 'event', (188,), (('reltype', 'AFTER'),))"
@@ -4574,64 +4298,29 @@
                   "predicted": "('tlink', 'event', (17,), 'event', (50,), (('reltype', 'BEFORE'),))"
                 },
                 {
+                  "predicted": "('tlink', 'event', (17,), 'event', (50,), (('reltype', 'BEFORE'),))"
+                },
+                {
                   "predicted": "('tlink', 'event', (188,), 'event', (218,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (279,), 'event', (303,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (361,), 'event', (371,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (361,), 'event', (383,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (361,), 'event', (402,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (383,), 'event', (402,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (407,), 'event', (416,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (410,), 'timex', (66,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (423,), 'event', (433,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (423,), 'event', (439,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (433,), 'event', (439,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (84,), 'event', (147,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (96,), 'event', (147,), (('reltype', 'BEFORE'),))"
                 }
-              ],
-              "type_mismatch": []
+              ]
             },
-            "f1": 0.125,
+            "f1": 0.07692307692307691,
             "fn": 10,
-            "fp": 18,
+            "fp": 38,
             "layer": "relation",
-            "precision": 0.1,
+            "precision": 0.05,
             "recall": 0.16666666666666666,
             "tp": 2
           }
         ],
-        "mode": "strict",
+        "mode": "relaxed",
         "suggestions": [
-          "entity: low F1 (0.321) - inspect extraction and matching rules for this layer.",
+          "entity: low F1 (0.327) - inspect extraction and matching rules for this layer.",
           "entity: recall is weaker than precision - investigate under-generation and missing extractions.",
-          "event: low F1 (0.253) - inspect extraction and matching rules for this layer.",
+          "event: low F1 (0.278) - inspect extraction and matching rules for this layer.",
           "event: precision is weaker than recall - investigate over-generation and filtering criteria.",
-          "event: type mismatches detected - tune label/attribute mapping in mapping-config.",
-          "relation: low F1 (0.125) - inspect extraction and matching rules for this layer.",
+          "relation: low F1 (0.077) - inspect extraction and matching rules for this layer.",
           "relation: precision is weaker than recall - investigate over-generation and filtering criteria.",
           "timex: precision is weaker than recall - investigate over-generation and filtering criteria."
         ],
@@ -4642,7 +4331,7 @@
         ]
       },
       {
-        "avg_f1": 0.18679070112893642,
+        "avg_f1": 0.19897504456327986,
         "doc_id": "76437",
         "layers": [
           {
@@ -4651,7 +4340,7 @@
               "endpoint_mismatch": 0,
               "missing": 13,
               "spurious": 27,
-              "type_mismatch": 1
+              "type_mismatch": 0
             },
             "examples": {
               "boundary_mismatch": [],
@@ -5149,87 +4838,26 @@
                   }
                 }
               ],
-              "type_mismatch": [
-                {
-                  "gold": {
-                    "attrs": {},
-                    "kind": "entity",
-                    "span": [
-                      32,
-                      33,
-                      34,
-                      35,
-                      36
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "NAM"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      32,
-                      33,
-                      34,
-                      35,
-                      36
-                    ]
-                  }
-                }
-              ]
+              "type_mismatch": []
             },
-            "f1": 0.125,
-            "fn": 14,
-            "fp": 28,
+            "f1": 0.16666666666666666,
+            "fn": 13,
+            "fp": 27,
             "layer": "entity",
-            "precision": 0.0967741935483871,
-            "recall": 0.17647058823529413,
-            "tp": 3
+            "precision": 0.12903225806451613,
+            "recall": 0.23529411764705882,
+            "tp": 4
           },
           {
             "errors": {
-              "boundary_mismatch": 1,
+              "boundary_mismatch": 0,
               "endpoint_mismatch": 0,
               "missing": 5,
               "spurious": 43,
-              "type_mismatch": 1
+              "type_mismatch": 0
             },
             "examples": {
-              "boundary_mismatch": [
-                {
-                  "gold": {
-                    "attrs": {
-                      "aspect": "NONE",
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "VERB",
-                      "pred": "drag down",
-                      "tense": "PAST",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      2,
-                      3
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "aspect": "NONE",
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "VERB",
-                      "pred": "drag",
-                      "tense": "PAST",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      2
-                    ]
-                  }
-                }
-              ],
+              "boundary_mismatch": [],
               "missing": [
                 {
                   "gold": {
@@ -6029,47 +5657,15 @@
                   }
                 }
               ],
-              "type_mismatch": [
-                {
-                  "gold": {
-                    "attrs": {
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "VERB",
-                      "pred": "fear",
-                      "tense": "PRESENT",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      95
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "aspect": "NONE",
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "VERB",
-                      "pred": "fear",
-                      "tense": "PRESENT",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      95
-                    ]
-                  }
-                }
-              ]
+              "type_mismatch": []
             },
-            "f1": 0.2777777777777778,
-            "fn": 7,
-            "fp": 45,
+            "f1": 0.33333333333333337,
+            "fn": 5,
+            "fp": 43,
             "layer": "event",
-            "precision": 0.18181818181818182,
-            "recall": 0.5882352941176471,
-            "tp": 10
+            "precision": 0.21818181818181817,
+            "recall": 0.7058823529411765,
+            "tp": 12
           },
           {
             "errors": {
@@ -6266,18 +5862,34 @@
             "errors": {
               "boundary_mismatch": 0,
               "endpoint_mismatch": 0,
-              "missing": 7,
-              "spurious": 40,
-              "type_mismatch": 1
+              "missing": 8,
+              "spurious": 85,
+              "type_mismatch": 0
             },
             "examples": {
-              "endpoint_mismatch": [],
+              "matched_pairs": [
+                {
+                  "gold": "('tlink', 'event', (14,), 'event', (37,), (('reltype', 'BEFORE'),))",
+                  "predicted": "('tlink', 'event', (14,), 'event', (37,), (('reltype', 'BEFORE'),))"
+                },
+                {
+                  "gold": "('tlink', 'event', (14,), 'timex', (15,), (('reltype', 'IS_INCLUDED'),))",
+                  "predicted": "('tlink', 'event', (14,), 'timex', (15,), (('reltype', 'IS_INCLUDED'),))"
+                },
+                {
+                  "gold": "('tlink', 'event', (14,), 'timex', (7, 8, 9, 10), (('reltype', 'IS_INCLUDED'),))",
+                  "predicted": "('tlink', 'event', (14,), 'timex', (7, 8, 9, 10), (('reltype', 'IS_INCLUDED'),))"
+                }
+              ],
               "missing": [
                 {
                   "gold": "('tlink', 'event', (104,), 'timex', (7, 8, 9, 10), (('reltype', 'AFTER'),))"
                 },
                 {
                   "gold": "('tlink', 'event', (37,), 'event', (43,), (('reltype', 'AFTER'),))"
+                },
+                {
+                  "gold": "('tlink', 'event', (37,), 'event', (62,), (('reltype', 'AFTER'),))"
                 },
                 {
                   "gold": "('tlink', 'event', (37,), 'timex', (38, 39, 40, 41), (('reltype', 'IS_INCLUDED'),))"
@@ -6300,7 +5912,16 @@
                   "predicted": "('tlink', 'event', (113,), 'event', (150,), (('reltype', 'BEFORE'),))"
                 },
                 {
+                  "predicted": "('tlink', 'event', (113,), 'event', (150,), (('reltype', 'BEFORE'),))"
+                },
+                {
                   "predicted": "('tlink', 'event', (113,), 'event', (174,), (('reltype', 'BEFORE'),))"
+                },
+                {
+                  "predicted": "('tlink', 'event', (113,), 'event', (174,), (('reltype', 'BEFORE'),))"
+                },
+                {
+                  "predicted": "('tlink', 'event', (113,), 'event', (187,), (('reltype', 'BEFORE'),))"
                 },
                 {
                   "predicted": "('tlink', 'event', (113,), 'event', (187,), (('reltype', 'BEFORE'),))"
@@ -6309,142 +5930,33 @@
                   "predicted": "('tlink', 'event', (113,), 'event', (224,), (('reltype', 'BEFORE'),))"
                 },
                 {
+                  "predicted": "('tlink', 'event', (113,), 'event', (224,), (('reltype', 'BEFORE'),))"
+                },
+                {
                   "predicted": "('tlink', 'event', (113,), 'timex', (107,), (('reltype', 'IS_INCLUDED'),))"
                 },
                 {
-                  "predicted": "('tlink', 'event', (128,), 'timex', (107,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (134,), 'timex', (107,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (14,), 'event', (62,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (150,), 'event', (174,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (150,), 'event', (187,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (150,), 'event', (224,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (150,), 'timex', (146,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (174,), 'event', (187,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (174,), 'event', (224,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (174,), 'timex', (168,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (187,), 'event', (224,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (187,), 'timex', (146,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (187,), 'timex', (188, 189), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (192,), 'event', (194,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (21,), 'timex', (15,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (210,), 'timex', (204,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (224,), 'event', (256,), (('reltype', 'AFTER'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (224,), 'timex', (188, 189), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (224,), 'timex', (225, 226), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (230,), 'timex', (225, 226), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (233,), 'timex', (225, 226), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (237,), 'timex', (225, 226), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (256,), 'event', (293,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (26,), 'timex', (15,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (309,), 'event', (311,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (309,), 'timex', (302, 303), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (311,), 'timex', (302, 303), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (397,), 'event', (406,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (397,), 'event', (417,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (397,), 'event', (449,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (417,), 'event', (449,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (417,), 'timex', (413, 414), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (436,), 'timex', (413, 414), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (449,), 'event', (490,), (('reltype', 'AFTER'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (473,), 'event', (477,), (('reltype', 'BEFORE'),))"
-                }
-              ],
-              "type_mismatch": [
-                {
-                  "gold": "('tlink', 'event', (37,), 'event', (62,), (('reltype', 'AFTER'),))",
-                  "predicted": "('tlink', 'event', (37,), 'event', (62,), (('reltype', 'BEFORE'),))"
+                  "predicted": "('tlink', 'event', (113,), 'timex', (107,), (('reltype', 'IS_INCLUDED'),))"
                 }
               ]
             },
-            "f1": 0.10909090909090909,
+            "f1": 0.06060606060606061,
             "fn": 8,
-            "fp": 41,
+            "fp": 85,
             "layer": "relation",
-            "precision": 0.06818181818181818,
+            "precision": 0.03409090909090909,
             "recall": 0.2727272727272727,
             "tp": 3
           }
         ],
-        "mode": "strict",
+        "mode": "relaxed",
         "suggestions": [
-          "entity: low F1 (0.125) - inspect extraction and matching rules for this layer.",
+          "entity: low F1 (0.167) - inspect extraction and matching rules for this layer.",
           "entity: precision is weaker than recall - investigate over-generation and filtering criteria.",
-          "entity: type mismatches detected - tune label/attribute mapping in mapping-config.",
-          "event: boundary mismatches detected - verify token span anchoring (`start_tok`, `end_tok`) and overlap threshold.",
-          "event: low F1 (0.278) - inspect extraction and matching rules for this layer.",
+          "event: low F1 (0.333) - inspect extraction and matching rules for this layer.",
           "event: precision is weaker than recall - investigate over-generation and filtering criteria.",
-          "event: type mismatches detected - tune label/attribute mapping in mapping-config.",
-          "relation: low F1 (0.109) - inspect extraction and matching rules for this layer.",
+          "relation: low F1 (0.061) - inspect extraction and matching rules for this layer.",
           "relation: precision is weaker than recall - investigate over-generation and filtering criteria.",
-          "relation: type mismatches detected - tune label/attribute mapping in mapping-config.",
           "timex: low F1 (0.235) - inspect extraction and matching rules for this layer.",
           "timex: precision is weaker than recall - investigate over-generation and filtering criteria."
         ],
@@ -6456,7 +5968,7 @@
         ]
       },
       {
-        "avg_f1": 0.18707218314603713,
+        "avg_f1": 0.3423918839652322,
         "doc_id": "82738",
         "layers": [
           {
@@ -6756,114 +6268,14 @@
           },
           {
             "errors": {
-              "boundary_mismatch": 3,
+              "boundary_mismatch": 0,
               "endpoint_mismatch": 0,
               "missing": 3,
               "spurious": 45,
-              "type_mismatch": 2
+              "type_mismatch": 0
             },
             "examples": {
-              "boundary_mismatch": [
-                {
-                  "gold": {
-                    "attrs": {
-                      "aspect": "PERFECTIVE",
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "VERB",
-                      "pred": "know",
-                      "tense": "PRESENT",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      48,
-                      49
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "aspect": "NONE",
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "VERB",
-                      "pred": "know",
-                      "tense": "PRESENT",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      48
-                    ]
-                  }
-                },
-                {
-                  "gold": {
-                    "attrs": {
-                      "aspect": "NONE",
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "VERB",
-                      "pred": "tumbledown",
-                      "tense": "PRESPART",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      60,
-                      61
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "aspect": "NONE",
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "VERB",
-                      "pred": "tumble",
-                      "tense": "PRESPART",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      60
-                    ]
-                  }
-                },
-                {
-                  "gold": {
-                    "attrs": {
-                      "aspect": "NONE",
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "VERB",
-                      "pred": "close",
-                      "tense": "PAST",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      83,
-                      84
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "aspect": "NONE",
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "VERB",
-                      "pred": "close",
-                      "tense": "PAST",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      83
-                    ]
-                  }
-                }
-              ],
+              "boundary_mismatch": [],
               "missing": [
                 {
                   "gold": {
@@ -7660,136 +7072,26 @@
                   }
                 }
               ],
-              "type_mismatch": [
-                {
-                  "gold": {
-                    "attrs": {
-                      "aspect": "NONE",
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "NOUN",
-                      "pred": "crash",
-                      "tense": "NONE",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      56
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "NOUN",
-                      "pred": "crash",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      56
-                    ]
-                  }
-                },
-                {
-                  "gold": {
-                    "attrs": {
-                      "aspect": "NONE",
-                      "certainty": "CERTAIN",
-                      "polarity": "NEG",
-                      "pos": "VERB",
-                      "pred": "break",
-                      "tense": "PAST",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      77
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "aspect": "NONE",
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "VERB",
-                      "pred": "break",
-                      "tense": "PAST",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      77
-                    ]
-                  }
-                }
-              ]
+              "type_mismatch": []
             },
-            "f1": 0.19444444444444442,
-            "fn": 8,
-            "fp": 50,
+            "f1": 0.3333333333333333,
+            "fn": 3,
+            "fp": 45,
             "layer": "event",
-            "precision": 0.12280701754385964,
-            "recall": 0.4666666666666667,
-            "tp": 7
+            "precision": 0.21052631578947367,
+            "recall": 0.8,
+            "tp": 12
           },
           {
             "errors": {
-              "boundary_mismatch": 2,
+              "boundary_mismatch": 0,
               "endpoint_mismatch": 0,
               "missing": 0,
               "spurious": 5,
-              "type_mismatch": 3
+              "type_mismatch": 0
             },
             "examples": {
-              "boundary_mismatch": [
-                {
-                  "gold": {
-                    "attrs": {
-                      "type": "DATE",
-                      "value": "1987-10-20"
-                    },
-                    "kind": "timex",
-                    "span": [
-                      7,
-                      8
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "type": "DATE",
-                      "value": "2007-10-15"
-                    },
-                    "kind": "timex",
-                    "span": [
-                      8
-                    ]
-                  }
-                },
-                {
-                  "gold": {
-                    "attrs": {
-                      "type": "DATE",
-                      "value": "1987-10-20"
-                    },
-                    "kind": "timex",
-                    "span": [
-                      51,
-                      52
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "type": "DATE",
-                      "value": "2007-10-15"
-                    },
-                    "kind": "timex",
-                    "span": [
-                      52
-                    ]
-                  }
-                }
-              ],
+              "boundary_mismatch": [],
               "missing": [],
               "spurious": [
                 {
@@ -7856,99 +7158,35 @@
                   }
                 }
               ],
-              "type_mismatch": [
-                {
-                  "gold": {
-                    "attrs": {
-                      "type": "DATE",
-                      "value": "P1D"
-                    },
-                    "kind": "timex",
-                    "span": [
-                      25,
-                      26
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "type": "DURATION",
-                      "value": "P1D"
-                    },
-                    "kind": "timex",
-                    "span": [
-                      25,
-                      26
-                    ]
-                  }
-                },
-                {
-                  "gold": {
-                    "attrs": {
-                      "type": "DATE",
-                      "value": "P20Y"
-                    },
-                    "kind": "timex",
-                    "span": [
-                      31,
-                      32,
-                      33
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "type": "DATE",
-                      "value": "1987"
-                    },
-                    "kind": "timex",
-                    "span": [
-                      31,
-                      32,
-                      33
-                    ]
-                  }
-                },
-                {
-                  "gold": {
-                    "attrs": {
-                      "type": "DATE",
-                      "value": "2007-10-20"
-                    },
-                    "kind": "timex",
-                    "span": [
-                      71
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "type": "DATE",
-                      "value": "2007-10-19"
-                    },
-                    "kind": "timex",
-                    "span": [
-                      71
-                    ]
-                  }
-                }
-              ]
+              "type_mismatch": []
             },
-            "f1": 0.2105263157894737,
-            "fn": 5,
-            "fp": 10,
+            "f1": 0.7368421052631579,
+            "fn": 0,
+            "fp": 5,
             "layer": "timex",
-            "precision": 0.16666666666666666,
-            "recall": 0.2857142857142857,
-            "tp": 2
+            "precision": 0.5833333333333334,
+            "recall": 1.0,
+            "tp": 7
           },
           {
             "errors": {
               "boundary_mismatch": 0,
               "endpoint_mismatch": 0,
               "missing": 13,
-              "spurious": 14,
+              "spurious": 30,
               "type_mismatch": 0
             },
             "examples": {
-              "endpoint_mismatch": [],
+              "matched_pairs": [
+                {
+                  "gold": "('tlink', 'event', (57,), 'event', (77,), (('reltype', 'BEFORE'),))",
+                  "predicted": "('tlink', 'event', (57,), 'event', (77,), (('reltype', 'BEFORE'),))"
+                },
+                {
+                  "gold": "('tlink', 'event', (77,), 'timex', (71,), (('reltype', 'IS_INCLUDED'),))",
+                  "predicted": "('tlink', 'event', (77,), 'timex', (71,), (('reltype', 'IS_INCLUDED'),))"
+                }
+              ],
               "missing": [
                 {
                   "gold": "('tlink', 'event', (16,), 'timex', (11, 12, 13, 14), (('reltype', 'IS_INCLUDED'),))"
@@ -7979,20 +7217,17 @@
                 },
                 {
                   "gold": "('tlink', 'event', (77,), 'event', (83, 84), (('reltype', 'BEGUN_BY'),))"
-                },
-                {
-                  "gold": "('tlink', 'event', (77,), 'timex', (11, 12, 13, 14), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "gold": "('tlink', 'timex', (23,), 'timex', (31, 32, 33), (('reltype', 'SIMULTANEOUS'),))"
-                },
-                {
-                  "gold": "('tlink', 'timex', (23,), 'timex', (51, 52), (('reltype', 'SIMULTANEOUS'),))"
                 }
               ],
               "spurious": [
                 {
                   "predicted": "('tlink', 'event', (122,), 'event', (124,), (('reltype', 'BEFORE'),))"
+                },
+                {
+                  "predicted": "('tlink', 'event', (122,), 'event', (124,), (('reltype', 'BEFORE'),))"
+                },
+                {
+                  "predicted": "('tlink', 'event', (137,), 'event', (174,), (('reltype', 'BEFORE'),))"
                 },
                 {
                   "predicted": "('tlink', 'event', (137,), 'event', (174,), (('reltype', 'BEFORE'),))"
@@ -8001,64 +7236,41 @@
                   "predicted": "('tlink', 'event', (174,), 'event', (216,), (('reltype', 'AFTER'),))"
                 },
                 {
+                  "predicted": "('tlink', 'event', (174,), 'event', (216,), (('reltype', 'AFTER'),))"
+                },
+                {
+                  "predicted": "('tlink', 'event', (187,), 'event', (191,), (('reltype', 'BEFORE'),))"
+                },
+                {
                   "predicted": "('tlink', 'event', (187,), 'event', (191,), (('reltype', 'BEFORE'),))"
                 },
                 {
                   "predicted": "('tlink', 'event', (216,), 'event', (233,), (('reltype', 'BEFORE'),))"
                 },
                 {
-                  "predicted": "('tlink', 'event', (216,), 'timex', (213,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (221,), 'timex', (213,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (24,), 'event', (57,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (24,), 'event', (77,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (339,), 'event', (342,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (354,), 'timex', (25, 26), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (358,), 'event', (360,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (43,), 'timex', (25, 26), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (83, 84), 'timex', (71,), (('reltype', 'IS_INCLUDED'),))"
+                  "predicted": "('tlink', 'event', (216,), 'event', (233,), (('reltype', 'BEFORE'),))"
                 }
-              ],
-              "type_mismatch": []
+              ]
             },
-            "f1": 0.12903225806451615,
+            "f1": 0.0851063829787234,
             "fn": 13,
-            "fp": 14,
+            "fp": 30,
             "layer": "relation",
-            "precision": 0.125,
+            "precision": 0.0625,
             "recall": 0.13333333333333333,
             "tp": 2
           }
         ],
-        "mode": "strict",
+        "mode": "relaxed",
         "suggestions": [
           "entity: low F1 (0.214) - inspect extraction and matching rules for this layer.",
           "entity: precision is weaker than recall - investigate over-generation and filtering criteria.",
-          "event: boundary mismatches detected - verify token span anchoring (`start_tok`, `end_tok`) and overlap threshold.",
-          "event: low F1 (0.194) - inspect extraction and matching rules for this layer.",
+          "event: low F1 (0.333) - inspect extraction and matching rules for this layer.",
           "event: precision is weaker than recall - investigate over-generation and filtering criteria.",
-          "event: type mismatches detected - tune label/attribute mapping in mapping-config.",
-          "relation: low F1 (0.129) - inspect extraction and matching rules for this layer.",
+          "relation: low F1 (0.085) - inspect extraction and matching rules for this layer.",
           "relation: precision is weaker than recall - investigate over-generation and filtering criteria.",
-          "timex: boundary mismatches detected - verify token span anchoring (`start_tok`, `end_tok`) and overlap threshold.",
-          "timex: low F1 (0.211) - inspect extraction and matching rules for this layer.",
-          "timex: precision is weaker than recall - investigate over-generation and filtering criteria.",
-          "timex: type mismatches detected - tune label/attribute mapping in mapping-config."
+          "timex: low F1 (0.737) - inspect extraction and matching rules for this layer.",
+          "timex: precision is weaker than recall - investigate over-generation and filtering criteria."
         ],
         "weak_layers": [
           "entity",
@@ -8068,44 +7280,19 @@
         ]
       },
       {
-        "avg_f1": 0.3264315346337376,
+        "avg_f1": 0.3992733457019172,
         "doc_id": "96770",
         "layers": [
           {
             "errors": {
-              "boundary_mismatch": 1,
+              "boundary_mismatch": 0,
               "endpoint_mismatch": 0,
-              "missing": 8,
+              "missing": 6,
               "spurious": 7,
               "type_mismatch": 0
             },
             "examples": {
-              "boundary_mismatch": [
-                {
-                  "gold": {
-                    "attrs": {
-                      "syntactic_type": "NAM"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      47,
-                      48,
-                      49,
-                      50
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "syntactic_type": "NAM"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      48,
-                      49
-                    ]
-                  }
-                }
-              ],
+              "boundary_mismatch": [],
               "missing": [
                 {
                   "gold": {
@@ -8143,45 +7330,11 @@
                 {
                   "gold": {
                     "attrs": {
-                      "syntactic_type": "CONJ"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      18,
-                      19,
-                      20
-                    ]
-                  }
-                },
-                {
-                  "gold": {
-                    "attrs": {
                       "syntactic_type": "PRO"
                     },
                     "kind": "entity",
                     "span": [
                       55
-                    ]
-                  }
-                },
-                {
-                  "gold": {
-                    "attrs": {
-                      "syntactic_type": "CONJ"
-                    },
-                    "kind": "entity",
-                    "span": [
-                      78,
-                      79,
-                      80,
-                      81,
-                      82,
-                      83,
-                      84,
-                      85,
-                      86,
-                      87,
-                      88
                     ]
                   }
                 },
@@ -8294,13 +7447,13 @@
               ],
               "type_mismatch": []
             },
-            "f1": 0.5853658536585366,
-            "fn": 9,
-            "fp": 8,
+            "f1": 0.6666666666666667,
+            "fn": 6,
+            "fp": 7,
             "layer": "entity",
-            "precision": 0.6,
-            "recall": 0.5714285714285714,
-            "tp": 12
+            "precision": 0.65,
+            "recall": 0.6842105263157895,
+            "tp": 13
           },
           {
             "errors": {
@@ -8308,7 +7461,7 @@
               "endpoint_mismatch": 0,
               "missing": 13,
               "spurious": 17,
-              "type_mismatch": 2
+              "type_mismatch": 0
             },
             "examples": {
               "boundary_mismatch": [],
@@ -8812,78 +7965,15 @@
                   }
                 }
               ],
-              "type_mismatch": [
-                {
-                  "gold": {
-                    "attrs": {
-                      "aspect": "NONE",
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "VERB",
-                      "pred": "plunge",
-                      "tense": "PAST",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      3
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "aspect": "NONE",
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "VERB",
-                      "pred": "plunge",
-                      "tense": "PRESENT",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      3
-                    ]
-                  }
-                },
-                {
-                  "gold": {
-                    "attrs": {
-                      "aspect": "NONE",
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "NOUN",
-                      "pred": "attack",
-                      "tense": "NONE",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      66
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "certainty": "CERTAIN",
-                      "polarity": "POS",
-                      "pos": "NOUN",
-                      "pred": "attack",
-                      "time": "NON_FUTURE"
-                    },
-                    "kind": "event",
-                    "span": [
-                      66
-                    ]
-                  }
-                }
-              ]
+              "type_mismatch": []
             },
-            "f1": 0.22727272727272727,
-            "fn": 15,
-            "fp": 19,
+            "f1": 0.31818181818181823,
+            "fn": 13,
+            "fp": 17,
             "layer": "event",
-            "precision": 0.20833333333333334,
-            "recall": 0.25,
-            "tp": 5
+            "precision": 0.2916666666666667,
+            "recall": 0.35,
+            "tp": 7
           },
           {
             "errors": {
@@ -8891,7 +7981,7 @@
               "endpoint_mismatch": 0,
               "missing": 0,
               "spurious": 6,
-              "type_mismatch": 1
+              "type_mismatch": 0
             },
             "examples": {
               "boundary_mismatch": [],
@@ -8978,58 +8068,46 @@
                   }
                 }
               ],
-              "type_mismatch": [
-                {
-                  "gold": {
-                    "attrs": {
-                      "type": "DURATION",
-                      "value": "PAST_REF"
-                    },
-                    "kind": "timex",
-                    "span": [
-                      101
-                    ]
-                  },
-                  "predicted": {
-                    "attrs": {
-                      "type": "DATE",
-                      "value": "PAST_REF"
-                    },
-                    "kind": "timex",
-                    "span": [
-                      101
-                    ]
-                  }
-                }
-              ]
+              "type_mismatch": []
             },
-            "f1": 0.4285714285714285,
-            "fn": 1,
-            "fp": 7,
+            "f1": 0.5714285714285715,
+            "fn": 0,
+            "fp": 6,
             "layer": "timex",
-            "precision": 0.3,
-            "recall": 0.75,
-            "tp": 3
+            "precision": 0.4,
+            "recall": 1.0,
+            "tp": 4
           },
           {
             "errors": {
               "boundary_mismatch": 0,
               "endpoint_mismatch": 0,
-              "missing": 9,
-              "spurious": 14,
-              "type_mismatch": 3
+              "missing": 12,
+              "spurious": 35,
+              "type_mismatch": 0
             },
             "examples": {
-              "endpoint_mismatch": [],
+              "matched_pairs": [
+                {
+                  "gold": "('tlink', 'event', (15,), 'timex', (21,), (('reltype', 'IS_INCLUDED'),))",
+                  "predicted": "('tlink', 'event', (15,), 'timex', (21,), (('reltype', 'IS_INCLUDED'),))"
+                }
+              ],
               "missing": [
                 {
                   "gold": "('tlink', 'event', (100,), 'timex', (9, 10, 11, 12), (('reltype', 'IS_INCLUDED'),))"
+                },
+                {
+                  "gold": "('tlink', 'event', (15,), 'event', (51,), (('reltype', 'INCLUDES'),))"
                 },
                 {
                   "gold": "('tlink', 'event', (15,), 'timex', (9, 10, 11, 12), (('reltype', 'IS_INCLUDED'),))"
                 },
                 {
                   "gold": "('tlink', 'event', (38,), 'timex', (40, 41), (('reltype', 'IS_INCLUDED'),))"
+                },
+                {
+                  "gold": "('tlink', 'event', (51,), 'event', (76,), (('reltype', 'IS_INCLUDED'),))"
                 },
                 {
                   "gold": "('tlink', 'event', (51,), 'timex', (9, 10, 11, 12), (('reltype', 'IS_INCLUDED'),))"
@@ -9041,18 +8119,21 @@
                   "gold": "('tlink', 'event', (68,), 'event', (76,), (('reltype', 'BEFORE'),))"
                 },
                 {
+                  "gold": "('tlink', 'event', (76,), 'event', (100,), (('reltype', 'BEGUN_BY'),))"
+                },
+                {
                   "gold": "('tlink', 'event', (76,), 'timex', (9, 10, 11, 12), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "gold": "('tlink', 'event', (92,), 'event', (100,), (('reltype', 'SIMULTANEOUS'),))"
-                },
-                {
-                  "gold": "('tlink', 'event', (92,), 'timex', (9, 10, 11, 12), (('reltype', 'INCLUDES'),))"
                 }
               ],
               "spurious": [
                 {
                   "predicted": "('tlink', 'event', (130,), 'event', (142,), (('reltype', 'AFTER'),))"
+                },
+                {
+                  "predicted": "('tlink', 'event', (130,), 'event', (142,), (('reltype', 'AFTER'),))"
+                },
+                {
+                  "predicted": "('tlink', 'event', (142,), 'event', (180,), (('reltype', 'BEFORE'),))"
                 },
                 {
                   "predicted": "('tlink', 'event', (142,), 'event', (180,), (('reltype', 'BEFORE'),))"
@@ -9061,77 +8142,41 @@
                   "predicted": "('tlink', 'event', (142,), 'event', (229,), (('reltype', 'BEFORE'),))"
                 },
                 {
+                  "predicted": "('tlink', 'event', (142,), 'event', (229,), (('reltype', 'BEFORE'),))"
+                },
+                {
                   "predicted": "('tlink', 'event', (15,), 'event', (100,), (('reltype', 'BEFORE'),))"
                 },
                 {
-                  "predicted": "('tlink', 'event', (15,), 'event', (76,), (('reltype', 'BEFORE'),))"
+                  "predicted": "('tlink', 'event', (15,), 'event', (100,), (('reltype', 'BEFORE'),))"
                 },
                 {
-                  "predicted": "('tlink', 'event', (180,), 'event', (229,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (180,), 'timex', (175, 176), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (188,), 'timex', (175, 176), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (191,), 'timex', (175, 176), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (229,), 'timex', (231,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (252,), 'event', (255,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (255,), 'timex', (256,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (32,), 'timex', (21,), (('reltype', 'IS_INCLUDED'),))"
-                },
-                {
-                  "predicted": "('tlink', 'event', (51,), 'event', (100,), (('reltype', 'BEFORE'),))"
-                }
-              ],
-              "type_mismatch": [
-                {
-                  "gold": "('tlink', 'event', (15,), 'event', (51,), (('reltype', 'INCLUDES'),))",
                   "predicted": "('tlink', 'event', (15,), 'event', (51,), (('reltype', 'BEFORE'),))"
                 },
                 {
-                  "gold": "('tlink', 'event', (51,), 'event', (76,), (('reltype', 'IS_INCLUDED'),))",
-                  "predicted": "('tlink', 'event', (51,), 'event', (76,), (('reltype', 'BEFORE'),))"
-                },
-                {
-                  "gold": "('tlink', 'event', (76,), 'event', (100,), (('reltype', 'BEGUN_BY'),))",
-                  "predicted": "('tlink', 'event', (76,), 'event', (100,), (('reltype', 'BEFORE'),))"
+                  "predicted": "('tlink', 'event', (15,), 'event', (51,), (('reltype', 'BEFORE'),))"
                 }
               ]
             },
-            "f1": 0.06451612903225808,
+            "f1": 0.04081632653061225,
             "fn": 12,
-            "fp": 17,
+            "fp": 35,
             "layer": "relation",
-            "precision": 0.05555555555555555,
+            "precision": 0.027777777777777776,
             "recall": 0.07692307692307693,
             "tp": 1
           }
         ],
-        "mode": "strict",
+        "mode": "relaxed",
         "suggestions": [
-          "entity: boundary mismatches detected - verify token span anchoring (`start_tok`, `end_tok`) and overlap threshold.",
-          "entity: low F1 (0.585) - inspect extraction and matching rules for this layer.",
-          "entity: recall is weaker than precision - investigate under-generation and missing extractions.",
-          "event: low F1 (0.227) - inspect extraction and matching rules for this layer.",
+          "entity: low F1 (0.667) - inspect extraction and matching rules for this layer.",
+          "entity: precision is weaker than recall - investigate over-generation and filtering criteria.",
+          "event: low F1 (0.318) - inspect extraction and matching rules for this layer.",
           "event: precision is weaker than recall - investigate over-generation and filtering criteria.",
-          "event: type mismatches detected - tune label/attribute mapping in mapping-config.",
-          "relation: low F1 (0.065) - inspect extraction and matching rules for this layer.",
+          "relation: low F1 (0.041) - inspect extraction and matching rules for this layer.",
           "relation: precision is weaker than recall - investigate over-generation and filtering criteria.",
-          "relation: type mismatches detected - tune label/attribute mapping in mapping-config.",
-          "timex: low F1 (0.429) - inspect extraction and matching rules for this layer.",
-          "timex: precision is weaker than recall - investigate over-generation and filtering criteria.",
-          "timex: type mismatches detected - tune label/attribute mapping in mapping-config."
+          "timex: low F1 (0.571) - inspect extraction and matching rules for this layer.",
+          "timex: precision is weaker than recall - investigate over-generation and filtering criteria."
         ],
         "weak_layers": [
           "entity",
@@ -9144,7 +8189,7 @@
     "f1_threshold": 0.75,
     "hotspot_documents": [
       {
-        "avg_f1": 0.18679070112893642,
+        "avg_f1": 0.19897504456327986,
         "doc_id": "76437",
         "weak_layers": [
           "entity",
@@ -9154,17 +8199,7 @@
         ]
       },
       {
-        "avg_f1": 0.18707218314603713,
-        "doc_id": "82738",
-        "weak_layers": [
-          "entity",
-          "event",
-          "timex",
-          "relation"
-        ]
-      },
-      {
-        "avg_f1": 0.2263981645540866,
+        "avg_f1": 0.2638085877274129,
         "doc_id": "61327",
         "weak_layers": [
           "entity",
@@ -9174,7 +8209,7 @@
         ]
       },
       {
-        "avg_f1": 0.2623076923076923,
+        "avg_f1": 0.2972916666666667,
         "doc_id": "112579",
         "weak_layers": [
           "entity",
@@ -9184,8 +8219,8 @@
         ]
       },
       {
-        "avg_f1": 0.3264315346337376,
-        "doc_id": "96770",
+        "avg_f1": 0.3423918839652322,
+        "doc_id": "82738",
         "weak_layers": [
           "entity",
           "event",
@@ -9194,62 +8229,65 @@
         ]
       },
       {
-        "avg_f1": 0.3672059744053415,
+        "avg_f1": 0.3629768965212003,
         "doc_id": "62405",
         "weak_layers": [
           "entity",
           "event",
           "relation"
         ]
+      },
+      {
+        "avg_f1": 0.3992733457019172,
+        "doc_id": "96770",
+        "weak_layers": [
+          "entity",
+          "event",
+          "timex",
+          "relation"
+        ]
       }
     ],
     "issue_totals": {
       "entity": {
-        "boundary_mismatch": 3,
+        "boundary_mismatch": 0,
         "endpoint_mismatch": 0,
-        "missing": 65,
-        "spurious": 95,
-        "type_mismatch": 1
+        "missing": 62,
+        "spurious": 94,
+        "type_mismatch": 0
       },
       "event": {
-        "boundary_mismatch": 4,
+        "boundary_mismatch": 0,
         "endpoint_mismatch": 0,
         "missing": 51,
         "spurious": 217,
-        "type_mismatch": 10
+        "type_mismatch": 0
       },
       "relation": {
         "boundary_mismatch": 0,
-        "endpoint_mismatch": 1,
-        "missing": 60,
-        "spurious": 125,
-        "type_mismatch": 4
+        "endpoint_mismatch": 0,
+        "missing": 65,
+        "spurious": 271,
+        "type_mismatch": 0
       },
       "timex": {
-        "boundary_mismatch": 2,
+        "boundary_mismatch": 0,
         "endpoint_mismatch": 0,
         "missing": 6,
         "spurious": 39,
-        "type_mismatch": 5
+        "type_mismatch": 0
       }
     },
-    "mode": "strict",
+    "mode": "relaxed",
     "suggestions": [
       "entity: dataset-level precision gap - tighten confidence filters and post-processing constraints.",
-      "entity: high boundary mismatch volume - calibrate span normalization and tokenizer alignment.",
-      "entity: micro F1=0.306 below threshold 0.75 - mark as priority optimization track.",
-      "entity: type mismatch volume present - refine schema mapping and attribute projection.",
+      "entity: micro F1=0.345 below threshold 0.75 - mark as priority optimization track.",
       "event: dataset-level precision gap - tighten confidence filters and post-processing constraints.",
-      "event: high boundary mismatch volume - calibrate span normalization and tokenizer alignment.",
-      "event: micro F1=0.237 below threshold 0.75 - mark as priority optimization track.",
-      "event: type mismatch volume present - refine schema mapping and attribute projection.",
+      "event: micro F1=0.309 below threshold 0.75 - mark as priority optimization track.",
       "relation: dataset-level precision gap - tighten confidence filters and post-processing constraints.",
-      "relation: micro F1=0.101 below threshold 0.75 - mark as priority optimization track.",
-      "relation: type mismatch volume present - refine schema mapping and attribute projection.",
+      "relation: micro F1=0.061 below threshold 0.75 - mark as priority optimization track.",
       "timex: dataset-level precision gap - tighten confidence filters and post-processing constraints.",
-      "timex: high boundary mismatch volume - calibrate span normalization and tokenizer alignment.",
-      "timex: micro F1=0.379 below threshold 0.75 - mark as priority optimization track.",
-      "timex: type mismatch volume present - refine schema mapping and attribute projection."
+      "timex: micro F1=0.526 below threshold 0.75 - mark as priority optimization track."
     ]
   },
   "documents_evaluated": 6,
@@ -9286,7 +8324,7 @@
         "runs": 2
       },
       "62405": {
-        "baseline_signature": "69ee263dd449c80324315dc492bc03f1e9409d9fdff46d01a22f9edfc65b2088",
+        "baseline_signature": "0056d3c03be0651c1d7c6eb2de9215582c0e687e8b01622d1bf21d765722ddc3",
         "deterministic": true,
         "doc_id": "62405",
         "mismatch_runs": [],
@@ -15030,7 +14068,7 @@
           "timex": 6
         },
         "predicted": {
-          "entity": 25,
+          "entity": 24,
           "event": 58,
           "relation": 40,
           "timex": 7
@@ -15244,7 +14282,7 @@
           "errors": {
             "boundary_mismatch": 0,
             "missing": 22,
-            "spurious": 16,
+            "spurious": 15,
             "type_mismatch": 0
           },
           "examples": {
@@ -15589,17 +14627,6 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "NOM"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    187
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "NAM"
                   },
                   "kind": "entity",
@@ -15743,12 +14770,12 @@
             ],
             "type_mismatch": []
           },
-          "f1": 0.3214285714285714,
+          "f1": 0.3272727272727273,
           "fn": 22,
-          "fp": 16,
+          "fp": 15,
           "matched_pairs": 9,
           "mode": "relaxed",
-          "precision": 0.36,
+          "precision": 0.375,
           "recall": 0.2903225806451613,
           "tp": 9
         },
@@ -16863,7 +15890,7 @@
           "errors": {
             "boundary_mismatch": 0,
             "missing": 22,
-            "spurious": 16,
+            "spurious": 15,
             "type_mismatch": 0
           },
           "examples": {
@@ -17208,17 +16235,6 @@
               {
                 "predicted": {
                   "attrs": {
-                    "syntactic_type": "NOM"
-                  },
-                  "kind": "entity",
-                  "span": [
-                    187
-                  ]
-                }
-              },
-              {
-                "predicted": {
-                  "attrs": {
                     "syntactic_type": "NAM"
                   },
                   "kind": "entity",
@@ -17362,12 +16378,12 @@
             ],
             "type_mismatch": []
           },
-          "f1": 0.3214285714285714,
+          "f1": 0.3272727272727273,
           "fn": 22,
-          "fp": 16,
+          "fp": 15,
           "matched_pairs": 9,
           "mode": "strict",
-          "precision": 0.36,
+          "precision": 0.375,
           "recall": 0.2903225806451613,
           "tp": 9
         },
