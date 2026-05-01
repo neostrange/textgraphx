@@ -835,7 +835,7 @@ class PhaseAssertions:
             actual=self._count(
                 """
                 MATCH (a)-[r1:TLINK]->(b), (a)-[r2:TLINK]->(b)
-                WHERE id(r1) < id(r2)
+                WHERE elementId(r1) < elementId(r2)
                   AND coalesce(r1.suppressed, false) = false
                   AND coalesce(r2.suppressed, false) = false
                 WITH coalesce(r1.relTypeCanonical, r1.relType, 'VAGUE') AS rel1,
@@ -914,7 +914,7 @@ def record_phase_run(
         cypher = """
         MERGE (r:PhaseRun {id: $id})
         SET r += $props
-        RETURN id(r) AS node_id
+        RETURN elementId(r) AS node_id
         """
         graph.run(cypher, {"id": run_id, "props": props}).data()
         logger.info(

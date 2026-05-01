@@ -218,7 +218,7 @@ class TlinksRecognizer:
         MATCH (fa:FrameArgument {type: 'ARGM-TMP'})-[:HAS_FRAME_ARGUMENT|PARTICIPANT]->(f_main)
         MATCH (f_sub:Frame)-[:INSTANTIATES]->(em_sub:EventMention)-[:REFERS_TO]->(e_sub:TEvent)
         MATCH (e_sub)<-[:TRIGGERS]-(tok_sub:TagOccurrence)
-        WHERE id(e_main) <> id(e_sub)
+        WHERE elementId(e_main) <> elementId(e_sub)
           AND em_sub.clauseType IN ['SUBORDINATE', 'COMPLEMENT']
           AND em_sub.scopeType IN ['TEMPORAL_SCOPE', 'LOCAL_SCOPE']
           AND fa.syntacticType = 'EVENTIVE'
@@ -302,7 +302,7 @@ class TlinksRecognizer:
             MATCH (e:TEvent {source: 'nombank_srl'})<-[:TRIGGERS]-(tok_e:TagOccurrence)
                   <-[:HAS_TOKEN]-(sent:Sentence)
                   -[:HAS_TOKEN]->(tok_t:TagOccurrence)-[:TRIGGERS]->(tm:TimexMention)
-            WHERE id(tok_e) <> id(tok_t)
+            WHERE elementId(tok_e) <> elementId(tok_t)
               AND abs(coalesce(tok_e.tok_index_doc, -1) - coalesce(tok_t.tok_index_doc, -1)) <= 15
               AND NOT tm:SRLTimexCandidate
               AND coalesce(e.is_timeml_core, true) = true
@@ -376,7 +376,7 @@ class TlinksRecognizer:
         logger.debug("suppress_tlink_conflicts")
         query_prefix = """
         MATCH (a)-[r1:TLINK]->(b), (a)-[r2:TLINK]->(b)
-        WHERE id(r1) < id(r2)
+        WHERE elementId(r1) < elementId(r2)
           AND coalesce(r1.suppressed, false) = false
           AND coalesce(r2.suppressed, false) = false
         WITH r1, r2,
@@ -398,18 +398,18 @@ class TlinksRecognizer:
              CASE
                 WHEN c1 > c2 THEN r2
                 WHEN c2 > c1 THEN r1
-                WHEN id(r1) < id(r2) THEN r2
+                WHEN elementId(r1) < elementId(r2) THEN r2
                 ELSE r1
              END AS loser,
              CASE
                 WHEN c1 > c2 THEN r1
                 WHEN c2 > c1 THEN r2
-                WHEN id(r1) < id(r2) THEN r1
+                WHEN elementId(r1) < elementId(r2) THEN r1
                 ELSE r2
              END AS winner
         WITH r1, loser, winner, t1, t2,
-             CASE WHEN id(loser) = id(r1) THEN t1 ELSE t2 END AS loser_type,
-             CASE WHEN id(winner) = id(r1) THEN t1 ELSE t2 END AS winner_type
+             CASE WHEN elementId(loser) = elementId(r1) THEN t1 ELSE t2 END AS loser_type,
+             CASE WHEN elementId(winner) = elementId(r1) THEN t1 ELSE t2 END AS winner_type
         """
         if shadow_only:
             query = (
@@ -538,7 +538,7 @@ class TlinksRecognizer:
                      WHEN dst:TIMEX OR dst:Timex3 THEN 'TIMEX'
                 ELSE 'OTHER'
              END AS target_anchor_type,
-             CASE WHEN id(src) = id(dst) THEN true ELSE false END AS is_self_link,
+             CASE WHEN elementId(src) = elementId(dst) THEN true ELSE false END AS is_self_link,
                  CASE WHEN (src:TEvent OR src:TIMEX OR src:Timex3) AND (dst:TEvent OR dst:TIMEX OR dst:Timex3) THEN true ELSE false END AS endpoint_contract_ok
         WITH src, dst, r, source_anchor_type, target_anchor_type, is_self_link, endpoint_contract_ok,
              (NOT endpoint_contract_ok OR is_self_link) AS inconsistent

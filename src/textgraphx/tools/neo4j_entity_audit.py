@@ -54,16 +54,16 @@ QUERIES: Dict[str, str] = {
     ),
     "unresolved_frame_arguments_sample": (
         "MATCH (fa:FrameArgument) WHERE NOT (fa)-[:REFERS_TO]->() "
-        "AND NOT (fa)-[:PARTICIPANT]->() RETURN id(fa) AS id, labels(fa) AS labels, properties(fa) AS props LIMIT 50"
+        "AND NOT (fa)-[:PARTICIPANT]->() RETURN elementId(fa) AS id, labels(fa) AS labels, properties(fa) AS props LIMIT 50"
     ),
     "duplicated_named_entity_uids": (
         "MATCH (ne:NamedEntity) WHERE ne.uid IS NOT NULL "
-        "WITH ne.uid AS uid, count(ne) AS cnt, collect(id(ne)) AS ids "
+        "WITH ne.uid AS uid, count(ne) AS cnt, collect(elementId(ne)) AS ids "
         "WHERE cnt > 1 RETURN uid, cnt, ids LIMIT 200"
     ),
-    "sample_frames": "MATCH (f:Frame) RETURN id(f) AS id, labels(f) AS labels, properties(f) AS props LIMIT 20",
+    "sample_frames": "MATCH (f:Frame) RETURN elementId(f) AS id, labels(f) AS labels, properties(f) AS props LIMIT 20",
     "sample_named_entities": (
-        "MATCH (ne:NamedEntity) RETURN id(ne) AS id, labels(ne) AS labels, properties(ne) AS props LIMIT 50"
+        "MATCH (ne:NamedEntity) RETURN elementId(ne) AS id, labels(ne) AS labels, properties(ne) AS props LIMIT 50"
     ),
     "participant_provenance_breakdown": (
         "MATCH ()-[r:PARTICIPANT]->() RETURN r.rule_id AS rule_id, r.evidence_source AS source, count(r) AS cnt "

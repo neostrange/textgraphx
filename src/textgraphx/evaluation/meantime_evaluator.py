@@ -420,7 +420,7 @@ def build_document_from_neo4j(
                max(tok.tok_index_doc) AS end_tok,
                head(collect(tok)) AS head_tok
         RETURN DISTINCT start_tok, end_tok,
-             id(m) AS node_id,
+             elementId(m) AS node_id,
              coalesce(m.syntactic_type, m.syntacticType) AS syntactic_type,
                             CASE WHEN m:NominalMention OR m:CorefMention THEN true ELSE false END AS is_nominal_mention,
                             coalesce(m.nominalEvalStartTok, m.start_tok) AS eval_start_tok,
@@ -1014,7 +1014,7 @@ def build_document_from_neo4j(
                 AND evt_start IS NOT NULL AND evt_end IS NOT NULL
               RETURN DISTINCT src_start, src_end, evt_start, evt_end,
                    coalesce(r.type, '') AS sem_role,
-                   source_labels, id(endpoint) AS endpoint_id
+                   source_labels, elementId(endpoint) AS endpoint_id
         }
         RETURN DISTINCT src_start, src_end, evt_start, evt_end, sem_role, source_labels, endpoint_id
         ORDER BY evt_start, src_start
@@ -1479,7 +1479,7 @@ def _nominal_projection_features(
     rows = graph.run(
         """
         MATCH (m)
-        WHERE id(m) = $node_id
+        WHERE elementId(m) = $node_id
         OPTIONAL MATCH (ht:TagOccurrence)-[:IN_MENTION]->(m)
                 WHERE ht.tok_index_doc = coalesce(m.nominalSemanticHeadTokenIndex, m.headTokenIndex, $fallback_head_idx)
         WITH m, head(collect(ht)) AS head_tok

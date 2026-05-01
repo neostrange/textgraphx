@@ -1248,7 +1248,7 @@ class DBpediaEnrichmentPhaseWrapper:
         graph.run(
             """
             MATCH (n)
-            WHERE id(n) = $node_id
+            WHERE elementId(n) = $node_id
             OPTIONAL MATCH (n)-[:REFERS_TO]->(e:Entity)
             SET n.dbpedia_lookup_text = $lookup_text,
                 n.dbpedia_resolution_status = $resolution_status,
@@ -1295,7 +1295,7 @@ class DBpediaEnrichmentPhaseWrapper:
         graph.run(
             """
             MATCH (n)
-            WHERE id(n) = $node_id
+            WHERE elementId(n) = $node_id
             OPTIONAL MATCH (n)-[:REFERS_TO]->(e:Entity)
             SET n.dbpedia_source = 'dbpedia_sparql',
                 n.dbpedia_resource = $resource_uri,
@@ -1366,7 +1366,7 @@ class DBpediaEnrichmentPhaseWrapper:
                              max(tok.tok_index_doc) AS end_tok
                         RETURN d.id AS doc_id,
                                d.text AS document_text,
-                               id(n) AS element_id,
+                               elementId(n) AS element_id,
                                coalesce(n.type, '') AS entity_type,
                                coalesce(n.normal_term, n.value, n.head, n.kb_id, '') AS lookup_text,
                                n.value AS value,
