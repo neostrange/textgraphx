@@ -356,7 +356,7 @@ class TestIniConfigLoading:
         importlib.reload(cfg_mod)
         cfg = cfg_mod.load_config(str(ini_file))
         # coref_url was not in the INI, so must fall back to dataclass default
-        assert "localhost" in cfg.services.coref_url
+        assert cfg.services.coref_url == ""
 
 
 # ---------------------------------------------------------------------------

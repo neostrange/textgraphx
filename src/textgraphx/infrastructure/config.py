@@ -46,7 +46,9 @@ class PathsConfig:
 class ServicesConfig:
     service_timeout_sec: int = 20
     wsd_url: str = "http://localhost:81/api/model"
-    coref_url: str = "http://localhost:9999/coreference_resolution"
+    # Optional external coreference service.
+    # Keep empty to prefer spaCy/pipe-provided coreference clusters.
+    coref_url: str = ""
     temporal_url: str = "http://localhost:5050/annotate"
     heideltime_url: str = "http://localhost:5000/annotate"
     srl_url: str = "http://localhost:8000/predict"

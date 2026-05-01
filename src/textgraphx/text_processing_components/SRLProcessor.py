@@ -153,7 +153,19 @@ class SRLProcessor:
             frameDict = {}
             sg_id = None
 
-            for x, indices_list in getattr(tok._, "SRL", {}).items():
+            srl_data = getattr(tok._, "SRL", {})
+            # Extract PropBank sense fields injected by extract_srl (transformer-srl service)
+            frame_sense = srl_data.get("__frame__")
+            frame_score = srl_data.get("__frame_score__")
+            try:
+                frame_score = float(frame_score) if frame_score is not None else None
+            except (TypeError, ValueError):
+                frame_score = None
+
+            for x, indices_list in srl_data.items():
+                if x.startswith("__"):
+                    # skip internal metadata keys like __frame__ / __frame_score__
+                    continue
                 for y in indices_list:
                     start = y[0]
                     end = y[-1]
@@ -161,8 +173,11 @@ class SRLProcessor:
                     token = span.root
 
                     if x == "V":
-                        # create/merge the Frame node
-                        sg_id = self._merge_frame(doc_id, start, end, token.text, token.i, span.text)
+                        # create/merge the Frame node, passing PropBank sense if available
+                        sg_id = self._merge_frame(
+                            doc_id, start, end, token.text, token.i, span.text,
+                            sense=frame_sense, sense_conf=frame_score, framework="PROPBANK",
+                        )
                         # link tag occurrences to the frame
                         indices = list(range(start, end + 1)) if len(y) == 2 else list(y)
                         self._link_indices_to_node(doc_id, indices, "Frame", "id", sg_id)

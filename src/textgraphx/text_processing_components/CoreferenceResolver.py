@@ -1,14 +1,17 @@
 """CoreferenceResolver
 
-Create Antecedent and CorefMention nodes from an external coreference
-service output and link mention tokens to the created nodes. The
-implementation creates deterministic ids for nodes so other phases can
-reference them consistently.
+Create Antecedent and CorefMention nodes from either:
+1) an external coreference service output, or
+2) spaCy-provided coreference span groups (for example via
+    spacy-experimental components)
+
+and link mention tokens to the created nodes. The implementation creates
+deterministic ids for nodes so other phases can reference them consistently.
 """
 
 import requests
-import json
 from textgraphx.database.client import make_graph_from_config
+from textgraphx.infrastructure.config import get_config
 from textgraphx.utils.id_utils import make_coref_uid
 import logging
 
@@ -37,6 +40,51 @@ class CoreferenceResolver:
         self.graph = make_graph_from_config()
         self.coreference_service_endpoint = coreference_service_endpoint
         logger.debug("CoreferenceResolver initialized with endpoint=%s", coreference_service_endpoint)
+
+    @staticmethod
+    def _service_timeout_seconds() -> int:
+        """Return a bounded request timeout for external coref calls."""
+        try:
+            timeout = int(get_config().services.service_timeout_sec)
+        except Exception:
+            timeout = 20
+        return max(1, timeout)
+
+    def _extract_spacy_coref_clusters(self, doc):
+        """Extract coreference clusters from spaCy doc span groups.
+
+        This reads span groups with keys containing "coref" and returns a list
+        of clusters where each cluster is a list of inclusive token bounds
+        ``(start, end)``.
+        """
+        clusters = []
+        seen = set()
+        doc_length = len(doc)
+        span_groups = getattr(doc, "spans", {}) or {}
+
+        for key, span_group in span_groups.items():
+            if "coref" not in str(key).lower() or span_group is None:
+                continue
+
+            mentions = []
+            for span in span_group:
+                start = int(getattr(span, "start", -1))
+                end_exclusive = int(getattr(span, "end", -1))
+                if start < 0 or end_exclusive <= start or end_exclusive > doc_length:
+                    continue
+                mentions.append((start, end_exclusive - 1))
+
+            mentions = sorted(set(mentions), key=lambda item: (item[0], item[1]))
+            if len(mentions) < 2:
+                continue
+
+            key_tuple = tuple(mentions)
+            if key_tuple in seen:
+                continue
+            seen.add(key_tuple)
+            clusters.append(mentions)
+
+        return clusters
 
     def _find_named_entity_by_span(self, start_index, end_index, doc_id):
         """Return an existing NamedEntity id for an exact token span, if present.
@@ -203,13 +251,34 @@ class CoreferenceResolver:
             keys `referent` and `antecedent` with the created node id strings.
         """
         logger.info("resolve_coreference: resolving coref for text_id=%s", text_id)
-        result = self.call_coreference_resolution_api(self.coreference_service_endpoint, doc.text)
-        if result is None:
-            logger.warning("resolve_coreference: coref service returned no result for text_id=%s", text_id)
-            return []
+
+        endpoint = (self.coreference_service_endpoint or "").strip()
+        if endpoint:
+            result = self.call_coreference_resolution_api(endpoint, doc.text)
+            if result is None:
+                logger.warning("resolve_coreference: external coref returned no result for text_id=%s", text_id)
+                return []
+            raw_clusters = result.get("clusters", [])
+        else:
+            spacy_clusters = self._extract_spacy_coref_clusters(doc)
+            if not spacy_clusters:
+                logger.info(
+                    "resolve_coreference: external coref disabled and no spaCy coref clusters found for text_id=%s",
+                    text_id,
+                )
+                return []
+            raw_clusters = [
+                [[start, end + 1] for start, end in cluster]
+                for cluster in spacy_clusters
+            ]
+            logger.info(
+                "resolve_coreference: using %d spaCy coref clusters for text_id=%s",
+                len(raw_clusters),
+                text_id,
+            )
 
         coref = []
-        for cluster in result.get("clusters", []):
+        for cluster in raw_clusters:
             if not cluster:
                 continue
             antecedent = cluster[0]
@@ -262,7 +331,9 @@ class CoreferenceResolver:
         """
 
         # Define the API endpoint and headers
-        url = coreference_service_endpoint
+        url = (coreference_service_endpoint or "").strip()
+        if not url:
+            return None
         headers = {"Content-Type": "application/json"}
 
         # Prepare the payload
@@ -270,7 +341,12 @@ class CoreferenceResolver:
 
         try:
             # Send a POST request to the API
-            response = requests.post(url, headers=headers, json=payload)
+            response = requests.post(
+                url,
+                headers=headers,
+                json=payload,
+                timeout=self._service_timeout_seconds(),
+            )
 
             # Check if the request was successful
             response.raise_for_status()
@@ -279,11 +355,13 @@ class CoreferenceResolver:
             return response.json()
 
         except requests.exceptions.HTTPError as http_err:
-            # Handle HTTP errors
-            logger.exception("HTTP error occurred when calling coref service: %s", http_err)
+            logger.warning("Coref service HTTP error: %s", http_err)
+        except requests.exceptions.RequestException as req_err:
+            logger.warning("Coref service request error: %s", req_err)
+        except ValueError as decode_err:
+            logger.warning("Coref service returned invalid JSON: %s", decode_err)
         except Exception as err:
-            # Handle any other exceptions
-            logger.exception("An error occurred when calling coref service: %s", err)
+            logger.warning("Unexpected coref service error: %s", err)
 
         # If an error occurs, return None
         return None

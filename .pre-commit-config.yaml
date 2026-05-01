@@ -1,0 +1,62 @@
+# Pre-commit hooks for textgraphx repository hygiene
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # ── General linting ──────────────────────────────────────────────────────
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  # ── Python linting ──────────────────────────────────────────────────────
+
+  - repo: https://github.com/psf/black
+    rev: 23.3.0
+    hooks:
+      - id: black
+        language_version: python3.10
+        exclude: |
+          (?x)^(
+            venv/|
+            src/textgraphx/notebooks/
+          )
+
+  # ── Repository hygiene: No stray artifacts ──────────────────────────────
+
+  - repo: local
+    hooks:
+      - id: no-stray-eval-artifacts
+        name: Prevent stray evaluation artifacts at repo root
+        entry: bash -c 'if ls *.json *.csv *.log *.txt *.patch 2>/dev/null | grep -qv requirements-test; then echo "❌ Stray artifacts detected at repo root (eval_*, cycle_log*, *.patch, etc.). Run: git clean -fd"; exit 1; fi'
+        language: system
+        pass_filenames: false
+        stages: [commit]
+
+      - id: no-magicmock-artifacts
+        name: Prevent MagicMock test artifacts
+        entry: bash -c 'if [ -d MagicMock ] || [ -d src/textgraphx/MagicMock ]; then echo "❌ MagicMock directory detected (test mock leak). Clean: rm -rf MagicMock/ src/textgraphx/MagicMock/"; exit 1; fi'
+        language: system
+        pass_filenames: false
+        stages: [commit]
+
+      - id: no-hardcoded-paths
+        name: Prevent hardcoded machine-local paths
+        entry: bash -c 'if grep -r "/home/neo/" src/textgraphx --include="*.py" | grep -v "^.*\.py:#.*$"; then echo "❌ Hardcoded /home/neo/ paths detected in source code"; exit 1; fi'
+        language: system
+        pass_filenames: false
+        stages: [commit]
+
+      - id: no-egg-info-artifacts
+        name: Prevent egg-info build artifacts
+        entry: bash -c 'if [ -d textgraphx.egg-info ] || [ -d src/textgraphx.egg-info ]; then echo "❌ egg-info build artifacts detected. Clean: rm -rf textgraphx.egg-info/ src/textgraphx.egg-info/"; exit 1; fi'
+        language: system
+        pass_filenames: false
+        stages: [commit]

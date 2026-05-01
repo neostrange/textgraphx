@@ -114,18 +114,25 @@ def check_external_services(cfg=None, fail_fast: bool = False) -> Tuple[bool, Li
 
     services = [
         ("WSD (AMUSE)", cfg.services.wsd_url),
-        ("Coreference", cfg.services.coref_url),
         ("Temporal (TTK)", cfg.services.temporal_url),
         ("HeidelTime", cfg.services.heideltime_url),
         ("SRL (AllenNLP)", cfg.services.srl_url),
         ("LLM (Ollama)", cfg.services.llm_url),
     ]
+    results = []
+    coref_url = getattr(cfg.services, "coref_url", "") or ""
+    if coref_url:
+        services.append(("Coreference (external)", coref_url))
+    else:
+        results.append(
+            "ℹ Coreference external service disabled (coref_url unset); "
+            "using spaCy coreference if available in the active pipeline."
+        )
     # Nominal SRL is optional; only probe when configured.
     nom_srl_url = getattr(cfg.services, "nom_srl_url", "") or ""
     if nom_srl_url:
         services.append(("SRL Nominal (CogComp)", nom_srl_url))
 
-    results = []
     all_reachable = True
     for name, url in services:
         passed, message = check_http_service(name, url)

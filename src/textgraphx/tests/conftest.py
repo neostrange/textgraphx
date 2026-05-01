@@ -114,3 +114,25 @@ def job_scheduler():
     from textgraphx.orchestration import JobScheduler
     
     return JobScheduler()
+
+
+@pytest.fixture
+def mock_config(tmp_path):
+    """Fixture providing a properly-configured mock config object.
+    
+    This fixture helps prevent MagicMock directory leakage by ensuring
+    that mocked config objects have proper string representations when
+    used as paths (e.g., cfg.paths.output_dir).
+    
+    Use this instead of bare MagicMock() for config objects in tests.
+    """
+    from unittest.mock import MagicMock
+    
+    cfg = MagicMock()
+    cfg.paths = MagicMock()
+    cfg.paths.output_dir = str(tmp_path / "output")
+    cfg.paths.data_dir = str(tmp_path / "data")
+    cfg.runtime = MagicMock()
+    cfg.runtime.mode = "test"
+    cfg.runtime.strict_transition_gate = False
+    return cfg
