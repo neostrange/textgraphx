@@ -144,6 +144,7 @@ class RefinementPhase():
         "mention_cleanup": [
             "trim_trailing_punctuation_from_entity_mentions",
             "tag_discourse_relevant_entities",
+            "cleanup_intermediate_frameargument_refers_to",
         ],
         "meantime_boundary_alignment": [
             "trim_determiners_from_mentions",
@@ -2376,6 +2377,43 @@ class RefinementPhase():
         """
         data= graph.run(query).data()
         
+        return ""
+
+    def cleanup_intermediate_frameargument_refers_to(self):
+        """Remove intermediate FrameArgument → NamedEntity REFERS_TO edges.
+
+        The linking passes first create FA → NamedEntity edges as an
+        intermediate step, then promote them to canonical targets (Entity /
+        TEvent / TIMEX).  Once promotion is complete, the bare
+        NamedEntity-target edges are no longer needed and violate the
+        REFERS_TO integrity contract (all targets must be canonical).
+
+        This pass deletes every FA → REFERS_TO → NamedEntity edge where:
+        - the NamedEntity target is NOT itself a canonical Entity/TEvent/TIMEX,
+        - AND the FrameArgument already has at least one canonical REFERS_TO
+          target.
+
+        Idempotent: safe to run multiple times.
+        """
+        logger.debug("cleanup_intermediate_frameargument_refers_to")
+        graph = self.graph
+
+        query = """
+            MATCH (fa:FrameArgument)-[r:REFERS_TO]->(ne:NamedEntity)
+            WHERE NOT (ne:Entity OR ne:TEvent OR ne:TIMEX)
+            WITH fa, r
+            WHERE (fa)-[:REFERS_TO]->(:Entity)
+               OR (fa)-[:REFERS_TO]->(:TEvent)
+               OR (fa)-[:REFERS_TO]->(:TIMEX)
+            DELETE r
+            RETURN count(*) AS deleted
+        """
+        data = graph.run(query).data()
+        deleted = data[0].get("deleted", 0) if data else 0
+        logger.info(
+            "cleanup_intermediate_frameargument_refers_to: removed %d intermediate FA→NamedEntity edges",
+            deleted,
+        )
         return ""
 
 

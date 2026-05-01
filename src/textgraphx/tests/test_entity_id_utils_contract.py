@@ -30,11 +30,16 @@ class TestMakeEntityId:
 
     @pytest.mark.unit
     @pytest.mark.contract
-    def test_unresolved_entity_is_doc_scoped(self):
-        """Two different docs with the same surface must NOT share an Entity id."""
+    def test_unresolved_entity_is_cross_doc_stable(self):
+        """Same surface and type across different docs MUST share an Entity id.
+
+        Unresolved (non-URI) entities with the same normalized surface form
+        and NE type represent the same real-world referent and must merge to
+        a single canonical node across documents.
+        """
         id_doc1 = make_entity_id("doc1", "France", "GPE")
         id_doc2 = make_entity_id("doc2", "France", "GPE")
-        assert id_doc1 != id_doc2, "Unresolved entity ids must be per-document"
+        assert id_doc1 == id_doc2, "Unresolved entity ids must be cross-document stable"
 
     @pytest.mark.unit
     @pytest.mark.contract

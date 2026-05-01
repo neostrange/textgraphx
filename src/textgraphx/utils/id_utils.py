@@ -128,18 +128,20 @@ def make_entity_id(doc_id: Union[str, int], kb_id_or_surface: Union[str, None], 
     - *kb_id* present  : id is derived from the KB URI fragment so that the same
       real-world entity always resolves to the same node regardless of which
       document introduced it.  The KB URI itself is stored on ``Entity.kb_id``.
-    - *kb_id* absent   : id is per-document, anchored on (doc_id, normalized
-      surface, type).  This prevents false cross-document merges for unresolved
-      entities while keeping runs deterministic.
+    - *kb_id* absent   : id is cross-document stable, anchored on (normalized
+      surface, type).  Entities with the same surface form and NE type are
+      treated as the same real-world referent across documents (same-surface
+      merging).  ``doc_id`` is accepted for API compatibility but not used in
+      the hash.
     """
     surface = kb_id_or_surface or ""
     if surface and ("/" in surface or ":" in surface):
         # Looks like a URI — derive a cross-doc stable fragment
         fragment = surface.rsplit("/", 1)[-1].rsplit(":", 1)[-1]
         return f"entity_{_short_hash([fragment, ne_type], length=24)}"
-    # Unresolved: per-document scoped
-    base = [_safe_str(doc_id), _normalize_surface_text(surface), ne_type.lower()]
-    return f"entity_{_safe_str(doc_id)}_{_short_hash(base, length=20)}"
+    # Unresolved: cross-document stable by (normalized_surface, type)
+    base = [_normalize_surface_text(surface), ne_type.lower()]
+    return f"entity_{_short_hash(base, length=20)}"
 
 def make_event_mention_token_id(doc_id: Union[str, int], start: int, end: int) -> str:
     """Return a stable EventMention token_id: em_<doc>_<start>_<end>
