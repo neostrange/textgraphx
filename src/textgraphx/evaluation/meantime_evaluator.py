@@ -487,7 +487,7 @@ def build_document_from_neo4j(
             nominal_features = _nominal_projection_features(
                 graph=graph,
                 doc_id=doc_id_int,
-                node_id=int(row.get("node_id")),
+                node_id=row.get("node_id"),
                 fallback_head_idx=head_idx if head_idx is not None else int(row["end_tok"]),
             )
             # Priority 1: anchor NOM projection around semantic head (fallback: surface head).
@@ -1473,7 +1473,7 @@ def _looks_like_proper_name_span(span: TokenSpan, gold_token_lookup: Dict[int, s
 def _nominal_projection_features(
     graph: Any,
     doc_id: int | str,
-    node_id: int,
+    node_id: str,
     fallback_head_idx: int,
 ) -> Dict[str, Any]:
     rows = graph.run(
