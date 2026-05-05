@@ -31,6 +31,9 @@ Dense, link-only entry point. If you are not sure where to go, start here.
 
 ## NLP Components
 
+- [docs/NLP_FUNCTION_CATALOG.md](docs/NLP_FUNCTION_CATALOG.md) — Full catalog of all 155 NLP/IE functions across all pipeline stages with purpose, inputs, and outputs
+- [docs/NLP_FUNCTION_DEPENDENCY_GRAPH.md](docs/NLP_FUNCTION_DEPENDENCY_GRAPH.md) — Function dependency DAG, execution ordering, parallelism map, and critical-path analysis
+- [docs/SPACY_GAP_ANALYSIS_AND_GRAPH_ENHANCEMENTS.md](docs/SPACY_GAP_ANALYSIS_AND_GRAPH_ENHANCEMENTS.md) — Critical function analysis, spaCy attribute gaps vs. stored schema, and 11 graph-computable enhancement Cypher algorithms
 - [docs/SRL_FRAMEWORKS.md](docs/SRL_FRAMEWORKS.md) — PropBank (verbal) and NomBank (nominal) SRL, role normalization, `ALIGNS_WITH`
 - [docs/COREF_POLICY.md](docs/COREF_POLICY.md) — Coreference backend decision; maverick-coref deprecation
 - [docs/nombank_integration.md](docs/nombank_integration.md) — CogComp SRL-English integration notes
