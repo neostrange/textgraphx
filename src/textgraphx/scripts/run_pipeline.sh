@@ -18,12 +18,28 @@ fi
 # install deps
 "$PYTHON_BIN" -m pip install -r "$ROOT/requirements.txt"
 
-# install lightweight spaCy model (skip if already installed)
-"$PYTHON_BIN" -m spacy download en_core_web_sm || true
-
 # defaults
 DATASET="${1:-$ROOT/datastore/dataset}"
-MODEL="${2:-sm}"
+MODEL="${2:-trf}"
+
+case "$MODEL" in
+  trf|en_core_web_trf)
+    SPACY_MODEL="en_core_web_trf"
+    ;;
+  sm|en_core_web_sm)
+    SPACY_MODEL="en_core_web_sm"
+    ;;
+  md|en_core_web_md)
+    SPACY_MODEL="en_core_web_md"
+    ;;
+  *)
+    echo "Unsupported model '$MODEL'. Use trf|sm|md (or full spaCy model name)." >&2
+    exit 2
+    ;;
+esac
+
+# install requested spaCy model (skip hard-fail if already present/offline)
+"$PYTHON_BIN" -m spacy download "$SPACY_MODEL" || true
 
 : "${NEO4J_URI:=bolt://localhost:7687}"
 : "${NEO4J_USER:=neo4j}"
@@ -31,7 +47,7 @@ MODEL="${2:-sm}"
 
 export NEO4J_URI NEO4J_USER NEO4J_PASSWORD
 
-echo "Running full pipeline review flow (model=$MODEL, dir=$DATASET)..."
+echo "Running full pipeline review flow (model=$MODEL/$SPACY_MODEL, dir=$DATASET)..."
 "$PYTHON_BIN" -m textgraphx.orchestration.orchestrator --dir "$DATASET" --model "$MODEL"
 
 echo "Pipeline complete."

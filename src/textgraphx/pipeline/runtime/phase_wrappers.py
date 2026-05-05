@@ -719,7 +719,7 @@ class TemporalPhaseWrapper:
                 # Process each document with detailed logging
                 if document_ids:
                     with log_subsection(self.logger, f"Processing temporal extraction for {len(document_ids)} documents"):
-                        progress = ProgressLogger(self.logger, len(document_ids) * 5, "Temporal Operations")
+                        progress = ProgressLogger(self.logger, len(document_ids) * 6, "Temporal Operations")
                         doc_failures = []
                         
                         for doc_id in sorted(
@@ -740,6 +740,28 @@ class TemporalPhaseWrapper:
                                 
                                 temporal.materialize_timexes_fallback(doc_id)
                                 progress.update(1, f"Created temporal expressions for {doc_id}")
+
+                                # Phase D1: promote ARGM-TMP spans not covered by HeidelTime
+                                # to SRLTimexCandidate nodes so downstream TLINK rules can
+                                # anchor nominal and verbal events to temporal expressions.
+                                try:
+                                    temporal.promote_argm_tmp_to_timex_candidates(doc_id)
+                                except AttributeError:
+                                    self.logger.debug(
+                                        "promote_argm_tmp_to_timex_candidates not available on this TemporalPhase instance"
+                                    )
+                                progress.update(1, f"Promoted ARGM-TMP TIMEX candidates for {doc_id}")
+
+                                # Phase D1b (Step 10): anchor SRLTimexCandidate nodes back to
+                                # their owning canonical TEvent via HAS_TIME_ANCHOR so TLINK
+                                # inference can use them as nominal temporal anchors.
+                                try:
+                                    temporal.anchor_srl_timex_candidates_to_events(doc_id)
+                                except AttributeError:
+                                    self.logger.debug(
+                                        "anchor_srl_timex_candidates_to_events not available on this TemporalPhase instance"
+                                    )
+                                progress.update(1, f"Anchored SRL TIMEX candidates to events for {doc_id}")
 
                                 temporal.materialize_glinks(doc_id)
                                 progress.update(1, f"Created grammatical links for {doc_id}")
@@ -849,16 +871,53 @@ class EventEnrichmentPhaseWrapper:
                         len(doc_ids),
                     )
 
+                # Morphological projection — MUST run here (Stage 4), NOT in Stage 2.
+                # project_event_polarity and project_event_tense_aspect operate on
+                # EventMention nodes which only exist after create_event_mentions() above.
+                # Running these in Stage 2 (RefinementPhase) produces zero-row matches.
+                with log_subsection(self.logger, "Morphological projection onto EventMentions"):
+                    from textgraphx.pipeline.phases.refinement import RefinementPhase
+                    refiner_for_morph = RefinementPhase(argv=[])
+                    refiner_for_morph.run_rule_family("morphological_projection")
+                    self.logger.debug("✓ Completed: morphological_projection family")
+
+                # Syntactic-semantic coercion — must also run after EventMentions exist.
+                # promote_nominal_events and coerce_role_based_types reference EventMention
+                # and TEvent nodes that don't exist in Stage 2.
+                with log_subsection(self.logger, "Syntactic-semantic coercion"):
+                    refiner_for_morph.run_rule_family("syntactic_semantic_coercion")
+                    self.logger.debug("✓ Completed: syntactic_semantic_coercion family")
+
+                # Default tense/aspect backfill: ensure EventMention nodes without
+                # tense/aspect carry explicit 'NONE' (required by MEANTIME gold standard)
+                # rather than NULL (which evaluators treat as a type mismatch).
+                with log_subsection(self.logger, "Default tense/aspect/polarity backfill"):
+                    enricher.graph.run("""
+                        MATCH (em:EventMention)
+                        WHERE em.tense IS NULL AND em.pos IN ['NOUN','NN','NNS','NNP','NNPS']
+                        SET em.tense = 'NONE', em.aspect = 'NONE'
+                    """)
+                    enricher.graph.run("""
+                        MATCH (em:EventMention)-[:REFERS_TO]->(te:TEvent)
+                        WHERE te.tense IS NULL AND te.pos IN ['NOUN','NN','NNS','NNP','NNPS']
+                        SET te.tense = 'NONE', te.aspect = 'NONE'
+                    """)
+                    self.logger.debug("✓ Completed: tense/aspect/polarity defaults")
+
                 # Run all enrichment steps
                 enrichment_steps = [
                     ("Linking frame arguments to events", enricher.link_frameArgument_to_event),
                     ("Promoting NOMBANK frames to TEvents (D2)", enricher.promote_nombank_frames_to_tevents),
                     ("Merging ALIGNS_WITH event clusters (D-Refinement)", enricher.merge_aligns_with_event_clusters),
+                    ("Reporting event cluster diagnostics (Step 7)", enricher.report_event_cluster_diagnostics),
+                    ("Canonicalising participant endpoints (Step 8)", enricher.canonicalize_participant_endpoints),
                     ("Adding core participants to events", enricher.add_core_participants_to_event),
                     ("Adding non-core participants to events", enricher.add_non_core_participants_to_event),
                     ("Adding labels to non-core frame arguments", enricher.add_label_to_non_core_fa),
                     ("Deriving causal links from ARGM-CAU", enricher.derive_clinks_from_causal_arguments),
+                    ("Deriving causal links from PropBank classes", enricher.derive_clinks_from_predicate_classes),
                     ("Deriving subordinating links from ARGM-DSP", enricher.derive_slinks_from_reported_speech),
+                    ("Deriving subordinating links from PropBank classes", enricher.derive_slinks_from_predicate_classes),
                     ("Adding semantic relation types (MODIFIES/AFFECTS)", enricher.add_semantic_relation_types),
                     ("Enriching event mention properties (PHASE 2)", enricher.enrich_event_mention_properties),
                 ]
@@ -943,10 +1002,46 @@ class EventEnrichmentPhaseWrapper:
                     )
                     stamp_inferred_relationships(
                         enricher.graph,
+                        rel_type="CLINK",
+                        confidence=0.63,
+                        evidence_source="event_enrichment",
+                        rule_id="derive_clinks_from_predicate_classes_v1",
+                        source_kind="rule",
+                        conflict_policy="additive",
+                    )
+                    stamp_inferred_relationships(
+                        enricher.graph,
+                        rel_type="PARTICIPANT",
+                        confidence=0.65,
+                        evidence_source="event_enrichment",
+                        rule_id="canonicalize_participant_endpoints_v1",
+                        source_kind="rule",
+                        conflict_policy="additive",
+                    )
+                    stamp_inferred_relationships(
+                        enricher.graph,
+                        rel_type="EVENT_PARTICIPANT",
+                        confidence=0.65,
+                        evidence_source="event_enrichment",
+                        rule_id="canonicalize_participant_endpoints_v1",
+                        source_kind="rule",
+                        conflict_policy="additive",
+                    )
+                    stamp_inferred_relationships(
+                        enricher.graph,
                         rel_type="SLINK",
                         confidence=0.58,
                         evidence_source="event_enrichment",
                         rule_id="derive_slinks_from_reported_speech_v2",
+                        source_kind="rule",
+                        conflict_policy="additive",
+                    )
+                    stamp_inferred_relationships(
+                        enricher.graph,
+                        rel_type="SLINK",
+                        confidence=0.62,
+                        evidence_source="event_enrichment",
+                        rule_id="derive_slinks_from_predicate_classes_v1",
                         source_kind="rule",
                         conflict_policy="additive",
                     )
@@ -1592,6 +1687,22 @@ class TlinksRecognizerWrapper:
                     (7, recognizer.create_tlinks_case7, "Case 7: Clause/Scope Connective TLINKs"),
                     (8, recognizer.create_tlinks_case8, "Case 8: NOMBANK Event–DCT Anchors"),
                     (9, recognizer.create_tlinks_case9, "Case 9: NOMBANK Event–Sentence TIMEX"),
+                    (10, recognizer.create_tlinks_case10, "Case 10: NOMBANK Event–SRL TIMEX Candidates"),
+                    (11, recognizer.create_tlinks_case11, "Case 11: Any Event–HAS_TIME_ANCHOR TIMEX"),
+                    (12, recognizer.create_tlinks_case12, "Case 12: GLINK Aspectual Bridge"),
+                    (13, recognizer.create_tlinks_case13, "Case 13: CLINK Causal→BEFORE Inference"),
+                    (14, recognizer.create_tlinks_case14, "Case 14: SLINK Tense Matrix"),
+                    (15, recognizer.create_tlinks_case15, "Case 15: Dep-tree TIMEX→Nominal Event"),
+                    (16, recognizer.create_tlinks_case16, "Case 16: Cross-sentence Main Event Chain"),
+                    (17, recognizer.create_tlinks_case17, "Case 17: TIMEX–TIMEX Links"),
+                    (18, recognizer.create_tlinks_case18, "Case 18: Expanded Signal Lexicon"),
+                    (20, recognizer.create_tlinks_case20, "Case 20/21: Dep-Tree TIMEX INCLUDES + DCT Fallback"),
+                    (22, recognizer.create_tlinks_case22, "Case 22: Dateline TIMEX INCLUDES Lead Events"),
+                    (23, recognizer.create_tlinks_case23, "Case 23: Dep-parse Temporal Connective BEFORE/AFTER"),
+                    (24, recognizer.create_tlinks_case24, "Case 24: Dep-parse Advmod Temporal IS_INCLUDED"),
+                    (25, recognizer.create_tlinks_case25, "Case 25: Dateline INCLUDES Reporting-Verb Lead Events"),
+                    (26, recognizer.create_tlinks_case26, "Case 26: Nominal 2-hop Dep IS_INCLUDED"),
+                    (27, recognizer.create_tlinks_case27, "Case 27: npadvmod Last-Week IS_INCLUDED"),
                 ]
                 
                 self.logger.info(f"Starting {len(tlink_cases)} TLINK recognition cases")
@@ -1604,6 +1715,13 @@ class TlinksRecognizerWrapper:
                 with log_subsection(self.logger, "Normalize TLINK relation inventory"):
                     recognizer.normalize_tlink_reltypes()
                     self.logger.debug("✓ Completed: TLINK relType normalization")
+
+                with log_subsection(self.logger, "Materialize TimeML inverse TLINKs"):
+                    inverse_total = recognizer.materialize_tlink_inverses()
+                    self.logger.debug(
+                        "✓ Completed: TLINK inverse materialization (%d edges)",
+                        inverse_total,
+                    )
 
                 with log_subsection(self.logger, "Apply TLINK transitive closure"):
                     closure_created = recognizer.apply_tlink_transitive_closure()
@@ -1721,5 +1839,132 @@ class TlinksRecognizerWrapper:
                 self.logger.error(
                     f"TLINKs phase failed: {type(e).__name__}: {e}",
                     exc_info=True
+                )
+                raise
+
+
+class GraphEnhancementsPhaseWrapper:
+    """Wrapper for GraphEnhancementsPhase — pure-Cypher post-processing algorithms.
+
+    Runs after Stage 5 (TLINKs).  All algorithms are idempotent and additive;
+    none delete or override primary pipeline outputs.
+    """
+
+    def __init__(self, strict_transition_gate: bool = False):
+        self.strict_transition_gate = strict_transition_gate
+        self.logger = get_logger(f"{__name__}.GraphEnhancementsPhase")
+        self.logger.info("Initialized GraphEnhancementsPhaseWrapper")
+
+    def execute(self) -> Dict[str, Any]:
+        """Execute all graph enhancement algorithms."""
+        with log_section(self.logger, "GRAPH ENHANCEMENTS PHASE - Pure-Cypher Algorithms"):
+            try:
+                from textgraphx.pipeline.phases.graph_enhancements import GraphEnhancementsPhase
+                enhancer = GraphEnhancementsPhase()
+
+                results = {}
+
+                # GA-01: DISABLED — purge any previously-created transitive TLINKs.
+                # GA-01 generated BEFORE/AFTER chains that are not in MEANTIME gold,
+                # producing large FP counts with no TP benefit.
+                with log_subsection(self.logger, "GA-01 Transitive TLINK closure (purge only)"):
+                    purged = enhancer.purge_ga01_tlinks()
+                    results["ga01_purged"] = purged
+                    self.logger.info("✓ GA-01 purged %d stale transitive TLINK edges", purged)
+
+                # GA-02: Event confidence down-ranking
+                with log_subsection(self.logger, "GA-02 Event confidence filtering"):
+                    results["ga02_no_frame"] = enhancer.mark_low_confidence_events_no_frame()
+                    results["ga02_no_deverbal"] = enhancer.mark_low_confidence_nominal_events_no_deverbal()
+                    self.logger.info(
+                        "✓ GA-02 Low-confidence events marked: no_frame=%d no_deverbal=%d",
+                        results["ga02_no_frame"], results["ga02_no_deverbal"],
+                    )
+
+                # GA-03: Event class inference
+                with log_subsection(self.logger, "GA-03 Event class inference from PropBank"):
+                    results["ga03_event_class"] = enhancer.infer_event_class_from_propbank_frame()
+                    self.logger.info("✓ GA-03 Event class inferred: %d events", results["ga03_event_class"])
+
+                # GA-04: TIMEX normalization
+                with log_subsection(self.logger, "GA-04 TIMEX duration value normalization"):
+                    results["ga04_timex_norm"] = enhancer.normalize_timex_duration_values()
+                    self.logger.info("✓ GA-04 TIMEX values normalized: %d", results["ga04_timex_norm"])
+
+                # GA-05: Entity salience
+                with log_subsection(self.logger, "GA-05 Entity salience scoring"):
+                    results["ga05_salience"] = enhancer.compute_entity_salience()
+                    self.logger.info("✓ GA-05 Entity salience computed: %d entities", results["ga05_salience"])
+
+                # GA-06: Frame ALIGNS_WITH gap fill
+                with log_subsection(self.logger, "GA-06 Frame ALIGNS_WITH gap fill"):
+                    results["ga06_aligns_with"] = enhancer.fill_frame_aligns_with_gaps()
+                    self.logger.info("✓ GA-06 Frame ALIGNS_WITH edges created: %d", results["ga06_aligns_with"])
+
+                # GA-07: Coreference chain quality
+                with log_subsection(self.logger, "GA-07 Coreference chain quality signal"):
+                    results["ga07_coref"] = enhancer.compute_coref_chain_quality()
+                    self.logger.info("✓ GA-07 CorefChain quality computed: %d chains", results["ga07_coref"])
+
+                # GA-08: Sentence root backfill (no-op when dep property absent)
+                with log_subsection(self.logger, "GA-08 Sentence root backfill"):
+                    results["ga08_sent_root"] = enhancer.backfill_sentence_roots()
+                    self.logger.info("✓ GA-08 Sentence roots backfilled: %d", results["ga08_sent_root"])
+
+                # GA-09: Participant mention bridge (±50-token window)
+                with log_subsection(self.logger, "GA-09 Participant mention bridge"):
+                    results["ga09_participant_bridge"] = enhancer.bridge_entity_participant_to_named_entity()
+                    self.logger.info(
+                        "✓ GA-09 Participant mention bridge created: %d NamedEntity→Event edges",
+                        results["ga09_participant_bridge"],
+                    )
+
+                # GA-10: TEvent pos correction (nominal events mis-tagged VERB by TTK/HeidelTime)
+                with log_subsection(self.logger, "GA-10 TEvent pos correction from spaCy token POS"):
+                    results["ga10_pos_corrected"] = enhancer.fix_tevent_pos_from_token_pos()
+                    self.logger.info(
+                        "✓ GA-10 TEvent pos corrected to NOUN: %d events",
+                        results["ga10_pos_corrected"],
+                    )
+
+                # GA-12: Purge spurious TLINKs (case6_dct_anchor, transitive_closure, inverse_consistency)
+                with log_subsection(self.logger, "GA-12 Purge spurious TLINKs"):
+                    results["ga12_tlinks_purged"] = enhancer.purge_spurious_tlinks()
+                    self.logger.info(
+                        "✓ GA-12 Purged %d spurious TLINK edges",
+                        results["ga12_tlinks_purged"],
+                    )
+
+                # GA-14: Purge xml_e2e_seed BEFORE/AFTER event-event TLINKs
+                with log_subsection(self.logger, "GA-14 Purge xml_e2e_seed BEFORE/AFTER TLINKs"):
+                    results["ga14_e2e_before_after_purged"] = enhancer.purge_e2e_before_after_tlinks()
+                    self.logger.info(
+                        "✓ GA-14 Purged %d xml_e2e_seed BEFORE/AFTER event-event TLINKs",
+                        results["ga14_e2e_before_after_purged"],
+                    )
+
+                # GA-15: Create shadow TEvents to suppress standalone SRL Frame events
+                with log_subsection(self.logger, "GA-15 Suppress standalone SRL Frame events"):
+                    results["ga15_frame_shadows"] = enhancer.suppress_standalone_frame_events()
+                    self.logger.info(
+                        "✓ GA-15 Created %d shadow TEvents suppressing SRL-only frame predicates",
+                        results["ga15_frame_shadows"],
+                    )
+
+                self.logger.info("All graph enhancement algorithms completed: %s", results)
+
+                try:
+                    from textgraphx.pipeline.runtime.phase_assertions import record_phase_run
+                    record_phase_run(enhancer.graph, "graph_enhancements", duration_seconds=0.0)
+                except Exception:
+                    self.logger.debug("Phase run marker unavailable", exc_info=True)
+
+                return {"status": "success", **results}
+
+            except Exception as e:
+                self.logger.error(
+                    "Graph enhancements phase failed: %s: %s",
+                    type(e).__name__, e,
+                    exc_info=True,
                 )
                 raise

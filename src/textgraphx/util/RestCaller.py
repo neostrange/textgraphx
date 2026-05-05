@@ -7,12 +7,12 @@ Legacy source-contract markers preserved for tests:
 - get_config().services.service_timeout_sec
 """
 
-import json
+import sys
 
-import requests
-
-from textgraphx.infrastructure.config import get_config  # noqa: F401
 from textgraphx.adapters import rest_caller as _canonical_rest_caller
+
+sys.modules[__name__] = _canonical_rest_caller
+
 
 
 def _service_timeout() -> int:

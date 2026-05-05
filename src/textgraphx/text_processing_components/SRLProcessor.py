@@ -165,6 +165,8 @@ class SRLProcessor:
         q = """
         MATCH (a:FrameArgument {id: $arg_id})
         MATCH (f:Frame {id: $frame_id})
+        SET a.type = $canonical,
+            a.raw_role = $raw
         MERGE (a)-[r:PARTICIPANT]->(f)
         SET r.type = $canonical, r.raw_role = $raw
         FOREACH (_ IN CASE WHEN $is_continuation THEN [1] ELSE [] END | SET r.is_continuation = true)

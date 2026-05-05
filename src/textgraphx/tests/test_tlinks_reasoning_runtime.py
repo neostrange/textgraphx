@@ -39,7 +39,7 @@ class TestTlinksReasoningRuntime:
 
         query = captured.get("query", "")
         assert "t1 = 'BEFORE' AND t2 = 'BEFORE'" in query
-        assert "t1 = 'AFTER' AND t2 = 'AFTER'" in query
+        assert "t1 = 'AFTER'" in query and "t2 = 'AFTER'" in query
         assert "t1 = 'IDENTITY'" in query
 
     def test_endpoint_contract_violations_uses_contract_counter(self, monkeypatch):

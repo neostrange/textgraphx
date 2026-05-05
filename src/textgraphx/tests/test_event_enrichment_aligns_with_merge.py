@@ -130,33 +130,26 @@ class TestPass2EventMentionRedirect:
 
 @pytest.mark.unit
 class TestPass3TlinkTransfer:
-    def test_outbound_tlinks_transferred(self, method_src):
-        """Outbound TLINKs (secondary → X) must be re-created on canonical."""
-        # Both ends of the transferred TLINK should reference e_canonical
-        outbound_count = method_src.count("(e_canonical)-[new_tl:TLINK")
-        assert outbound_count >= 1, "Expected at least one outbound TLINK MERGE"
+    """Verify that TLINK transfer (formerly Passes 3a/3b) is absent.
 
-    def test_inbound_tlinks_transferred(self, method_src):
-        """Inbound TLINKs (X → secondary) must be re-created on canonical."""
-        inbound_count = method_src.count("(other)-[new_tl:TLINK")
-        assert inbound_count >= 1, "Expected at least one inbound TLINK MERGE"
+    TlinksRecognizer now guards merged events with coalesce(e.merged,false)=false,
+    so TLINKs are never created for secondary events in the first place.  TLINK
+    creation is exclusively owned by TlinksRecognizer (architectural contract).
+    """
 
-    def test_suppressed_tlinks_excluded(self, method_src):
-        """TLINKs already marked suppressed must not be transferred."""
-        assert "coalesce(tl.suppressed, false) = false" in method_src
+    def test_no_tlink_merge_in_event_enrichment(self, method_src):
+        """TLINK creation must not appear in merge_aligns_with_event_clusters."""
+        import re
+        tlink_create = re.search(r"MERGE.*TLINK|CREATE.*TLINK", method_src, re.IGNORECASE)
+        assert not tlink_create, (
+            "merge_aligns_with_event_clusters must not create TLINKs; "
+            "TLINK ownership belongs exclusively to TlinksRecognizer. "
+            "Use coalesce(e.merged,false)=false guards in TlinksRecognizer instead."
+        )
 
-    def test_confidence_scaled_by_0_9(self, method_src):
-        """Transferred TLINK confidence must be discounted (×0.9) for the extra hop."""
-        assert "* 0.9" in method_src
-
-    def test_source_attribute_on_transferred_tlink(self, method_src):
-        """Transferred TLINKs must carry source='aligns_with_transfer'."""
-        assert "aligns_with_transfer" in method_src
-
-    def test_transferred_tlink_uses_on_create_set(self, method_src):
-        """Must use ON CREATE SET so existing TLINKs between the same endpoints
-        are not overwritten."""
-        assert "ON CREATE SET" in method_src
+    def test_source_aligns_with_transfer_not_present(self, method_src):
+        """'aligns_with_transfer' source label must not appear after TLINK removal."""
+        assert "aligns_with_transfer" not in method_src
 
 
 # ---------------------------------------------------------------------------
@@ -190,10 +183,10 @@ class TestPass4MarkMerged:
 
 @pytest.mark.unit
 def test_each_pass_wrapped_in_try_except(method_src):
-    """All 4 passes must be independently wrapped; failure in one must not stop others."""
+    """All 3 passes must be independently wrapped; failure in one must not stop others."""
     count = method_src.count("except Exception")
-    assert count >= 4, (
-        f"Expected ≥4 independent except-Exception handlers (one per pass), found {count}"
+    assert count >= 3, (
+        f"Expected ≥3 independent except-Exception handlers (one per pass), found {count}"
     )
 
 
@@ -227,13 +220,13 @@ def test_method_returns_merged_count():
 
     obj = EventEnrichmentPhase.__new__(EventEnrichmentPhase)
     mock_graph = MagicMock()
-    # All passes: sense-conflict (0), redirect (0), tlink_out (0), tlink_in (0), mark (3)
+    # 5 passes: lv_redirect (P0a), lv_mark (P0b), sense-conflict (P1), redirect (P2), mark (P4)
     mock_graph.run.return_value.data.side_effect = [
-        [{"conflicts": 0}],
-        [{"redirected": 2}],
-        [{"transferred": 1}],
-        [{"transferred": 0}],
-        [{"marked": 3}],
+        [{"redirected": 0}],    # Pass 0a: light-verb EventMention redirect
+        [{"marked": 0}],        # Pass 0b: light-verb mark-merged
+        [{"conflicts": 0}],     # Pass 1: sense-conflict
+        [{"redirected": 2}],    # Pass 2: ALIGNS_WITH redirect
+        [{"marked": 3}],        # Pass 4: mark-merged
     ]
     obj.graph = mock_graph
 
@@ -262,13 +255,13 @@ def test_method_tolerates_pass1_exception():
 
     obj = EventEnrichmentPhase.__new__(EventEnrichmentPhase)
     mock_graph = MagicMock()
-    # First call raises, rest succeed
+    # LV passes succeed; sense-conflict (P1) raises; redirect and mark succeed
     mock_graph.run.return_value.data.side_effect = [
-        RuntimeError("sense conflict DB error"),
-        [{"redirected": 1}],
-        [{"transferred": 0}],
-        [{"transferred": 0}],
-        [{"marked": 1}],
+        [{"redirected": 0}],           # Pass 0a: lv redirect
+        [{"marked": 0}],               # Pass 0b: lv mark
+        RuntimeError("sense conflict DB error"),  # Pass 1: raises
+        [{"redirected": 1}],           # Pass 2: redirect
+        [{"marked": 1}],               # Pass 4: mark
     ]
     obj.graph = mock_graph
 

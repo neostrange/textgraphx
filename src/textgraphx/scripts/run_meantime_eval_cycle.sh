@@ -111,7 +111,7 @@ FALLBACK_USED=false
 if ! "$PYTHON_BIN" -m textgraphx.run_pipeline \
 	--dataset "$DATASET_DIR" \
 	--cleanup none \
-	--phases ingestion,refinement,temporal,event_enrichment,tlinks; then
+	--phases ingestion,refinement,temporal,event_enrichment,tlinks,graph_enhancements; then
 	PIPELINE_OK=0
 fi
 
@@ -127,7 +127,7 @@ if [[ "$PIPELINE_OK" -ne 1 ]]; then
 	"$PYTHON_BIN" -m textgraphx.run_pipeline \
 		--dataset "$DATASET_DIR" \
 		--cleanup none \
-		--phases ingestion,refinement,temporal,event_enrichment,tlinks
+		--phases ingestion,refinement,temporal,event_enrichment,tlinks,graph_enhancements
 fi
 
 run_eval_mode() {

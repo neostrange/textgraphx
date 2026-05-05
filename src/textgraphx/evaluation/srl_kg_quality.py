@@ -57,6 +57,22 @@ class ConfidenceCalibrationMetrics:
 
 
 @dataclass
+class TemporalAnchoringMetrics:
+    """Quality of the SRL → canonical TIMEX → TLINK anchoring pipeline."""
+    srl_timex_candidates_created: int = 0
+    srl_timex_promoted_to_canonical: int = 0
+    srl_timex_as_tlink_endpoint: int = 0
+    nominal_events_with_srl_temporal_anchor: int = 0
+    promotion_rate: float = 0.0
+    tlink_yield_rate: float = 0.0
+    # Step-12 HAS_TIME_ANCHOR diagnostics
+    events_with_time_anchor: int = 0
+    anchored_events_as_tlink_endpoint: int = 0
+    temporally_isolated_events: int = 0
+    anchor_tlink_yield_rate: float = 0.0
+
+
+@dataclass
 class SRLKGQualityReport:
     doc_id: Optional[str]
     coverage: FrameCoverageMetrics = field(default_factory=FrameCoverageMetrics)
@@ -65,6 +81,9 @@ class SRLKGQualityReport:
         default_factory=ConfidenceCalibrationMetrics
     )
     aligns_with_count: int = 0
+    temporal_anchoring: TemporalAnchoringMetrics = field(
+        default_factory=TemporalAnchoringMetrics
+    )
 
 
 class SRLKGQualityEvaluator:
@@ -97,6 +116,7 @@ class SRLKGQualityEvaluator:
         report.density = self._argument_density(doc_id)
         report.calibration = self._confidence_calibration(doc_id)
         report.aligns_with_count = self._aligns_with_count(doc_id)
+        report.temporal_anchoring = self._temporal_anchoring(doc_id)
         return report
 
     # ------------------------------------------------------------------
@@ -227,3 +247,101 @@ class SRLKGQualityEvaluator:
         except Exception as exc:
             logger.warning("aligns_with_count query failed: %s", exc)
             return 0
+
+    def _temporal_anchoring(self, doc_id: Optional[str]) -> TemporalAnchoringMetrics:
+        """Measure how well SRL ARGM-TMP candidates flow into canonical TIMEXs and TLINKs."""
+        doc_filter = "AND tm.doc_id = toInteger($doc_id)" if doc_id else ""
+        params = {"doc_id": doc_id} if doc_id else {}
+
+        # Count all SRLTimexCandidate mentions
+        q_candidates = f"""
+        MATCH (tm:TimexMention:SRLTimexCandidate)
+        WHERE 1=1 {doc_filter}
+        RETURN count(tm) AS total
+        """
+        # Count those that have a REFERS_TO → TIMEX bridge
+        q_promoted = f"""
+        MATCH (tm:TimexMention:SRLTimexCandidate)-[:REFERS_TO]->(t:TIMEX)
+        WHERE 1=1 {doc_filter}
+        RETURN count(DISTINCT t) AS total
+        """
+        # Count canonical TIMEXs (reached from SRL candidates) that appear as TLINK endpoints
+        q_tlink_endpoint = f"""
+        MATCH (tm:TimexMention:SRLTimexCandidate)-[:REFERS_TO]->(t:TIMEX)
+        WHERE 1=1 {doc_filter}
+        WITH DISTINCT t
+        MATCH ()-[:TLINK]->(t)
+        RETURN count(DISTINCT t) AS total
+        """
+        # Count nominal TEvents (source='nombank_srl') that have at least one TLINK to an SRL-derived TIMEX
+        q_nominal_anchored = f"""
+        MATCH (tm:TimexMention:SRLTimexCandidate)-[:REFERS_TO]->(t:TIMEX)
+        WHERE 1=1 {doc_filter}
+        WITH DISTINCT t
+        MATCH (e:TEvent {{source: 'nombank_srl'}})-[:TLINK]->(t)
+        RETURN count(DISTINCT e) AS total
+        """
+
+        def _fetch(query: str) -> int:
+            try:
+                row = self.graph.run(query, params).data()
+                return (row[0].get("total", 0) or 0) if row else 0
+            except Exception as exc:
+                logger.warning("temporal_anchoring sub-query failed: %s", exc)
+                return 0
+
+        candidates = _fetch(q_candidates)
+        promoted = _fetch(q_promoted)
+        tlink_ep = _fetch(q_tlink_endpoint)
+        nominal_anchored = _fetch(q_nominal_anchored)
+
+        promotion_rate = promoted / candidates if candidates else 0.0
+        tlink_yield = tlink_ep / promoted if promoted else 0.0
+
+        # --- Step-12 HAS_TIME_ANCHOR diagnostics ---
+        doc_filter_e = "AND e.doc_id = toInteger($doc_id)" if doc_id else ""
+
+        # TEvents that carry at least one HAS_TIME_ANCHOR edge (from step 10)
+        q_anchored = f"""
+        MATCH (e:TEvent)-[:HAS_TIME_ANCHOR]->(:TimexMention:SRLTimexCandidate)
+        WHERE coalesce(e.merged, false) = false {doc_filter_e}
+        RETURN count(DISTINCT e) AS total
+        """
+        # Of those, how many are already an endpoint of at least one TLINK
+        q_anchor_tlink = f"""
+        MATCH (e:TEvent)-[:HAS_TIME_ANCHOR]->(:TimexMention:SRLTimexCandidate)
+        WHERE coalesce(e.merged, false) = false {doc_filter_e}
+        WITH DISTINCT e
+        MATCH (e)-[:TLINK]->()
+        RETURN count(DISTINCT e) AS total
+        """
+        # Canonical non-merged TEvents with no TLINK and no HAS_TIME_ANCHOR (temporally isolated)
+        q_isolated = f"""
+        MATCH (e:TEvent)
+        WHERE coalesce(e.merged, false) = false
+          AND coalesce(e.low_confidence, false) = false
+          AND coalesce(e.is_timeml_core, true) = true
+          {doc_filter_e}
+          AND NOT EXISTS {{ MATCH (e)-[:HAS_TIME_ANCHOR]->() }}
+          AND NOT EXISTS {{ MATCH (e)-[:TLINK]->() }}
+          AND NOT EXISTS {{ MATCH ()-[:TLINK]->(e) }}
+        RETURN count(e) AS total
+        """
+
+        events_with_anchor = _fetch(q_anchored)
+        anchor_tlink_ep = _fetch(q_anchor_tlink)
+        isolated = _fetch(q_isolated)
+        anchor_tlink_yield = anchor_tlink_ep / events_with_anchor if events_with_anchor else 0.0
+
+        return TemporalAnchoringMetrics(
+            srl_timex_candidates_created=candidates,
+            srl_timex_promoted_to_canonical=promoted,
+            srl_timex_as_tlink_endpoint=tlink_ep,
+            nominal_events_with_srl_temporal_anchor=nominal_anchored,
+            promotion_rate=promotion_rate,
+            tlink_yield_rate=tlink_yield,
+            events_with_time_anchor=events_with_anchor,
+            anchored_events_as_tlink_endpoint=anchor_tlink_ep,
+            temporally_isolated_events=isolated,
+            anchor_tlink_yield_rate=anchor_tlink_yield,
+        )

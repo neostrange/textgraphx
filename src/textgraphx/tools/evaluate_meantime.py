@@ -158,6 +158,16 @@ def _build_parser() -> argparse.ArgumentParser:
             "Use 'all' or leave empty to include all non-core roles."
         ),
     )
+    parser.add_argument(
+        "--strict-nom-layer-filter",
+        action="store_true",
+        default=False,
+        help=(
+            "Restrict NOM entity projections to nodes carrying an explicit :NominalMention "
+            "or :CorefMention label.  When disabled (default), NamedEntity nodes with "
+            "syntactic_type='NOM' are also projected, which may inflate entity FP counts."
+        ),
+    )
     return parser
 
 
@@ -253,6 +263,7 @@ def _evaluate_single(args: argparse.Namespace, mapping: EvaluationMapping) -> di
 
         graph = make_graph_from_config()
         try:
+            _strict_nom = bool(getattr(args, "strict_nom_layer_filter", False))
             predicted_doc = build_document_from_neo4j(
                 graph=graph,
                 doc_id=args.doc_id,
@@ -263,6 +274,7 @@ def _evaluate_single(args: argparse.Namespace, mapping: EvaluationMapping) -> di
                 nominal_profile_mode=getattr(args, "nominal_profile_mode", "all"),
                 include_non_core_participants=include_non_core_participants,
                 non_core_participant_roles=non_core_participant_roles,
+                strict_nom_layer_filter=_strict_nom,
             )
             projection_determinism = check_projection_determinism(
                 graph=graph,
@@ -319,6 +331,9 @@ def _evaluate_single(args: argparse.Namespace, mapping: EvaluationMapping) -> di
         "nominal_profile_mode": str(getattr(args, "nominal_profile_mode", "all")),
         "gold_like_nominal_filter": bool(getattr(args, "gold_like_nominal_filter", False)),
         "nominal_precision_filters": bool(getattr(args, "nominal_precision_filters", False)),
+        "strict_nom_layer_filter": bool(getattr(args, "strict_nom_layer_filter", False)),
+        "frame_fallback_event_count": base.get("frame_fallback_event_count", 0),
+        "unmatched_gold_events": base.get("unmatched_gold_events", 0),
     }
     return base
 
@@ -362,6 +377,7 @@ def _evaluate_batch(args: argparse.Namespace, mapping: EvaluationMapping) -> dic
                     nominal_profile_mode=getattr(args, "nominal_profile_mode", "all"),
                     include_non_core_participants=include_non_core_participants,
                     non_core_participant_roles=non_core_participant_roles,
+                    strict_nom_layer_filter=bool(getattr(args, "strict_nom_layer_filter", False)),
                 )
                 if graph is not None and getattr(args, "projection_determinism_runs", None) is not None:
                     projection_determinism_by_doc[str(gold_doc.doc_id)] = check_projection_determinism(

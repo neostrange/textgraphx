@@ -455,3 +455,240 @@ class QualityGateVerifier:
             return True, f"Improvement {difference:+.4f} is statistically significant (p < {self.significance_level})"
         else:
             return False, f"Improvement {difference:+.4f} may be due to random variation"
+
+
+# ---------------------------------------------------------------------------
+# Step 17: SRL-profile baseline discipline
+# ---------------------------------------------------------------------------
+
+#: The four canonical SRL experiment profiles for A/B tracking.
+SRL_PROFILES = (
+    "verbal_only",
+    "verbal_plus_nominal_ungated",
+    "verbal_plus_nominal_gated",
+    "verbal_plus_nominal_gated_aligns_with",
+)
+
+
+@dataclass
+class SRLProfileBaseline:
+    """Per-SRL-profile MEANTIME scores with relation-by-kind deltas.
+
+    Stores enough information to attribute a score change to a specific SRL
+    profile and relation kind, so that improvements or regressions can be
+    attributed rather than mixed across conditions.
+    """
+
+    profile: str
+    timestamp: str
+    rotation_reason: str
+    event_strict_f1: float = 0.0
+    event_relaxed_f1: float = 0.0
+    relation_strict_f1: float = 0.0
+    relation_relaxed_f1: float = 0.0
+    # Relation-by-kind scores (e.g. {"has_participant": 0.42, "tlink": 0.18, ...})
+    relation_by_kind: Dict[str, float] = field(default_factory=dict)
+    determinism_pass: bool = True
+    cross_phase_consistency_pass: bool = True
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "profile": self.profile,
+            "timestamp": self.timestamp,
+            "rotation_reason": self.rotation_reason,
+            "event_strict_f1": self.event_strict_f1,
+            "event_relaxed_f1": self.event_relaxed_f1,
+            "relation_strict_f1": self.relation_strict_f1,
+            "relation_relaxed_f1": self.relation_relaxed_f1,
+            "relation_by_kind": self.relation_by_kind,
+            "determinism_pass": self.determinism_pass,
+            "cross_phase_consistency_pass": self.cross_phase_consistency_pass,
+        }
+
+    @staticmethod
+    def from_dict(d: Dict[str, Any]) -> "SRLProfileBaseline":
+        return SRLProfileBaseline(**d)
+
+    def relation_kind_delta(self, other: "SRLProfileBaseline") -> Dict[str, float]:
+        """Compute per-kind F1 deltas relative to *other* (self minus other)."""
+        all_kinds = set(self.relation_by_kind) | set(other.relation_by_kind)
+        return {
+            kind: self.relation_by_kind.get(kind, 0.0) - other.relation_by_kind.get(kind, 0.0)
+            for kind in sorted(all_kinds)
+        }
+
+
+class SRLProfileBaselineManager:
+    """Manages locked baseline artifacts for the four SRL experiment profiles.
+
+    Each profile gets its own JSON file under ``baseline_dir/srl_profiles/``.
+    Rotation archives the old file with a timestamp suffix and writes a new
+    locked baseline.  Rotation must supply an explicit *reason* string; the
+    gate rejects empty reasons to prevent silent auto-rotation.
+    """
+
+    PROFILES = SRL_PROFILES
+
+    def __init__(self, baseline_dir: Path | str):
+        self.baseline_dir = Path(baseline_dir) / "srl_profiles"
+        self.baseline_dir.mkdir(parents=True, exist_ok=True)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _profile_path(self, profile: str) -> Path:
+        return self.baseline_dir / f"{profile}.json"
+
+    def _archive_path(self, profile: str, timestamp: str) -> Path:
+        return self.baseline_dir / f"{profile}.{timestamp}.archived.json"
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def save(self, baseline: SRLProfileBaseline) -> Path:
+        """Write a new locked baseline (no archiving).  Use rotate() for updates."""
+        path = self._profile_path(baseline.profile)
+        with path.open("w") as fh:
+            json.dump(baseline.to_dict(), fh, indent=2)
+        return path
+
+    def load(self, profile: str) -> Optional[SRLProfileBaseline]:
+        """Load the locked baseline for *profile*, or ``None`` if absent."""
+        path = self._profile_path(profile)
+        if not path.exists():
+            return None
+        with path.open() as fh:
+            return SRLProfileBaseline.from_dict(json.load(fh))
+
+    def rotate(
+        self,
+        new_baseline: SRLProfileBaseline,
+        reason: str,
+    ) -> Tuple[Path, Optional[Path]]:
+        """Replace the locked baseline for a profile, archiving the old one.
+
+        Parameters
+        ----------
+        new_baseline:
+            The new ``SRLProfileBaseline`` to lock.
+        reason:
+            Non-empty human-readable explanation (e.g. "Step 9 fallback
+            participants improve relation F1 by +0.03").  Empty reasons are
+            rejected to prevent silent rotation.
+
+        Returns
+        -------
+        (new_path, archived_path)
+            ``archived_path`` is ``None`` when no prior baseline existed.
+        """
+        if not reason.strip():
+            raise ValueError(
+                "rotate() requires a non-empty reason string. "
+                "Document why the baseline is changing before rotating."
+            )
+        new_baseline.rotation_reason = reason
+        new_baseline.timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+
+        archived_path: Optional[Path] = None
+        old_path = self._profile_path(new_baseline.profile)
+        if old_path.exists():
+            old_data = json.loads(old_path.read_text())
+            old_ts = old_data.get("timestamp", "unknown")
+            archived_path = self._archive_path(new_baseline.profile, old_ts)
+            old_path.rename(archived_path)
+
+        new_path = self.save(new_baseline)
+        return new_path, archived_path
+
+    def compare(
+        self, profile: str, candidate: SRLProfileBaseline
+    ) -> Dict[str, Any]:
+        """Compare *candidate* against the locked baseline for *profile*.
+
+        Returns a structured dict containing overall deltas and per-kind deltas
+        suitable for inclusion in a review bundle.
+        """
+        locked = self.load(profile)
+        if locked is None:
+            return {
+                "profile": profile,
+                "status": "no_baseline",
+                "note": f"No locked baseline for profile '{profile}'",
+            }
+        deltas = candidate.relation_kind_delta(locked)
+        overall_relation_delta = (
+            candidate.relation_strict_f1 - locked.relation_strict_f1
+        )
+        overall_event_delta = (
+            candidate.event_strict_f1 - locked.event_strict_f1
+        )
+        regression_kinds = {k: v for k, v in deltas.items() if v < -0.001}
+        improvement_kinds = {k: v for k, v in deltas.items() if v > 0.001}
+        return {
+            "profile": profile,
+            "status": "regression" if regression_kinds else "ok",
+            "event_strict_f1_delta": overall_event_delta,
+            "relation_strict_f1_delta": overall_relation_delta,
+            "relation_by_kind_deltas": deltas,
+            "regression_kinds": regression_kinds,
+            "improvement_kinds": improvement_kinds,
+            "determinism_pass": candidate.determinism_pass,
+            "cross_phase_consistency_pass": candidate.cross_phase_consistency_pass,
+        }
+
+    def list_profiles(self) -> List[str]:
+        """Return names of profiles that have a locked baseline."""
+        return [p.stem for p in sorted(self.baseline_dir.glob("*.json"))]
+
+
+def build_review_bundle(
+    profile_comparisons: List[Dict[str, Any]],
+    variance_report: Optional["VarianceReport"] = None,
+    consistency_issues: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Assemble a complete review bundle for the SRL-profile change set.
+
+    This is the single artefact that reviewers check before accepting a
+    baseline rotation.  It includes:
+
+    - Per-profile relation-by-kind deltas (from ``SRLProfileBaselineManager.compare``)
+    - Determinism verification result
+    - Cross-phase consistency issues (from ``CrossPhaseValidator``)
+    - Overall pass/fail verdict
+
+    Parameters
+    ----------
+    profile_comparisons:
+        List of dicts returned by ``SRLProfileBaselineManager.compare()``.
+    variance_report:
+        Optional ``VarianceReport`` from ``VarianceAnalyzer.analyze()``.
+    consistency_issues:
+        Optional list of issue strings from the cross-phase validator.
+
+    Returns
+    -------
+    dict suitable for JSON serialisation and CI review.
+    """
+    any_regression = any(c.get("status") == "regression" for c in profile_comparisons)
+    any_det_fail = any(not c.get("determinism_pass", True) for c in profile_comparisons)
+    any_consistency_fail = bool(consistency_issues)
+
+    verdict = "PASS"
+    if any_regression:
+        verdict = "REGRESSION"
+    elif any_det_fail:
+        verdict = "DETERMINISM_FAIL"
+    elif any_consistency_fail:
+        verdict = "CONSISTENCY_FAIL"
+
+    bundle: Dict[str, Any] = {
+        "verdict": verdict,
+        "profile_comparisons": profile_comparisons,
+        "consistency_issues": consistency_issues or [],
+    }
+    if variance_report is not None:
+        bundle["variance"] = variance_report.to_dict()
+    return bundle
+

@@ -1,4 +1,4 @@
-"""Phase-D tests for TLINK cases 8 and 9 — NOMBANK nominal event endpoints (D3).
+"""Phase-D tests for TLINK cases 8, 9, and 10 — NOMBANK nominal event endpoints (D3).
 
 Static source-inspection + lightweight mock tests.  No live Neo4j or spaCy required.
 
@@ -6,6 +6,8 @@ Case 8: NOMBANK-sourced TEvent anchored to Document Creation Time (mirrors case6
         but lifts the ``pos NOT IN ['NN','NNS','NNP']`` exclusion that case6 applies).
 Case 9: NOMBANK-sourced TEvent linked to sentence-co-occurring TIMEX3 nodes
         (proximity-based; SRLTimexCandidate nodes excluded to avoid circularity).
+Case 10: NOMBANK-sourced TEvent linked to SRLTimexCandidate mentions only when
+     the candidate originates from the event's own ARGM-TMP frame argument.
 """
 
 from pathlib import Path
@@ -37,7 +39,7 @@ def wrapper_source() -> str:
 
 
 def _make_recognizer(return_value=None):
-    from textgraphx.TlinksRecognizer import TlinksRecognizer
+    from textgraphx.pipeline.phases.tlinks_recognizer import TlinksRecognizer
 
     obj = TlinksRecognizer.__new__(TlinksRecognizer)
     obj.graph = MagicMock()
@@ -193,7 +195,7 @@ class TestCase9NombankSentenceTimex:
 
     def test_uses_sentence_token_distance_window(self, method_src):
         """Must require local token proximity to avoid loose same-sentence matches."""
-        assert "abs(coalesce(tok_e.tok_index_doc, -1) - coalesce(tok_t.tok_index_doc, -1)) <= 15" in method_src
+        assert "abs(coalesce(tok_e.tok_index_doc, -1) - coalesce(tok_t.tok_index_doc, -1)) <= 8" in method_src
 
     def test_returns_count(self):
         recognizer = _make_recognizer([{"created": 5}])
@@ -216,7 +218,7 @@ class TestCase9NombankSentenceTimex:
         recognizer = _make_recognizer()
         recognizer.create_tlinks_case9()
         query = recognizer.graph.run.call_args[0][0]
-        assert "<= 15" in query
+        assert "<= 8" in query
 
     def test_srl_timex_exclusion_in_executed_query(self):
         recognizer = _make_recognizer()
@@ -232,13 +234,86 @@ class TestCase9NombankSentenceTimex:
 
 
 # ===========================================================================
+# Case 10: NOMBANK event → SRLTimexCandidate via matching ARGM-TMP evidence
+# ===========================================================================
+
+
+@pytest.mark.unit
+class TestCase10NombankSrlTimex:
+    """Case 10 query contract and structural tests."""
+
+    @pytest.fixture(scope="class")
+    def method_src(self, tr_source):
+        return _extract_method(tr_source, "create_tlinks_case10")
+
+    def test_method_exists(self, tr_source):
+        assert "def create_tlinks_case10(" in tr_source
+
+    def test_targets_nombank_source_events(self, method_src):
+        assert "nombank_srl" in method_src
+
+    def test_targets_srl_timex_candidates(self, method_src):
+        assert "SRLTimexCandidate" in method_src
+
+    def test_requires_argm_tmp_frame_argument(self, method_src):
+        assert "ARGM-TMP" in method_src
+
+    def test_joins_on_source_fa_id(self, method_src):
+        assert "tm.source_fa_id = fa.id" in method_src
+
+    def test_resolves_candidate_to_canonical_timex(self, method_src):
+        assert "OPTIONAL MATCH (tm)-[:REFERS_TO]->(t_ref:TIMEX)" in method_src
+        assert "WHERE t IS NOT NULL" in method_src
+
+    def test_excludes_provisional_frames(self, method_src):
+        assert "coalesce(f.provisional, false) = false" in method_src
+
+    def test_excludes_low_confidence_events(self, method_src):
+        assert "coalesce(e.low_confidence, false) = false" in method_src
+
+    def test_requires_timeml_core_events(self, method_src):
+        assert "coalesce(e.is_timeml_core, true) = true" in method_src
+
+    def test_default_reltype_is_included(self, method_src):
+        assert "IS_INCLUDED" in method_src
+
+    def test_rule_id_present(self, method_src):
+        assert "case10_nombank_srl_timex" in method_src
+
+    def test_confidence_is_0_58(self, method_src):
+        assert "0.58" in method_src
+
+    def test_uses_merge_not_create(self, method_src):
+        import re
+        assert "MERGE" in method_src
+        assert not re.search(r"\bCREATE\s*\(", method_src)
+
+    def test_returns_count(self):
+        recognizer = _make_recognizer([{"created": 2}])
+        rows = recognizer.create_tlinks_case10()
+        assert rows[0]["created"] == 2
+
+    def test_rule_id_in_executed_query(self):
+        recognizer = _make_recognizer()
+        recognizer.create_tlinks_case10()
+        query = recognizer.graph.run.call_args[0][0]
+        assert "case10_nombank_srl_timex" in query
+
+    def test_source_fa_join_in_executed_query(self):
+        recognizer = _make_recognizer()
+        recognizer.create_tlinks_case10()
+        query = recognizer.graph.run.call_args[0][0]
+        assert "tm.source_fa_id = fa.id" in query
+
+
+# ===========================================================================
 # Run sequence: both cases wired in __main__ and phase_wrappers
 # ===========================================================================
 
 
 @pytest.mark.unit
-class TestCase8Case9Wiring:
-    """Verify case8/case9 appear in the canonical run sequences."""
+class TestCase8Case9Case10Wiring:
+    """Verify case8/case9/case10 appear in the canonical run sequences."""
 
     def test_case8_wired_in_main(self, tr_source):
         main_block = tr_source[tr_source.rfind("if __name__"):]
@@ -250,14 +325,24 @@ class TestCase8Case9Wiring:
         main_block = tr_source[tr_source.rfind("if __name__"):]
         assert "create_tlinks_case9" in main_block
 
+    def test_case10_wired_in_main(self, tr_source):
+        main_block = tr_source[tr_source.rfind("if __name__"):]
+        assert "create_tlinks_case10" in main_block
+
     def test_case8_wired_in_phase_wrapper(self, wrapper_source):
         assert "create_tlinks_case8" in wrapper_source
 
     def test_case9_wired_in_phase_wrapper(self, wrapper_source):
         assert "create_tlinks_case9" in wrapper_source
 
+    def test_case10_wired_in_phase_wrapper(self, wrapper_source):
+        assert "create_tlinks_case10" in wrapper_source
+
     def test_case8_label_in_phase_wrapper(self, wrapper_source):
         assert "Case 8: NOMBANK Event" in wrapper_source
+
+    def test_case10_label_in_phase_wrapper(self, wrapper_source):
+        assert "Case 10: NOMBANK Event" in wrapper_source
 
     def test_case9_label_in_phase_wrapper(self, wrapper_source):
         assert "Case 9: NOMBANK Event" in wrapper_source

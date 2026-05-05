@@ -6,11 +6,12 @@ Legacy source-contract markers preserved for tests:
 - get_config().services.service_timeout_sec
 """
 
-import json
+import sys
 
-import requests
+from textgraphx.adapters import allen_nlp_coref as _canonical_allen_nlp_coref
 
-from textgraphx.infrastructure.config import get_config  # noqa: F401
+sys.modules[__name__] = _canonical_allen_nlp_coref
+
 
 
 def _service_timeout() -> int:
