@@ -343,14 +343,14 @@ The pipeline assumes a running Neo4j instance and several external NLP services:
 
 Additional codebase-level service URLs currently appear in helper modules (`util/RestCaller.py`, `util/CallAllenNlpCoref.py`, and LLM helper skeletons), which indicates endpoint configuration is still only partially centralized.
 
-The provided script [scripts/run_pipeline.sh](../src/textgraphx/scripts/run_pipeline.sh) bootstraps a local venv if needed, installs requirements, downloads `en_core_web_sm`, and then runs the phase scripts in sequence.
+The provided script [scripts/run_pipeline.sh](../src/textgraphx/scripts/run_pipeline.sh) bootstraps a local venv if needed, installs requirements, downloads the requested spaCy model (`en_core_web_trf` by default; `sm`/`md` only when explicitly requested), and then runs the phase scripts in sequence.
 
 ### CLI behavior
 
 `GraphBasedNLP.py` supports a small command-line interface:
 
 - `--dir` to choose the document directory
-- `--model` to choose between `sm` and `trf`
+- `--model` to choose between `trf` (default), `sm`, and `md`
 - `--require-neo4j` to fail fast if the database is unreachable
 - `--neo4j-retries` and `--neo4j-backoff` to control startup connectivity checks
 

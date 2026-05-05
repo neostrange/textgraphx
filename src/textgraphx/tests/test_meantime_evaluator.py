@@ -5,6 +5,8 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from textgraphx.evaluation.meantime_evaluator import (
     _canonicalize_event_attrs,
     _canonicalize_timex_attrs,
@@ -1064,3 +1066,67 @@ def test_nam_head_span_no_false_match_on_disjoint_spans():
     assert relaxed["tp"] == 0
     assert relaxed["fn"] == 1
     assert relaxed["fp"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Source-inspection: merged=false guards in projection queries
+# ---------------------------------------------------------------------------
+
+EVALUATOR_SRC = Path(__file__).resolve().parents[1] / "evaluation" / "meantime_evaluator.py"
+
+
+def _evaluator_source() -> str:
+    return EVALUATOR_SRC.read_text(encoding="utf-8")
+
+
+@pytest.mark.unit
+def test_tevent_projection_excludes_merged_events():
+    """TEvent UNION branch must guard on coalesce(m.merged, false) = false
+    so that secondary events collapsed by merge_aligns_with_event_clusters or
+    collapse_light_verbs are never projected as independent events."""
+    src = _evaluator_source()
+    # Find the TEvent UNION branch (identified by TRIGGERS]->(m:TEvent))
+    idx = src.find("[:TRIGGERS]->(m:TEvent)")
+    assert idx != -1, "TEvent UNION branch not found in evaluator"
+    # Look within the next 500 chars (the WHERE clause of that branch)
+    branch = src[idx: idx + 500]
+    assert "coalesce(m.merged, false) = false" in branch, (
+        "TEvent projection branch must filter merged events; "
+        "add AND coalesce(m.merged, false) = false to the WHERE clause"
+    )
+
+
+@pytest.mark.unit
+def test_tlink_projection_excludes_merged_endpoints():
+    """TLINK projection WHERE clause must guard on coalesce(a.merged, false)=false
+    and coalesce(b.merged, false)=false so TLINKs anchored at merged secondary
+    TEvents are not projected as false-positive relations."""
+    src = _evaluator_source()
+    idx = src.find("MATCH (a)-[r:TLINK]->(b)")
+    assert idx != -1, "TLINK projection query not found in evaluator"
+    # The guard must appear before the first OPTIONAL MATCH
+    optional_idx = src.find("OPTIONAL MATCH", idx)
+    tlink_scope = src[idx: optional_idx]
+    assert "coalesce(a.merged, false) = false" in tlink_scope, (
+        "TLINK projection must filter merged source endpoint"
+    )
+    assert "coalesce(b.merged, false) = false" in tlink_scope, (
+        "TLINK projection must filter merged target endpoint"
+    )
+
+
+@pytest.mark.unit
+def test_participant_projection_excludes_merged_tevent_endpoints():
+    """Participant projection must not link entities to merged TEvents.
+    The WHERE clause must include a guard that allows EventMentions through
+    but blocks TEvents with merged=true."""
+    src = _evaluator_source()
+    idx = src.find("MATCH (src)-[r:EVENT_PARTICIPANT|PARTICIPANT]->(evt)")
+    assert idx != -1, "Participant projection query not found in evaluator"
+    # Look within the surrounding WHERE clause (next 400 chars)
+    scope = src[idx: idx + 400]
+    assert "evt:TEvent" in scope, "Participant query must reference TEvent label"
+    assert "evt.merged" in scope, (
+        "Participant projection must guard merged TEvent endpoints; "
+        "add AND (NOT (evt:TEvent) OR coalesce(evt.merged, false) = false)"
+    )

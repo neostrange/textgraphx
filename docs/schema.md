@@ -393,6 +393,7 @@ Participant provenance note:
 | `TLINK` | `TIMEX -> TIMEX` | `id`, `relType`, `signalID`, `source` | Time-to-time temporal relation. |
 | `CLINK` | `TEvent -> TEvent` | `source`: currently `srl_argm_cau` | Derived causal relation from `ARGM-CAU` frame arguments during event enrichment. |
 | `SLINK` | `TEvent -> TEvent` | `source`: currently `srl_argm_dsp` | Derived subordinating relation from `ARGM-DSP` frame arguments during event enrichment. |
+| `HAS_TIME_ANCHOR` | `TEvent -> TimexMention:SRLTimexCandidate` | `source`: `'srl_argm_tmp_anchor'`. `confidence`: `1.0`. `created_at`: ISO timestamp. | Temporal anchor edge written by `temporal.anchor_srl_timex_candidates_to_events()` (Step 10) when an `ARGM-TMP` SRL argument resolves to a `TimexMention` with `SRLTimexCandidate` label and the target TIMEX has `merged=false` and `is_timeml_core=true`. TLINK case 11 (`create_tlinks_case11`) follows this edge to produce an `IS_INCLUDED` TLINK. Optional-tier for queries; canonical write path in Stage 3 (Temporal). |
 
 TLINK anchor-consistency note:
 

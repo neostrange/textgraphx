@@ -41,6 +41,73 @@ from textgraphx.reasoning.merge_utils import resolve_attribute_conflict
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# SLINK predicate inventories (lemma-level, lower-case, PropBank-grounded)
+# ---------------------------------------------------------------------------
+# Predicates whose ARG1/ARG2 complement introduces a subordinate event.
+# Grouped by TimeML slink_type semantics.
+
+_SLINK_EVIDENTIAL_LEMMAS: frozenset = frozenset({
+    # Reporting / speech-act
+    "say", "report", "announce", "state", "note", "claim", "tell",
+    "confirm", "deny", "insist", "warn", "suggest", "argue", "mention",
+    "indicate", "reveal", "predict", "promise", "propose", "assert",
+    "allege", "acknowledge", "admit", "emphasize", "stress", "observe",
+    "reiterate", "repeat", "respond", "reply", "counter",
+    # Non-factive cognition
+    "think", "believe", "expect", "assume", "consider", "suppose",
+    "suspect", "guess", "conclude", "speculate", "estimate",
+})
+
+_SLINK_FACTIVE_LEMMAS: frozenset = frozenset({
+    # Veridical cognition / discovery
+    "know", "realize", "discover", "notice", "find", "learn",
+    "understand", "recognize", "remember", "recall", "establish",
+    "prove", "determine",
+})
+
+_SLINK_MODAL_LEMMAS: frozenset = frozenset({
+    # Desire / intent / ability
+    "want", "hope", "plan", "intend", "decide", "attempt", "try",
+    "seek", "need", "wish", "fail", "manage", "agree", "refuse",
+})
+
+# Union used by Cypher WHERE clause
+_SLINK_ALL_LEMMAS: frozenset = (
+    _SLINK_EVIDENTIAL_LEMMAS | _SLINK_FACTIVE_LEMMAS | _SLINK_MODAL_LEMMAS
+)
+
+
+# ---------------------------------------------------------------------------
+# CLINK predicate inventories (lemma-level, lower-case, PropBank-grounded)
+# ---------------------------------------------------------------------------
+# Predicates whose ARG1/ARG2/ARG2 structure encodes a causal relation between
+# two events.  Divided by the direction of causality in the CLINK relation:
+#   - CAUSE  : subject/agent causes the object/complement event
+#   - ENABLE : agent enables or allows the complement event (permissive)
+#   - PREVENT: agent blocks or prevents the complement event
+
+_CLINK_CAUSE_LEMMAS: frozenset = frozenset({
+    "cause", "lead", "trigger", "result", "produce", "generate",
+    "create", "bring", "force", "make", "drive", "prompt", "spur",
+    "give", "yield", "induce", "provoke", "spark", "precipitate",
+    "contribute", "result", "stem",
+})
+
+_CLINK_ENABLE_LEMMAS: frozenset = frozenset({
+    "allow", "enable", "permit", "let", "support", "help", "facilitate",
+    "encourage", "ensure", "guarantee", "provide", "offer",
+})
+
+_CLINK_PREVENT_LEMMAS: frozenset = frozenset({
+    "prevent", "stop", "block", "ban", "prohibit", "restrict", "limit",
+    "hinder", "hamper", "impede", "obstruct", "avoid", "deter",
+})
+
+_CLINK_ALL_LEMMAS: frozenset = (
+    _CLINK_CAUSE_LEMMAS | _CLINK_ENABLE_LEMMAS | _CLINK_PREVENT_LEMMAS
+)
+
 
 # This phase will run after the TemporalPhase.
 # NOTES: 
@@ -497,10 +564,11 @@ class EventEnrichmentPhase():
         
         WITH em_noun, em_verb
         OPTIONAL MATCH (em_verb)-[:REFERS_TO]->(te_verb:TEvent)
-        SET te_verb.is_timeml_core = false
-        
-        WITH em_noun, em_verb
         OPTIONAL MATCH (em_noun)-[:REFERS_TO]->(te_noun:TEvent)
+        SET te_verb.is_timeml_core = false,
+            te_verb.merged = CASE WHEN te_noun IS NOT NULL THEN true ELSE te_verb.merged END,
+            te_verb.merged_into = CASE WHEN te_noun IS NOT NULL THEN te_noun.id ELSE te_verb.merged_into END,
+            te_verb.merged_by = CASE WHEN te_noun IS NOT NULL THEN 'collapse_light_verbs' ELSE te_verb.merged_by END
         SET te_noun.tense = coalesce(te_noun.tense, em_verb.tense),
             te_noun.aspect = coalesce(te_noun.aspect, em_verb.aspect)
             
@@ -648,6 +716,7 @@ class EventEnrichmentPhase():
 
         try:
             from textgraphx.pipeline.phases.temporal import TemporalPhase as _TP
+            from textgraphx.pipeline.phases.temporal import _wn as _temporal_wn
             _is_eventive = _TP._is_eventive_nominal
         except Exception:
             logger.warning(
@@ -656,6 +725,8 @@ class EventEnrichmentPhase():
             return 0
 
         # Pull all NOMBANK frames not yet linked to a TEvent.
+        # Extra columns: sense_conf (for the confidence gate) and has_verbal_alignment
+        # (whether a PropBank frame for the same predicate already exists via ALIGNS_WITH).
         candidate_query = """
         MATCH (a:AnnotatedText)-[:CONTAINS_SENTENCE]->(:Sentence)
               -[:HAS_TOKEN]->(tok:TagOccurrence)
@@ -675,7 +746,9 @@ class EventEnrichmentPhase():
                coalesce(f.predicate, f.frame) AS headword,
                a.id AS doc_id,
                head_tok.id AS head_tok_id,
-               min_tok, max_tok
+               min_tok, max_tok,
+               coalesce(f.sense_conf, 0.0) AS sense_conf,
+               exists((f)-[:ALIGNS_WITH]->(:Frame {framework: 'PROPBANK'})) AS has_verbal_alignment
         """
         try:
             rows = self.graph.run(candidate_query).data()
@@ -689,8 +762,29 @@ class EventEnrichmentPhase():
             headword = (row.get("headword") or "").strip().lower()
             if not headword:
                 continue
-            if not _is_eventive(headword):
-                continue
+
+            sense_conf = float(row.get("sense_conf") or 0.0)
+            has_verbal = bool(row.get("has_verbal_alignment", False))
+
+            # --- Eventive-evidence gate (two-branch) ---
+            # Branch A: WordNet unavailable — fail-open is too permissive.
+            #   Require verbal alignment OR high sense confidence instead.
+            # Branch B: WordNet available — lexname must pass, then apply a
+            #   secondary confidence gate when no verbal counterpart exists.
+            if _temporal_wn is None:
+                if not (has_verbal or sense_conf >= 0.65):
+                    continue
+            else:
+                if not _is_eventive(headword):
+                    continue
+                # Borderline eventive nominals without verbal support need
+                # at least moderate sense confidence to avoid false positives.
+                if not has_verbal and sense_conf < 0.55:
+                    continue
+
+            # Confidence is calibrated: verbally-aligned nominals inherit the
+            # higher-confidence verbal evidence; standalone nominals stay at 0.70.
+            confidence = 0.80 if has_verbal else 0.70
 
             frame_id = row["frame_id"]
             doc_id = row["doc_id"]
@@ -709,7 +803,7 @@ class EventEnrichmentPhase():
                 event.source     = 'nombank_srl',
                 event.start_tok  = $min_tok,
                 event.end_tok    = $max_tok,
-                event.confidence = 0.70,
+                event.confidence = $confidence,
                 event.is_timeml_core = true,
                 event.low_confidence = false
             WITH event
@@ -732,6 +826,7 @@ class EventEnrichmentPhase():
                         "max_tok": max_tok,
                         "frame_id": frame_id,
                         "head_tok_id": row.get("head_tok_id"),
+                        "confidence": confidence,
                     },
                 )
                 promoted += 1
@@ -779,6 +874,64 @@ class EventEnrichmentPhase():
         """
         logger.debug("merge_aligns_with_event_clusters")
         graph = self.graph
+
+        # ------------------------------------------------------------------
+        # Pass 0: light-verb inversion
+        # For frames where f_verbal.is_light_verb_host = true the NOMINAL
+        # frame carries the semantically canonical event.  Redirect EventMention
+        # REFERS_TO from the verbal TEvent to the nominal TEvent and transfer
+        # tense/aspect, then mark the verbal TEvent as merged.  This must run
+        # BEFORE the general ALIGNS_WITH merge pass so the general pass skips
+        # already-merged events.
+        # ------------------------------------------------------------------
+        lv_redirect_query = """
+        MATCH (f_verbal:Frame {is_light_verb_host: true})-[:ALIGNS_WITH]->(f_nominal:Frame)
+        WHERE coalesce(f_verbal.provisional, false) = false
+          AND coalesce(f_nominal.provisional, false) = false
+        MATCH (f_verbal)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_verbal:TEvent)
+        MATCH (f_nominal)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_nominal:TEvent)
+        WHERE elementId(e_verbal) <> elementId(e_nominal)
+          AND coalesce(e_verbal.merged, false) = false
+        SET e_nominal.tense  = coalesce(e_nominal.tense,  e_verbal.tense),
+            e_nominal.aspect = coalesce(e_nominal.aspect, e_verbal.aspect)
+        WITH e_verbal, e_nominal
+        MATCH (em:EventMention)-[:REFERS_TO]->(e_verbal)
+        MERGE (em)-[new_ref:REFERS_TO {source: 'light_verb_canonicalization'}]->(e_nominal)
+        ON CREATE SET
+            new_ref.merged_from = e_verbal.id,
+            new_ref.confidence  = 0.85
+        RETURN count(em) AS redirected
+        """
+        try:
+            rows = graph.run(lv_redirect_query).data()
+            lv_redirected = rows[0].get("redirected", 0) if rows else 0
+            logger.info(
+                "merge_aligns_with_event_clusters: light-verb pass redirected %d EventMention refs",
+                lv_redirected,
+            )
+        except Exception:
+            logger.exception("merge_aligns_with_event_clusters: light-verb redirect pass failed")
+
+        lv_mark_query = """
+        MATCH (f_verbal:Frame {is_light_verb_host: true})-[:ALIGNS_WITH]->(f_nominal:Frame)
+        MATCH (f_verbal)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_verbal:TEvent)
+        MATCH (f_nominal)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_nominal:TEvent)
+        WHERE elementId(e_verbal) <> elementId(e_nominal)
+          AND coalesce(e_verbal.merged, false) = false
+        SET e_verbal.merged      = true,
+            e_verbal.merged_into = e_nominal.id,
+            e_verbal.merged_by   = 'light_verb_canonicalization'
+        RETURN count(e_verbal) AS marked
+        """
+        try:
+            rows = graph.run(lv_mark_query).data()
+            lv_marked = rows[0].get("marked", 0) if rows else 0
+            logger.info(
+                "merge_aligns_with_event_clusters: light-verb pass marked %d verbal TEvents as merged",
+                lv_marked,
+            )
+        except Exception:
+            logger.exception("merge_aligns_with_event_clusters: light-verb mark pass failed")
 
         # ------------------------------------------------------------------
         # Pass 1: flag ALIGNS_WITH pairs with sense-contradicting frames
@@ -837,72 +990,13 @@ class EventEnrichmentPhase():
             logger.exception("merge_aligns_with_event_clusters: EventMention redirect pass failed")
 
         # ------------------------------------------------------------------
-        # Pass 3a: transfer outbound TLINKs (secondary → X) to canonical
-        # ------------------------------------------------------------------
-        tlink_out_query = """
-        MATCH (f_canonical:Frame)-[aw:ALIGNS_WITH]->(f_secondary:Frame)
-        WHERE coalesce(aw.sense_conflict, false) = false
-        MATCH (f_canonical)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_canonical:TEvent)
-        MATCH (f_secondary)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_secondary:TEvent)
-        WHERE elementId(e_canonical) <> elementId(e_secondary)
-          AND coalesce(e_secondary.merged, false) = false
-        WITH e_canonical, e_secondary
-        MATCH (e_secondary)-[tl:TLINK]->(other)
-        WHERE elementId(other) <> elementId(e_canonical)
-          AND coalesce(tl.suppressed, false) = false
-        MERGE (e_canonical)-[new_tl:TLINK {relType: coalesce(tl.relTypeCanonical, tl.relType, 'VAGUE')}]->(other)
-        ON CREATE SET
-            new_tl.relTypeCanonical = coalesce(tl.relTypeCanonical, tl.relType, 'VAGUE'),
-            new_tl.confidence       = round(coalesce(tl.confidence, 0.5) * 0.9, 3),
-            new_tl.source           = 'aligns_with_transfer',
-            new_tl.rule_id          = coalesce(tl.rule_id, 'unknown') + '_merged',
-            new_tl.evidence_source  = 'event_enrichment'
-        RETURN count(new_tl) AS transferred
-        """
-        try:
-            rows = graph.run(tlink_out_query).data()
-            t_out = rows[0].get("transferred", 0) if rows else 0
-            logger.info(
-                "merge_aligns_with_event_clusters: %d outbound TLINKs transferred", t_out
-            )
-        except Exception:
-            logger.exception("merge_aligns_with_event_clusters: TLINK outbound transfer failed")
-
-        # ------------------------------------------------------------------
-        # Pass 3b: transfer inbound TLINKs (X → secondary) to canonical
-        # ------------------------------------------------------------------
-        tlink_in_query = """
-        MATCH (f_canonical:Frame)-[aw:ALIGNS_WITH]->(f_secondary:Frame)
-        WHERE coalesce(aw.sense_conflict, false) = false
-        MATCH (f_canonical)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_canonical:TEvent)
-        MATCH (f_secondary)-[:DESCRIBES|FRAME_DESCRIBES_EVENT]->(e_secondary:TEvent)
-        WHERE elementId(e_canonical) <> elementId(e_secondary)
-          AND coalesce(e_secondary.merged, false) = false
-        WITH e_canonical, e_secondary
-        MATCH (other)-[tl:TLINK]->(e_secondary)
-        WHERE elementId(other) <> elementId(e_canonical)
-          AND coalesce(tl.suppressed, false) = false
-        MERGE (other)-[new_tl:TLINK {relType: coalesce(tl.relTypeCanonical, tl.relType, 'VAGUE')}]->(e_canonical)
-        ON CREATE SET
-            new_tl.relTypeCanonical = coalesce(tl.relTypeCanonical, tl.relType, 'VAGUE'),
-            new_tl.confidence       = round(coalesce(tl.confidence, 0.5) * 0.9, 3),
-            new_tl.source           = 'aligns_with_transfer',
-            new_tl.rule_id          = coalesce(tl.rule_id, 'unknown') + '_merged',
-            new_tl.evidence_source  = 'event_enrichment'
-        RETURN count(new_tl) AS transferred
-        """
-        try:
-            rows = graph.run(tlink_in_query).data()
-            t_in = rows[0].get("transferred", 0) if rows else 0
-            logger.info(
-                "merge_aligns_with_event_clusters: %d inbound TLINKs transferred", t_in
-            )
-        except Exception:
-            logger.exception("merge_aligns_with_event_clusters: TLINK inbound transfer failed")
-
-        # ------------------------------------------------------------------
         # Pass 4: mark secondary TEvents as merged
         # ------------------------------------------------------------------
+        # NOTE: Passes 3a/3b (TLINK outbound/inbound transfer) were removed
+        # because TlinksRecognizer now runs with coalesce(e.merged,false)=false
+        # guards, so TLINKs are never created for secondary (merged) events in
+        # the first place.  TLINK creation is exclusively owned by
+        # TlinksRecognizer (architectural contract).
         mark_query = """
         MATCH (f_canonical:Frame)-[aw:ALIGNS_WITH]->(f_secondary:Frame)
         WHERE coalesce(aw.sense_conflict, false) = false
@@ -928,6 +1022,162 @@ class EventEnrichmentPhase():
             logger.exception("merge_aligns_with_event_clusters: mark-merged pass failed")
 
         return merged_count
+
+
+    def report_event_cluster_diagnostics(self):
+        """Return a structured diagnostics snapshot of the ALIGNS_WITH merge state (Step 7).
+
+        Counts, per document and globally:
+
+        - ``clusters_formed``   — ALIGNS_WITH pairs whose frames are non-provisional and
+          sense-compatible (i.e. they were eligible to be merged).
+        - ``sense_conflicts``   — ALIGNS_WITH pairs where ``aw.sense_conflict = true``.
+        - ``em_redirected``     — EventMention nodes that now have a ``REFERS_TO`` edge
+          from a previous merge (``source IN ['aligns_with_merge', 'light_verb_canonicalization']``).
+        - ``events_merged``     — TEvent nodes with ``merged = true``.
+        - ``events_unmerged``   — TEvent nodes with ``merged`` absent or false (canonical events).
+        - ``lv_merges``         — TEvent nodes merged by the light-verb canonicalization pass.
+
+        Non-fatal: returns an empty dict on query error.
+
+        Returns:
+            dict with keys ``clusters_formed``, ``sense_conflicts``,
+            ``em_redirected``, ``events_merged``, ``events_unmerged``,
+            ``lv_merges``.  All values are integers.
+        """
+        logger.debug("report_event_cluster_diagnostics")
+        graph = self.graph
+
+        query = """
+        // Eligible (non-provisional, no sense conflict) ALIGNS_WITH pairs
+        OPTIONAL MATCH (f_c:Frame)-[aw:ALIGNS_WITH]->(f_s:Frame)
+        WHERE coalesce(f_c.provisional, false) = false
+          AND coalesce(f_s.provisional, false) = false
+        WITH
+            count(CASE WHEN coalesce(aw.sense_conflict, false) = false THEN 1 END) AS clusters_formed,
+            count(CASE WHEN coalesce(aw.sense_conflict, false) = true  THEN 1 END) AS sense_conflicts
+
+        // EventMention REFERS_TO edges written by merge passes
+        OPTIONAL MATCH (em_r:EventMention)-[ref:REFERS_TO]->(:TEvent)
+        WHERE ref.source IN ['aligns_with_merge', 'light_verb_canonicalization']
+        WITH clusters_formed, sense_conflicts,
+             count(DISTINCT em_r) AS em_redirected
+
+        // TEvent merge state
+        OPTIONAL MATCH (te:TEvent)
+        WITH clusters_formed, sense_conflicts, em_redirected,
+             count(CASE WHEN coalesce(te.merged, false) = true  THEN 1 END) AS events_merged,
+             count(CASE WHEN coalesce(te.merged, false) = false THEN 1 END) AS events_unmerged,
+             count(CASE WHEN te.merged_by = 'light_verb_canonicalization' THEN 1 END) AS lv_merges
+
+        RETURN clusters_formed, sense_conflicts, em_redirected,
+               events_merged, events_unmerged, lv_merges
+        """
+        try:
+            rows = graph.run(query).data()
+        except Exception:
+            logger.exception("report_event_cluster_diagnostics: query failed")
+            return {}
+
+        if not rows:
+            return {}
+
+        diag = rows[0]
+        logger.info(
+            "event_cluster_diagnostics: clusters_formed=%d sense_conflicts=%d "
+            "em_redirected=%d events_merged=%d events_unmerged=%d lv_merges=%d",
+            diag.get("clusters_formed", 0),
+            diag.get("sense_conflicts", 0),
+            diag.get("em_redirected", 0),
+            diag.get("events_merged", 0),
+            diag.get("events_unmerged", 0),
+            diag.get("lv_merges", 0),
+        )
+        return diag
+
+
+    def canonicalize_participant_endpoints(self):
+        """Transfer PARTICIPANT / EVENT_PARTICIPANT edges from merged TEvents to their canonical cluster head (Step 8).
+
+        When a Frame's directly-described TEvent is later marked as
+        ``merged=true`` by ``merge_aligns_with_event_clusters``, any PARTICIPANT
+        edges that were written to that secondary event before (or during) the
+        merge pass are left pointing to a dead-end node.  The MEANTIME
+        evaluator's ``merged=false`` projection guard then silently drops those
+        participants, inflating FN counts.
+
+        This method detects such orphaned edges and creates equivalent edges on
+        the canonical (non-merged) event referenced by
+        ``secondary.merged_into``.  The ``confidence`` of the transferred edge
+        is scaled by 0.95 to signal that it passed through one merge hop.
+        The original orphaned edge is *left in place* so graph provenance is
+        preserved (the evaluator already filters it out via ``merged=false``).
+
+        Returns:
+            int — number of (PARTICIPANT + EVENT_PARTICIPANT) edges transferred.
+        """
+        logger.debug("canonicalize_participant_endpoints")
+        graph = self.graph
+        total_transferred = 0
+
+        participant_transfer_query = """
+        MATCH (e)-[r:PARTICIPANT]->(secondary:TEvent)
+        WHERE coalesce(secondary.merged, false) = true
+          AND secondary.merged_into IS NOT NULL
+        MATCH (canonical:TEvent {id: secondary.merged_into})
+        WHERE coalesce(canonical.merged, false) = false
+        MERGE (e)-[new_r:PARTICIPANT]->(canonical)
+        ON CREATE SET
+            new_r.type           = r.type,
+            new_r.is_core        = r.is_core,
+            new_r.confidence     = coalesce(r.confidence, 0.65) * 0.95,
+            new_r.evidence_source = coalesce(r.evidence_source, 'event_enrichment'),
+            new_r.rule_id        = 'canonicalize_participant_endpoints_v1',
+            new_r.authority_tier = coalesce(r.authority_tier, 'secondary'),
+            new_r.source_kind    = coalesce(r.source_kind, 'rule'),
+            new_r.conflict_policy = coalesce(r.conflict_policy, 'additive'),
+            new_r.transferred_from = secondary.id,
+            new_r.created_at     = datetime().epochMillis
+        RETURN count(new_r) AS transferred
+        """
+
+        event_participant_transfer_query = """
+        MATCH (e)-[r:EVENT_PARTICIPANT]->(secondary:TEvent)
+        WHERE coalesce(secondary.merged, false) = true
+          AND secondary.merged_into IS NOT NULL
+        MATCH (canonical:TEvent {id: secondary.merged_into})
+        WHERE coalesce(canonical.merged, false) = false
+        MERGE (e)-[new_r:EVENT_PARTICIPANT]->(canonical)
+        ON CREATE SET
+            new_r.type           = r.type,
+            new_r.is_core        = r.is_core,
+            new_r.confidence     = coalesce(r.confidence, 0.65) * 0.95,
+            new_r.evidence_source = coalesce(r.evidence_source, 'event_enrichment'),
+            new_r.rule_id        = 'canonicalize_participant_endpoints_v1',
+            new_r.authority_tier = coalesce(r.authority_tier, 'secondary'),
+            new_r.source_kind    = coalesce(r.source_kind, 'rule'),
+            new_r.conflict_policy = coalesce(r.conflict_policy, 'additive'),
+            new_r.transferred_from = secondary.id,
+            new_r.created_at     = datetime().epochMillis
+        RETURN count(new_r) AS transferred
+        """
+
+        for label, qry in [("PARTICIPANT", participant_transfer_query),
+                           ("EVENT_PARTICIPANT", event_participant_transfer_query)]:
+            try:
+                rows = graph.run(qry).data()
+                n = rows[0].get("transferred", 0) if rows else 0
+                total_transferred += n
+                logger.info(
+                    "canonicalize_participant_endpoints: %d %s edges transferred to canonical events",
+                    n, label,
+                )
+            except Exception:
+                logger.exception(
+                    "canonicalize_participant_endpoints: %s transfer pass failed", label
+                )
+
+        return total_transferred
 
 
     #// PURPOSE: To add/link core-participants to an Event object. Core-Participants include ['ARG0','ARG1','ARG2','ARG3','ARG4']
@@ -969,6 +1219,7 @@ class EventEnrichmentPhase():
                                         ORDER BY rel_priority ASC, distance ASC
                                         WITH fa, e, head(collect(event)) AS event
                                                                                 WHERE event IS NOT NULL
+                                                                                    AND coalesce(event.merged, false) = false
                                                                                     AND coalesce(e.doc_id, event.doc_id) = event.doc_id
                     merge (e)-[r:PARTICIPANT]->(event)
                     set r.type = fa.type,
@@ -1005,6 +1256,7 @@ class EventEnrichmentPhase():
                                         {participant_source_subquery}
                                         WITH f, em, event, fa, e
                                         WHERE fa.type IN ['ARG0','ARG1','ARG2','ARG3','ARG4']
+                                                                                    AND coalesce(event.merged, false) = false
                                                                                     AND coalesce(e.doc_id, em.doc_id, event.doc_id) = event.doc_id
                                         WITH DISTINCT f, em, event, fa, e
                     merge (e)-[r:PARTICIPANT]->(em)
@@ -1143,6 +1395,110 @@ class EventEnrichmentPhase():
         return ""
 
 
+    def add_precision_fallback_participants(self):
+        """Precision-first head-token fallback for unresolved core participant endpoints (Step 9).
+
+        Fires only when ALL of the following tight guards are satisfied:
+
+        - ``fa.type`` is a core role (ARG0–ARG4).
+        - A canonical non-provisional ``Frame`` describes a non-merged canonical ``TEvent``.
+        - The ``FrameArgument`` head token index falls **within or immediately adjacent to
+          (tolerance ±1)** an ``Entity`` span in the same document.
+        - The entity is canonical (``Entity`` label, same ``doc_id``).
+        - No ``PARTICIPANT`` edge from that entity to that event already exists.
+
+        This method is intentionally **opt-in**: it is wired into the ``__main__`` block
+        for local testing but is *not* run by the pipeline runtime by default.  Enable
+        it in ``phase_wrappers.py`` only after A/B evaluation shows a net gain.
+
+        The precision guard (no competing canonical link) prevents the historically
+        regressive head-token fallback from inflating participant false positives.
+
+        Returns:
+            int — number of PARTICIPANT + EVENT_PARTICIPANT edge pairs created.
+        """
+        logger.debug("add_precision_fallback_participants")
+        graph = self.graph
+
+        query = """
+        // Walk frame → canonical TEvent (non-merged, non-provisional frame)
+        MATCH (f:Frame)<-[:PARTICIPANT]-(fa:FrameArgument)
+        WHERE fa.type IN ['ARG0','ARG1','ARG2','ARG3','ARG4']
+          AND coalesce(f.provisional, false) = false
+        OPTIONAL MATCH (f)-[:FRAME_DESCRIBES_EVENT]->(event_c:TEvent)
+        OPTIONAL MATCH (f)-[:DESCRIBES]->(event_l:TEvent)
+        WITH f, fa, coalesce(event_c, event_l) AS event
+        WHERE event IS NOT NULL
+          AND coalesce(event.merged, false) = false
+
+        // Guard: no canonical PARTICIPANT already exists for this fa→event pair
+        WHERE NOT EXISTS {
+            MATCH (existing_e)-[:PARTICIPANT]->(event)
+            WHERE (existing_e:Entity OR existing_e:VALUE)
+        }
+
+        // Head-token alignment: find an Entity whose span covers fa.headTokenIndex ±1
+        WITH f, fa, event
+        WHERE fa.headTokenIndex IS NOT NULL OR fa.head IS NOT NULL
+        WITH f, fa, event,
+             toInteger(coalesce(fa.headTokenIndex, -999)) AS head_idx
+
+        MATCH (e:Entity)
+        WHERE e.doc_id = event.doc_id
+          AND coalesce(e.merged, false) = false
+          AND (
+              (toInteger(e.start_tok) <= head_idx AND head_idx <= toInteger(e.end_tok))
+           OR abs(toInteger(e.start_tok) - head_idx) <= 1
+           OR abs(toInteger(e.end_tok)   - head_idx) <= 1
+          )
+
+        // Deduplicate to one entity per (fa, event) using span-length as tiebreak
+        WITH fa, event, e,
+             (toInteger(e.end_tok) - toInteger(e.start_tok)) AS span_len
+        ORDER BY span_len ASC
+        WITH fa, event, head(collect(e)) AS e
+
+        WHERE e IS NOT NULL
+
+        MERGE (e)-[r:PARTICIPANT]->(event)
+        ON CREATE SET
+            r.type            = fa.type,
+            r.is_core         = true,
+            r.confidence      = 0.55,
+            r.evidence_source = 'event_enrichment',
+            r.rule_id         = 'precision_fallback_participant_v1',
+            r.authority_tier  = 'secondary',
+            r.source_kind     = 'rule',
+            r.conflict_policy = 'additive',
+            r.created_at      = datetime().epochMillis
+
+        MERGE (e)-[nr:EVENT_PARTICIPANT]->(event)
+        ON CREATE SET
+            nr.type            = fa.type,
+            nr.is_core         = true,
+            nr.confidence      = 0.55,
+            nr.evidence_source = 'event_enrichment',
+            nr.rule_id         = 'precision_fallback_participant_v1',
+            nr.authority_tier  = 'secondary',
+            nr.source_kind     = 'rule',
+            nr.conflict_policy = 'additive',
+            nr.created_at      = datetime().epochMillis
+
+        RETURN count(DISTINCT r) AS created
+        """
+        try:
+            rows = graph.run(query).data()
+            n = rows[0].get("created", 0) if rows else 0
+            logger.info(
+                "add_precision_fallback_participants: %d edge pairs written (head-token fallback)",
+                n,
+            )
+            return n
+        except Exception:
+            logger.exception("add_precision_fallback_participants: query failed")
+            return 0
+
+
     def derive_clinks_from_causal_arguments(self):
         logger.debug("derive_clinks_from_causal_arguments")
         graph = self.graph
@@ -1167,6 +1523,98 @@ class EventEnrichmentPhase():
         if data:
             return data[0].get("linked", 0)
         return 0
+
+
+    def derive_clinks_from_predicate_classes(self):
+        """Derive CLINK relations from PropBank predicate-class + lemma evidence (E3).
+
+        Extends ``derive_clinks_from_causal_arguments`` by matching on the
+        **PropBank predicate lemma** (``f.predicate`` / sense-prefix of ``f.frame``)
+        for verbs that express causation, enablement, or prevention between two events.
+        This catches all tenses, aspects, and morphological variants in one lookup,
+        and covers the ARG1/ARG2 causal complement path rather than only ARGM-CAU.
+
+        Three causal classes:
+
+        - **CAUSE**   — direct causation (cause, lead, trigger, result, …)
+        - **ENABLE**  — permissive causation (allow, enable, permit, help, …)
+        - **PREVENT** — prevention (prevent, stop, block, ban, …)
+
+        Guards:
+        - PropBank frames only (``framework='PROPBANK'``).
+        - Provisional frames excluded.
+        - Merged (secondary/collapsed) TEvent endpoints excluded.
+        - Both endpoints must belong to the same document (same ``doc_id``).
+
+        Idempotent: uses MERGE so repeated runs do not multiply edges.
+        Non-fatal: any query exception is logged and 0 is returned.
+        """
+        logger.debug("derive_clinks_from_predicate_classes")
+        graph = self.graph
+
+        query = """
+        MATCH (f:Frame {framework: 'PROPBANK'})
+        WHERE coalesce(f.provisional, false) = false
+          AND toLower(coalesce(f.predicate,
+                split(coalesce(f.frame, ''), '.')[0])) IN $clink_all_lemmas
+        WITH f,
+             toLower(coalesce(f.predicate,
+                split(coalesce(f.frame, ''), '.')[0])) AS pred_lemma
+        OPTIONAL MATCH (f)-[:FRAME_DESCRIBES_EVENT]->(main_c:TEvent)
+        OPTIONAL MATCH (f)-[:DESCRIBES]->(main_l:TEvent)
+        WITH f, pred_lemma, coalesce(main_c, main_l) AS main_event
+        WHERE main_event IS NOT NULL
+          AND coalesce(main_event.merged, false) = false
+        MATCH (fa:FrameArgument)-[:HAS_FRAME_ARGUMENT|PARTICIPANT]->(f)
+        WHERE fa.type IN ['ARG1', 'ARG2']
+        CALL {
+            WITH fa, main_event
+            MATCH (fa)<-[:PARTICIPATES_IN|IN_FRAME]-(t:TagOccurrence)-[:TRIGGERS]->(sub:TEvent)
+            WHERE main_event <> sub
+              AND coalesce(sub.merged, false) = false
+              AND main_event.doc_id = sub.doc_id
+            WITH sub,
+                 min(abs(toInteger(coalesce(t.tok_index_doc, 0))
+                       - toInteger(coalesce(fa.headTokenIndex, 0)))) AS distance
+            ORDER BY distance ASC
+            LIMIT 1
+            RETURN sub
+        }
+        WITH main_event, sub, pred_lemma
+        MERGE (main_event)-[cl:CLINK]->(sub)
+        SET cl.source       = 'srl_propbank_class',
+            cl.rule_id      = 'derive_clinks_from_predicate_classes_v1',
+            cl.source_kind  = 'rule',
+            cl.link_semantics = 'causal',
+            cl.clink_type   = CASE
+                WHEN pred_lemma IN $enable_lemmas  THEN 'ENABLE'
+                WHEN pred_lemma IN $prevent_lemmas THEN 'PREVENT'
+                ELSE 'CAUSE'
+            END,
+            cl.confidence_hint = CASE
+                WHEN pred_lemma IN $enable_lemmas  THEN 0.58
+                WHEN pred_lemma IN $prevent_lemmas THEN 0.60
+                ELSE 0.63
+            END
+        RETURN count(DISTINCT cl) AS linked
+        """
+        try:
+            data = graph.run(
+                query,
+                parameters={
+                    "clink_all_lemmas": list(_CLINK_ALL_LEMMAS),
+                    "enable_lemmas": list(_CLINK_ENABLE_LEMMAS),
+                    "prevent_lemmas": list(_CLINK_PREVENT_LEMMAS),
+                },
+            ).data()
+        except Exception:
+            logger.exception("derive_clinks_from_predicate_classes: query failed")
+            return 0
+
+        linked = data[0].get("linked", 0) if data else 0
+        logger.info("derive_clinks_from_predicate_classes: %d CLINKs written", linked)
+        return linked
+
 
     def add_semantic_relation_types(self):
         """Materialize additional semantic relations from SRL evidence.
@@ -1274,6 +1722,101 @@ class EventEnrichmentPhase():
         if data:
             return data[0].get("linked", 0)
         return 0
+
+
+    def derive_slinks_from_predicate_classes(self):
+        """Derive SLINK relations from PropBank predicate-class + lemma evidence (E2).
+
+        Extends ``derive_slinks_from_reported_speech`` by matching on the
+        **PropBank predicate lemma** (``f.predicate`` / sense-prefix of ``f.frame``)
+        instead of surface-inflected headword strings.  This catches all tenses,
+        aspects, and morphological variants of each predicate in a single lookup.
+
+        Four predicate classes are covered:
+
+        - **EVIDENTIAL** — reporting / speech-act + non-factive cognition
+          (say, report, announce, think, believe, …)
+        - **FACTIVE** — veridical cognition / discovery
+          (know, realize, discover, find, …)
+        - **MODAL** — desire / intent / ability
+          (want, hope, plan, try, …)
+
+        The SLINK ``slink_type`` property is set to the class label, enabling
+        MEANTIME-style SLINK type matching during evaluation.
+
+        Guards:
+        - Provisional frames (``provisional=true``) are excluded.
+        - Merged (secondary/collapsed) TEvent endpoints are excluded.
+        - Both endpoints must belong to the same document (same ``doc_id``).
+
+        Idempotent: uses MERGE so repeated runs do not multiply edges.
+        Non-fatal: any query exception is logged and 0 is returned.
+        """
+        logger.debug("derive_slinks_from_predicate_classes")
+        graph = self.graph
+
+        query = """
+        MATCH (f:Frame {framework: 'PROPBANK'})
+        WHERE coalesce(f.provisional, false) = false
+          AND toLower(coalesce(f.predicate,
+                split(coalesce(f.frame, ''), '.')[0])) IN $slink_all_lemmas
+        WITH f,
+             toLower(coalesce(f.predicate,
+                split(coalesce(f.frame, ''), '.')[0])) AS pred_lemma
+        OPTIONAL MATCH (f)-[:FRAME_DESCRIBES_EVENT]->(main_c:TEvent)
+        OPTIONAL MATCH (f)-[:DESCRIBES]->(main_l:TEvent)
+        WITH f, pred_lemma, coalesce(main_c, main_l) AS main_event
+        WHERE main_event IS NOT NULL
+          AND coalesce(main_event.merged, false) = false
+        MATCH (fa:FrameArgument)-[:HAS_FRAME_ARGUMENT|PARTICIPANT]->(f)
+        WHERE fa.type IN ['ARG1', 'ARG2']
+        CALL {
+            WITH fa, main_event
+            MATCH (fa)<-[:PARTICIPATES_IN|IN_FRAME]-(t:TagOccurrence)-[:TRIGGERS]->(sub:TEvent)
+            WHERE main_event <> sub
+              AND coalesce(sub.merged, false) = false
+              AND main_event.doc_id = sub.doc_id
+            WITH sub,
+                 min(abs(toInteger(coalesce(t.tok_index_doc, 0))
+                       - toInteger(coalesce(fa.headTokenIndex, 0)))) AS distance
+            ORDER BY distance ASC
+            LIMIT 1
+            RETURN sub
+        }
+        WITH main_event, sub, pred_lemma
+        MERGE (main_event)-[sl:SLINK]->(sub)
+        SET sl.source      = 'srl_propbank_class',
+            sl.rule_id     = 'derive_slinks_from_predicate_classes_v1',
+            sl.source_kind = 'rule',
+            sl.link_semantics = 'subordinating',
+            sl.slink_type  = CASE
+                WHEN pred_lemma IN $factive_lemmas   THEN 'FACTIVE'
+                WHEN pred_lemma IN $modal_lemmas     THEN 'MODAL'
+                ELSE 'EVIDENTIAL'
+            END,
+            sl.confidence_hint = CASE
+                WHEN pred_lemma IN $factive_lemmas THEN 0.68
+                WHEN pred_lemma IN $modal_lemmas   THEN 0.60
+                ELSE 0.62
+            END
+        RETURN count(DISTINCT sl) AS linked
+        """
+        try:
+            data = graph.run(
+                query,
+                parameters={
+                    "slink_all_lemmas": list(_SLINK_ALL_LEMMAS),
+                    "factive_lemmas": list(_SLINK_FACTIVE_LEMMAS),
+                    "modal_lemmas": list(_SLINK_MODAL_LEMMAS),
+                },
+            ).data()
+        except Exception:
+            logger.exception("derive_slinks_from_predicate_classes: query failed")
+            return 0
+
+        linked = data[0].get("linked", 0) if data else 0
+        logger.info("derive_slinks_from_predicate_classes: %d SLINKs written", linked)
+        return linked
 
 
     def enrich_event_mention_properties(self):
@@ -1414,13 +1957,14 @@ class EventEnrichmentPhase():
         rows = graph.run(query_aspect).data()
         aspect_count = rows[0].get("aspect_formalized", 0) if rows else 0
 
-        # MEANTIME noun event mentions are typically underspecified for tense/aspect;
-        # drop explicit NONE for noun mentions to avoid over-specification mismatches.
+        # MEANTIME gold standard uses tense='NONE', aspect='NONE' for noun events.
+        # Ensure noun EventMentions carry 'NONE' (not NULL) to match gold annotations
+        # and avoid type_mismatch failures in evaluation.
         query_noun_normalization = """
         MATCH (em:EventMention)
         WHERE em.pos IN ['NOUN', 'NN', 'NNS', 'NNP', 'NNPS']
-        SET em.tense = CASE WHEN em.tense = 'NONE' THEN NULL ELSE em.tense END,
-            em.aspect = CASE WHEN em.aspect = 'NONE' THEN NULL ELSE em.aspect END
+        SET em.tense = 'NONE',
+            em.aspect = 'NONE'
         RETURN count(*) AS noun_attrs_normalized
         """
         graph.run(query_noun_normalization).data()
@@ -1617,11 +2161,17 @@ if __name__ == '__main__':
     tp.link_frameArgument_to_event()
     tp.promote_nombank_frames_to_tevents()
     tp.merge_aligns_with_event_clusters()
+    tp.report_event_cluster_diagnostics()
+    tp.canonicalize_participant_endpoints()
     tp.add_core_participants_to_event()
     tp.add_non_core_participants_to_event()
     tp.add_label_to_non_core_fa()
+    # Step 9 (opt-in): head-token fallback — enable in phase_wrappers only after A/B eval
+    tp.add_precision_fallback_participants()
     tp.derive_clinks_from_causal_arguments()
+    tp.derive_clinks_from_predicate_classes()
     tp.derive_slinks_from_reported_speech()
+    tp.derive_slinks_from_predicate_classes()
     tp.enrich_event_mention_properties()
     _phase_duration = _time.time() - _phase_start
 

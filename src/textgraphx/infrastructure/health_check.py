@@ -148,7 +148,7 @@ def check_external_services(cfg=None, fail_fast: bool = False) -> Tuple[bool, Li
 
 def run_health_checks(
     dataset_path: str,
-    model_name: str = "en_core_web_sm",
+    model_name: str = "en_core_web_trf",
     neo4j_uri: str = "bolt://localhost:7687",
     neo4j_user: str = "neo4j",
     neo4j_password: str = "neo4j",

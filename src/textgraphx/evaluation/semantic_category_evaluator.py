@@ -5,15 +5,20 @@ Measures:
   - Category assignment coverage
   - Category coherence and consistency
   - Frame-to-category linking accuracy
+  - SRL KG quality (frame coverage, argument density, confidence calibration)
 """
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from textgraphx.evaluation.report_validity import RunMetadata
+from textgraphx.evaluation.srl_kg_quality import SRLKGQualityEvaluator
 from textgraphx.evaluation.unified_metrics import create_unified_report, UnifiedMetricReport
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -66,6 +71,18 @@ class SemanticCategoryEvaluator:
             orphaned_categories=self._count_orphaned_categories(),
         )
 
+    def evaluate_srl_quality(self, doc_id: Optional[str] = None):
+        """Delegate to SRLKGQualityEvaluator for frame-level SRL metrics.
+
+        Returns an ``SRLKGQualityReport`` or ``None`` if the evaluator fails
+        (e.g., during tests without a live graph).
+        """
+        try:
+            return SRLKGQualityEvaluator(self.graph).evaluate(doc_id=doc_id)
+        except Exception:
+            logger.debug("SRLKGQualityEvaluator unavailable; skipping SRL metrics", exc_info=True)
+            return None
+
     def _count_frames(self) -> int:
         result = self.graph.run("MATCH (n:Frame) RETURN count(n) AS c").data()
         return int(result[0]["c"]) if result else 0
@@ -114,6 +131,7 @@ def create_semantic_category_report(
     run_metadata: RunMetadata,
     graph: Any,
     determinism_pass: Optional[bool] = None,
+    doc_id: Optional[str] = None,
 ) -> UnifiedMetricReport:
     """Create unified report for semantic category evaluation."""
     evaluator = SemanticCategoryEvaluator(graph)
@@ -122,10 +140,27 @@ def create_semantic_category_report(
     metrics_dict = raw_metrics.to_dict()
     metrics_dict["quality_score"] = raw_metrics.compute_quality_score()
 
+    # -- SRL KG quality sub-metrics (Phase G integration) ------------------
+    srl_report = evaluator.evaluate_srl_quality(doc_id=doc_id)
+    srl_metrics: Dict[str, Any] = {}
+    if srl_report is not None:
+        srl_metrics = {
+            "srl_frames_per_sentence": srl_report.coverage.frames_per_sentence,
+            "srl_propbank_frames": srl_report.coverage.propbank_frames,
+            "srl_nombank_frames": srl_report.coverage.nombank_frames,
+            "srl_args_per_frame": srl_report.density.args_per_frame,
+            "srl_provisional_rate": srl_report.calibration.provisional_rate,
+            "srl_mean_confidence": srl_report.calibration.mean_confidence,
+            "srl_aligns_with_count": srl_report.aligns_with_count,
+        }
+        metrics_dict.update(srl_metrics)
+    # ----------------------------------------------------------------------
+
     feature_activation = {
         "semantic_categorization_activated": raw_metrics.frames_with_categories > 0,
         "categorized_frames": raw_metrics.frames_with_categories,
         "category_assignments": raw_metrics.total_categories_assigned,
+        "srl_quality_available": srl_report is not None,
     }
 
     inconclusive_reasons = []
@@ -152,5 +187,6 @@ def create_semantic_category_report(
                 "assignments": raw_metrics.total_categories_assigned,
                 "orphaned_categories": raw_metrics.orphaned_categories,
             },
+            "srl_quality": srl_metrics,
         },
     )

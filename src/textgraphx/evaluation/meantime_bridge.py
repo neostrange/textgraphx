@@ -32,6 +32,16 @@ from textgraphx.evaluation.meantime_evaluator import (
 from textgraphx.evaluation.metrics import precision_recall_f1, macro_average
 from textgraphx.evaluation.report_validity import RunMetadata
 
+try:
+    from textgraphx.evaluation.srl_kg_quality import (
+        SRLKGQualityEvaluator,
+        SRLKGQualityReport,
+    )
+    _SRL_QUALITY_AVAILABLE = True
+except ImportError:
+    _SRL_QUALITY_AVAILABLE = False
+    SRLKGQualityReport = None  # type: ignore[assignment,misc]
+
 
 def _safe_div(num: float, den: float) -> float:
     """Return num/den with safe zero-denominator fallback."""
@@ -97,6 +107,8 @@ class MEANTIMEResults:
     evaluation_note: str = ""
     gold_document: Optional[NormalizedDocument] = None
     predicted_document: Optional[NormalizedDocument] = None
+    # Step-16: optional SRL KG quality diagnostics attached at evaluation time
+    srl_diagnostics: Optional[Any] = field(default=None, compare=False)
 
     def macro_layer_f1(self, mode: str = "relaxed") -> Dict[str, float]:
         """Macro-average F1 across layers excluding relations."""
@@ -152,7 +164,27 @@ class MEANTIMEResults:
                 "all_including_relations": self.macro_all_f1(mode="relaxed"),
             },
             "evaluation_note": self.evaluation_note,
+            # Step-15 diagnostic: gold events with no projected match
+            "unmatched_gold_events": (
+                self.predicted_document.unmatched_gold_events
+                if self.predicted_document is not None
+                else 0
+            ),
+            # Step-16: SRL diagnostics attached at evaluation time (may be absent)
+            "srl_diagnostics": (
+                self._srl_diagnostics_inline()
+                if self.srl_diagnostics is not None
+                else None
+            ),
         }
+
+    def _srl_diagnostics_inline(self) -> Dict[str, Any]:
+        """Serialize srl_diagnostics to a plain dict (used by to_dict())."""
+        try:
+            from dataclasses import asdict
+            return asdict(self.srl_diagnostics)
+        except Exception:
+            return {}
 
 
 @dataclass
@@ -168,6 +200,9 @@ class ConsolidatedQualityReport:
     weight_phase_quality: float = 0.40  # Phase-level structural quality
     weight_meantime_f1: float = 0.40    # Gold-standard task accuracy
     weight_consistency: float = 0.20    # Cross-layer consistency
+
+    # Step-16: optional SRL KG quality diagnostics
+    srl_diagnostics: Optional[Any] = field(default=None, compare=False)
 
     def phase_quality_score(self) -> float:
         """Quality from M1-M7 evaluation suite (macro-average of all phases)."""
@@ -251,6 +286,7 @@ class ConsolidatedQualityReport:
             },
             "phase_suite": self.evaluation_suite.to_dict(),
             "meantime_validation": self.meantime_results.to_dict(),
+            "srl_diagnostics": self._srl_diagnostics_dict(),
         }
 
     def to_markdown(self) -> str:
@@ -336,7 +372,38 @@ class ConsolidatedQualityReport:
                 lines.append(f"- {reason}")
         lines.append("")
 
+        # Step-16: SRL diagnostics section
+        srl_dict = self._srl_diagnostics_dict()
+        if srl_dict:
+            ta = srl_dict.get("temporal_anchoring", {})
+            lines.extend([
+                "## 🔗 SRL Knowledge-Graph Diagnostics",
+                "",
+                "| Metric | Value |",
+                "|--------|-------|",
+                f"| Frame coverage (frames/sentence) | `{srl_dict.get('coverage', {}).get('frames_per_sentence', 0.0):.3f}` |",
+                f"| Argument density (args/frame) | `{srl_dict.get('density', {}).get('args_per_frame', 0.0):.3f}` |",
+                f"| Provisional frame rate | `{srl_dict.get('calibration', {}).get('provisional_rate', 0.0):.3f}` |",
+                f"| ALIGNS_WITH edges | `{srl_dict.get('aligns_with_count', 0)}` |",
+                f"| SRL timex candidates created | `{ta.get('srl_timex_candidates_created', 0)}` |",
+                f"| Nominal events with time anchor | `{ta.get('nominal_events_with_srl_temporal_anchor', 0)}` |",
+                f"| Events with HAS_TIME_ANCHOR | `{ta.get('events_with_time_anchor', 0)}` |",
+                f"| Anchor→TLINK yield | `{ta.get('anchor_tlink_yield_rate', 0.0):.3f}` |",
+                f"| Temporally isolated events | `{ta.get('temporally_isolated_events', 0)}` |",
+                "",
+            ])
+
         return "\n".join(lines)
+
+    def _srl_diagnostics_dict(self) -> Dict[str, Any]:
+        """Serialize SRL diagnostics to a plain dict (empty if not present)."""
+        if self.srl_diagnostics is None:
+            return {}
+        try:
+            from dataclasses import asdict
+            return asdict(self.srl_diagnostics)
+        except Exception:
+            return {}
 
     @staticmethod
     def _score_badge(score: float) -> str:
@@ -392,6 +459,7 @@ class MEANTIMEBridge:
         graph: Any,
         doc_id: int | str,
         gold_token_sequence: Optional[Tuple[Tuple[int, str], ...]] = None,
+        run_srl_diagnostics: bool = False,
     ) -> MEANTIMEResults:
         """Evaluate Neo4j-projected document against gold standard.
 
@@ -399,6 +467,8 @@ class MEANTIMEBridge:
             graph: Neo4j driver or session
             doc_id: Document ID in Neo4j
             gold_token_sequence: Token sequence from gold XML (for alignment if needed)
+            run_srl_diagnostics: If True, also compute SRL KG quality diagnostics and
+                attach them to the returned MEANTIMEResults as ``srl_diagnostics``.
 
         Returns:
             MEANTIMEResults with strict/relaxed scores for all mention layers
@@ -410,7 +480,30 @@ class MEANTIMEBridge:
             discourse_only=self.discourse_only,
             normalize_nominal_boundaries=self.normalize_nominal_boundaries,
         )
-        return self._score_documents(self.gold_document, predicted_document)
+        results = self._score_documents(self.gold_document, predicted_document)
+
+        if run_srl_diagnostics and _SRL_QUALITY_AVAILABLE:
+            try:
+                srl_report = SRLKGQualityEvaluator(graph).evaluate(doc_id=str(doc_id))
+                results = MEANTIMEResults(
+                    doc_id=results.doc_id,
+                    entity_strict=results.entity_strict,
+                    entity_relaxed=results.entity_relaxed,
+                    event_strict=results.event_strict,
+                    event_relaxed=results.event_relaxed,
+                    timex_strict=results.timex_strict,
+                    timex_relaxed=results.timex_relaxed,
+                    relation_scores=results.relation_scores,
+                    mode=results.mode,
+                    evaluation_note=results.evaluation_note,
+                    gold_document=results.gold_document,
+                    predicted_document=results.predicted_document,
+                    srl_diagnostics=srl_report,
+                )
+            except Exception:
+                pass  # non-fatal: SRL diagnostics are advisory
+
+        return results
 
     def evaluate_from_xml(
         self,
@@ -494,6 +587,9 @@ class MEANTIMEBridge:
             "tlink": LayerScores.from_prf_dict("tlink", False, tlink_relaxed_dict),
         }
 
+        # Step-15 diagnostic: populate unmatched_gold_events on the predicted doc
+        predicted.unmatched_gold_events = int(event_relaxed_dict.get("fn", 0))
+
         return MEANTIMEResults(
             doc_id=str(gold.doc_id),
             entity_strict=LayerScores.from_prf_dict("entity", True, entity_strict_dict),
@@ -515,6 +611,7 @@ class MEANTIMEBridge:
         weight_phase_quality: float = 0.40,
         weight_meantime_f1: float = 0.40,
         weight_consistency: float = 0.20,
+        srl_diagnostics: Optional[Any] = None,
     ) -> ConsolidatedQualityReport:
         """Create consolidated report combining phase + MEANTIME evaluation.
 
@@ -524,10 +621,14 @@ class MEANTIMEBridge:
             weight_phase_quality: Weight for phase-level structural quality
             weight_meantime_f1: Weight for gold-standard task accuracy
             weight_consistency: Weight for cross-layer consistency
+            srl_diagnostics: Optional SRLKGQualityReport attached by
+                ``evaluate_from_neo4j(run_srl_diagnostics=True)``. Falls back
+                to ``meantime_results.srl_diagnostics`` when None.
 
         Returns:
             ConsolidatedQualityReport with combined metrics and analysis
         """
+        effective_srl = srl_diagnostics if srl_diagnostics is not None else getattr(meantime_results, "srl_diagnostics", None)
         report = ConsolidatedQualityReport(
             run_metadata=evaluation_suite.run_metadata,
             evaluation_suite=evaluation_suite,
@@ -535,6 +636,7 @@ class MEANTIMEBridge:
             weight_phase_quality=weight_phase_quality,
             weight_meantime_f1=weight_meantime_f1,
             weight_consistency=weight_consistency,
+            srl_diagnostics=effective_srl,
         )
         return report
 

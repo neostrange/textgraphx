@@ -16,11 +16,29 @@ import re
 
 
 from typing import Dict, Any, List, Tuple, Optional, Sequence
+import os
 import spacy
-try:
-    _eval_nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
-except Exception:
-    _eval_nlp = None
+
+def _load_eval_nlp() -> object:
+    """Load spaCy model for evaluation lemmatisation.
+
+    Defaults to ``en_core_web_trf``.  Set ``TEXTGRAPHX_EVAL_SPACY_MODEL`` to
+    ``en_core_web_sm`` or ``en_core_web_md`` to opt in to a lighter model (e.g.
+    in CI environments without GPU resources).
+    """
+    _allowed = {"en_core_web_trf", "en_core_web_sm", "en_core_web_md"}
+    model = os.environ.get("TEXTGRAPHX_EVAL_SPACY_MODEL", "en_core_web_trf").strip()
+    if model not in _allowed:
+        raise ValueError(
+            f"TEXTGRAPHX_EVAL_SPACY_MODEL={model!r} is not allowed. "
+            f"Use one of: {sorted(_allowed)}"
+        )
+    try:
+        return spacy.load(model, disable=["parser", "ner"])
+    except Exception:
+        return None
+
+_eval_nlp = _load_eval_nlp()
 
 
 import xml.etree.ElementTree as ET
@@ -106,6 +124,10 @@ class NormalizedDocument:
     timex_mentions: Set[Mention] = field(default_factory=set)
     relations: Set[Relation] = field(default_factory=set)
     token_sequence: Tuple[Tuple[int, str], ...] = ()
+    # Step-15 diagnostic: number of gold event mentions that had no projected match
+    unmatched_gold_events: int = 0
+    # Diagnostic: number of events in final projection that came from the Frame-fallback branch (source_priority=0)
+    frame_fallback_event_count: int = 0
 
     def layer(self, name: str) -> Set[Mention]:
         if name == "entity":
@@ -358,6 +380,7 @@ def build_document_from_neo4j(
     nominal_profile_mode: str = "all",
     include_non_core_participants: bool = False,
     non_core_participant_roles: Optional[Sequence[str]] = None,
+    strict_nom_layer_filter: bool = False,
 ) -> NormalizedDocument:
     """Extract mention/relation projections for a document from Neo4j.
 
@@ -409,6 +432,15 @@ def build_document_from_neo4j(
         if discourse_only
         else ""
     )
+    if doc_id_int is None or str(doc_id_int).strip() == "":
+        LOGGER.warning(
+            "build_document_from_neo4j: doc_id=%r could not be resolved to a graph document; "
+            "all queries will return empty and every gold mention will be a false negative. "
+            "Verify AnnotatedText.publicId is set correctly in Neo4j.",
+            doc_id,
+        )
+        return doc
+
     entity_rows = graph.run(
         f"""
         MATCH (:AnnotatedText {{id: $doc_id}})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok:TagOccurrence)
@@ -466,7 +498,9 @@ def build_document_from_neo4j(
             continue
 
         # Strict NOM alignment: only project NOM mentions from explicit mention-layer nominals.
-        # TEMPORARILY DISABLED: if syntactic_type.upper() in {"NOM", "NOMINAL"} and not bool(row.get("is_nominal_mention", False)): continue
+        # Enabled via strict_nom_layer_filter=True; default is off to preserve backward-compatible projection.
+        if strict_nom_layer_filter and syntactic_type.upper() in {"NOM", "NOMINAL"} and not bool(row.get("is_nominal_mention", False)):
+            continue
 
         head_token_index = row.get("head_token_index")
         head_idx = _int_or_none(head_token_index)
@@ -487,7 +521,7 @@ def build_document_from_neo4j(
             nominal_features = _nominal_projection_features(
                 graph=graph,
                 doc_id=doc_id_int,
-                node_id=int(row.get("node_id")),
+                node_id=str(row.get("node_id") or ""),
                 fallback_head_idx=head_idx if head_idx is not None else int(row["end_tok"]),
             )
             # Priority 1: anchor NOM projection around semantic head (fallback: surface head).
@@ -622,6 +656,7 @@ def build_document_from_neo4j(
              WITH $doc_id AS doc_id
              MATCH (:AnnotatedText {id: doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(tok:TagOccurrence)-[:TRIGGERS]->(m:TEvent)
                          WHERE coalesce(m.low_confidence, false) = false
+                               AND coalesce(m.merged, false) = false
                              
                              AND NOT EXISTS {
                                      MATCH (em:EventMention)-[:REFERS_TO]->(m)
@@ -650,6 +685,7 @@ def build_document_from_neo4j(
                                      MATCH (ev:TEvent)
                                      WHERE ev.start_tok = f.start_tok
                                          AND ev.end_tok = f.end_tok
+                                         AND coalesce(ev.merged, false) = false
                              }
                          RETURN DISTINCT f.start_tok AS start_tok,
                                  f.end_tok AS end_tok,
@@ -672,6 +708,16 @@ def build_document_from_neo4j(
         {"doc_id": doc_id_int},
     ).data()
 
+    # Diagnostic: if both entity and event projections are empty, the publicId likely
+    # doesn't match the gold doc_id — all gold mentions will become false negatives.
+    if not entity_rows and not event_rows:
+        LOGGER.warning(
+            "build_document_from_neo4j: doc_id=%r (resolved=%r) returned no entities or events. "
+            "Verify AnnotatedText.publicId matches the gold XML doc_id, or that the pipeline "
+            "has been run for this document.",
+            doc_id, doc_id_int,
+        )
+
     # Prefer mention-layer rows over canonical fallbacks when both map to the same span.
     # This avoids duplicate-span projections that inflate spurious event mentions.
     event_by_span: Dict[TokenSpan, Tuple[int, Mention]] = {}
@@ -681,17 +727,25 @@ def build_document_from_neo4j(
         pred = dict(attrs).get("pred", "").lower()
         if not _should_project_event(attrs):
             continue
-            
+
         if len(span) > 1 and pred:
             best_idx = span[-1]
+            matched_head = False
             for idx in span:
                 tok_text = gold_token_lookup.get(int(idx), "").lower()
                 tok_lemma = _eval_nlp(tok_text)[0].lemma_.lower() if _eval_nlp else tok_text
                 if tok_text == pred or tok_lemma == pred:
                     best_idx = idx
+                    matched_head = True
                     break
+            if not matched_head:
+                LOGGER.debug(
+                    "event_span_collapse_fallback: pred=%r not found in span=%s; "
+                    "using rightmost token %d as anchor — TLINK endpoint alignment may be unreliable",
+                    pred, span, best_idx,
+                )
             span = (best_idx,)
-            
+
         mention = Mention(kind="event", span=span, attrs=attrs)
         priority = int(row.get("source_priority") or 0)
         current = event_by_span.get(span)
@@ -699,6 +753,14 @@ def build_document_from_neo4j(
             event_by_span[span] = (priority, mention)
 
     doc.event_mentions.update(m for _, m in event_by_span.values())
+    # Count Branch 3 (Frame-fallback) events that survived deduplication.
+    doc.frame_fallback_event_count = sum(1 for p, _ in event_by_span.values() if p == 0)
+    if doc.frame_fallback_event_count > 0:
+        LOGGER.debug(
+            "doc %s: %d Frame-fallback (Branch 3) events in final projection; "
+            "these carry pos=VERB with empty attribute set and rarely match gold strictly",
+            doc_id, doc.frame_fallback_event_count,
+        )
     projected_event_spans = frozenset(m.span for m in doc.event_mentions)
 
     timex_rows = graph.run(
@@ -769,6 +831,8 @@ def build_document_from_neo4j(
                     AND (b.doc_id = toInteger($doc_id) OR b.id STARTS WITH $doc_id + '_' OR EXISTS {
                                  MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN|IN_MENTION|IN_FRAME|FRAME_DESCRIBES_EVENT|DESCRIBES*0..2]-(b)
                             })
+                    AND coalesce(a.merged, false) = false
+                    AND coalesce(b.merged, false) = false
               OPTIONAL MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(a_tok:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN|IN_MENTION|IN_FRAME|FRAME_DESCRIBES_EVENT|DESCRIBES*0..2]-(a)
               OPTIONAL MATCH (:AnnotatedText {id: $doc_id})-[:CONTAINS_SENTENCE]->(:Sentence)-[:HAS_TOKEN]->(b_tok:TagOccurrence)-[:TRIGGERS|PARTICIPATES_IN|IN_MENTION|IN_FRAME|FRAME_DESCRIBES_EVENT|DESCRIBES*0..2]-(b)
               WITH a, b, r,
@@ -977,6 +1041,7 @@ def build_document_from_neo4j(
             WITH $doc_id AS doc_id
             MATCH (src)-[r:EVENT_PARTICIPANT|PARTICIPANT]->(evt)
               WHERE (evt:TEvent OR evt:EventMention)
+                AND (NOT (evt:TEvent) OR coalesce(evt.merged, false) = false)
                 AND (
                     coalesce(r.is_core, true) = true
                     OR (
@@ -1158,7 +1223,7 @@ def _canonicalize_timex_attrs(row: Dict[str, Any]) -> Tuple[Tuple[str, str], ...
     """Normalize TIMEX attrs toward MEANTIME strict comparison semantics."""
     typ = str(row.get("type") or "").strip().upper()
     value = str(row.get("value") or "").strip()
-    function_in_document = str(row.get("functionInDocument") or "").strip() or "NONE"
+    function_in_document = str(row.get("functionInDocument") or "").strip()
     anchor_time_id = str(row.get("anchorTimeID") or "").strip()
     begin_point = str(row.get("beginPoint") or "").strip()
     end_point = str(row.get("endPoint") or "").strip()
@@ -1473,7 +1538,7 @@ def _looks_like_proper_name_span(span: TokenSpan, gold_token_lookup: Dict[int, s
 def _nominal_projection_features(
     graph: Any,
     doc_id: int | str,
-    node_id: int,
+    node_id: str,
     fallback_head_idx: int,
 ) -> Dict[str, Any]:
     rows = graph.run(
@@ -2372,11 +2437,25 @@ def evaluate_documents(
             max_examples=max_examples,
         )
 
+    # Populate unmatched_gold_events on the document object (Issue 4 fix: was always 0).
+    unmatched_gold_events = int(strict["event"].get("fn", 0))
+    predicted_doc.unmatched_gold_events = unmatched_gold_events
+
+    # Emit a diagnostic warning when the Frame-fallback branch contributed events.
+    if getattr(predicted_doc, "frame_fallback_event_count", 0) > 0:
+        LOGGER.debug(
+            "doc %s: %d Frame-fallback events projected; event FP counts may be inflated",
+            gold_doc.doc_id,
+            predicted_doc.frame_fallback_event_count,
+        )
+
     return {
         "doc_id": gold_doc.doc_id,
         "strict": strict,
         "relaxed": relaxed,
         "relation_by_kind": relation_by_kind,
+        "unmatched_gold_events": unmatched_gold_events,
+        "frame_fallback_event_count": getattr(predicted_doc, "frame_fallback_event_count", 0),
         "counts": {
             "gold": {
                 "entity": len(gold_doc.entity_mentions),

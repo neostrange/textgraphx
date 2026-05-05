@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] — feature/srl-nombank-improvements
+
+### Added
+
+#### SRL/NomBank 18-step improvement roadmap (Steps 4–18)
+
+- **Step 4 — Role normalization provenance:** Argument edge now carries `raw_role`, `is_continuation`, `is_relative`, `predicative` provenance fields.
+- **Step 5 — Nominal promotion gating:** NomBank frames gated by `sense_conf >= frame_confidence_min`; below-threshold frames set `provisional=true`.
+- **Step 6 — Light-verb Pass 0:** `is_light_verb_host=true` set on verbal frame in light-verb constructions; nominal frame carries the event sense.
+- **Step 7 — Cluster diagnostics:** `EventEnrichmentPhase.report_event_cluster_diagnostics()` — reports merged/non-merged event cluster statistics.
+- **Step 8 — Canonical participant endpoints:** `EventEnrichmentPhase.canonicalize_participant_endpoints()` — rewires `PARTICIPANT`/`EVENT_PARTICIPANT` edges from `FrameArgument` to canonical `Entity`/`NUMERIC`.
+- **Step 9 — Precision fallback participants:** `EventEnrichmentPhase.add_precision_fallback_participants()` (opt-in) — adds high-confidence participants for spans where canonical linking left no participant edge.
+- **Step 10 — SRL TIMEX anchor:** `temporal.anchor_srl_timex_candidates_to_events()` — writes `HAS_TIME_ANCHOR` edges from canonical `TEvent` to `TimexMention:SRLTimexCandidate` where `merged=false`, `is_timeml_core=true`. See [docs/schema.md](docs/schema.md) for the new relationship entry.
+- **Step 11 — TLINK case 11:** `tlinks_recognizer.create_tlinks_case11()` — follows `HAS_TIME_ANCHOR` to produce `IS_INCLUDED` TLINK. Guards: `merged=false`, `low_confidence=false`, `is_timeml_core=true`. `confidence=0.57`, `rule_id='case11_has_time_anchor'`.
+- **Step 12 — Temporal anchoring diagnostics:** `TemporalAnchoringMetrics` gains `events_with_time_anchor`, `anchored_events_as_tlink_endpoint`, `temporally_isolated_events`, `anchor_tlink_yield_rate`.
+- **Step 13 — SLINK from predicate classes:** `EventEnrichmentPhase` writes `SLINK` edges from `ARGM-DSP` frame arguments.
+- **Step 14 — CLINK expansion:** `EventEnrichmentPhase` writes `CLINK` edges from `ARGM-CAU` frame arguments.
+- **Step 15 — Evaluator branch 3 merged-event guard:** `meantime_evaluator.py` Frame-fallback `NOT EXISTS` block now filters `merged=false` so secondary merged TEvents at the same span do not incorrectly block the Frame fallback path.
+- **Step 16 — SRL diagnostics in M8 bridge:** `ConsolidatedQualityReport` and `MEANTIMEResults` surface `srl_diagnostics` inline in `to_dict()` and `to_markdown()`.
+- **Step 17 — SRL-profile baseline rotation discipline:** `regression_detector.py` — added `SRLProfileBaseline` dataclass (per-profile MEANTIME event/relation F1 scores with per-kind deltas); `SRLProfileBaselineManager` (save/load/rotate/compare for 4 canonical SRL profiles: `verbal_only`, `verbal_plus_nominal_ungated`, `verbal_plus_nominal_gated`, `verbal_plus_nominal_gated_aligns_with`); `build_review_bundle()` assembles profile comparisons, variance, and cross-phase consistency into a single PR review artefact with a verdict (`PASS`/`REGRESSION`/`DETERMINISM_FAIL`/`CONSISTENCY_FAIL`). `rotate()` requires a non-empty reason string.
+- **Step 18 — Docs:** `docs/schema.md` — `HAS_TIME_ANCHOR` relationship entry added. `CHANGELOG.md` — this entry.
+- **Tests (steps 4–18):** 1137 unit+contract tests pass (previously 1108).
+
+#### Evaluation mechanism audit fixes (9 issues, all resolved)
+
+A systematic audit of `meantime_evaluator.py` and `evaluate_meantime.py` identified 9 correctness and observability issues. All are addressed in this entry. See [docs/EVALUATION_DIAGNOSTICS.md](docs/EVALUATION_DIAGNOSTICS.md) §5 for full details.
+
+- **Issue 4 (HIGH) — `unmatched_gold_events` always 0:** `NormalizedDocument.unmatched_gold_events` was declared but never written by `evaluate_documents()`. Fixed: the field is now set from `strict["event"].get("fn", 0)` at the end of `evaluate_documents()`. Also surfaced in the returned dict as `"unmatched_gold_events"`.
+- **Issue 2 (HIGH) — Branch 3 Frame-fallback counter missing:** Added `frame_fallback_event_count: int = 0` to `NormalizedDocument`. Set in `build_document_from_neo4j` after deduplication: `sum(1 for p, _ in event_by_span.values() if p == 0)`. Exposed in `evaluate_documents()` returned dict and in CLI `evaluation_scope`. A `DEBUG` log is emitted when count > 0.
+- **Issue 3 (HIGH) — NOM guard permanently disabled:** The `TEMPORARILY DISABLED` NOM entity guard is promoted to a named parameter `strict_nom_layer_filter: bool = False` on `build_document_from_neo4j`. When `True`, NOM projections are restricted to explicit `:NominalMention`/`:CorefMention` nodes. CLI flag: `--strict-nom-layer-filter`. Default `False` preserves backward compatibility.
+- **Issue 9 (LOW) — TIMEX `functionInDocument` injected as `"NONE"`:** Removed `or "NONE"` from `_canonicalize_timex_attrs()`. The field is now only added to `attrs_map` when actually present and non-empty.
+- **Issues 1/5 (CRITICAL/MEDIUM) — Span collapse fallback silent:** Added `matched_head` flag in the event multi-token span collapse loop. A `LOGGER.debug("event_span_collapse_fallback: ...")` is emitted when the headword is not found and the rightmost token fallback fires. No behavior change; purely diagnostic.
+- **Issue 7 (MEDIUM) — Silent empty prediction:** Added two diagnostic warnings in `build_document_from_neo4j`: (1) `LOGGER.warning` when `doc_id_int` resolves to `None`/empty; (2) `LOGGER.warning` after entity+event queries when both return empty rows, prompting verification of `AnnotatedText.publicId`.
+- **Issue 6 (MEDIUM) — SLINK/CLINK invisible in default scope:** No behavioral change. `evaluation_scope` in the CLI output now also includes `"strict_nom_layer_filter"`, `"frame_fallback_event_count"`, and `"unmatched_gold_events"` for traceability. Users should pass `--relation-scope all` to score SLINK/CLINK (see § 4 of diagnostics doc).
+- **Issue 8 (LOW) — Auxiliary filter with empty pred:** No code change. Documented in diagnostics § 5 for completeness.
+- **Tests:** 14 new unit tests in `src/textgraphx/tests/test_evaluation_mechanism_fixes.py`. Total test count: **1151**.
+
+---
+
 ## [Unreleased] — feature/new-features-2026-05-01
 
 ### Added

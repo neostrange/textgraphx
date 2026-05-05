@@ -169,7 +169,8 @@ The pipeline now provides actionable error messages:
 
 **"spaCy model not found"**
 - The `./run.sh` script auto-installs it
-- Manual install: `python -m spacy download en_core_web_sm`
+- Manual install (default): `python -m spacy download en_core_web_trf`
+- Optional explicit lightweight models: `en_core_web_sm` or `en_core_web_md`
 
 **"Virtual environment not found"**
 - Run `./run.sh` once to auto-create `.venv310`
@@ -205,7 +206,7 @@ Expected output when health checks pass:
 ======================================================================
 Start time:  2026-04-03T14:45:00.123456
 Dataset:     /path/to/dataset
-spaCy Model: en_core_web_sm
+spaCy Model: en_core_web_trf
 ======================================================================
 
 Running all phases in canonical order:

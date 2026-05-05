@@ -2800,6 +2800,139 @@ class RefinementPhase():
         logger.info("materialize_wider_conjunction_mentions: created %d wider CONJ mentions", created)
         return ""
 
+    # =============== NEW LINGUISTIC REFINEMENT RULES ===============
+
+    def project_event_polarity(self):
+        """Set event polarity based on dependency graph negation."""
+        logger.debug("project_event_polarity")
+        query = """
+        MATCH (e:EventMention)<-[:IN_MENTION]-(head:TagOccurrence)
+        WHERE head.tok_index_doc = e.headTokenIndex OR e.headTokenIndex IS NULL
+        MATCH (head)-[dep:IS_DEPENDENT]-(mod:TagOccurrence)
+        WHERE dep.type = 'neg'
+        SET e.polarity = "NEG"
+        """
+        self.graph.run(query)
+
+    def project_event_tense_aspect(self):
+        """Set event tense based on dependency graph auxiliaries."""
+        logger.debug("project_event_tense_aspect")
+        query = """
+        MATCH (e:EventMention)<-[:IN_MENTION]-(head:TagOccurrence)
+        WHERE head.tok_index_doc = e.headTokenIndex OR e.headTokenIndex IS NULL
+        MATCH (head)-[dep:IS_DEPENDENT]-(mod:TagOccurrence)
+        WHERE dep.type IN ['aux', 'auxpass']
+        WITH e, collect(toLower(mod.text)) as aux_words
+        SET e.tense = CASE 
+            WHEN any(w IN aux_words WHERE w IN ['was', 'were', 'had', 'did', 'been']) THEN 'PAST'
+            WHEN any(w IN aux_words WHERE w IN ['will', 'shall', 'would', 'could']) THEN 'FUTURE'
+            ELSE coalesce(e.tense, 'PRESENT') END,
+            e.aspect = CASE 
+            WHEN any(w IN aux_words WHERE w IN ['is', 'are', 'am', 'was', 'were', 'be', 'been']) AND e.value ENDS WITH 'ing' THEN 'PROGRESSIVE'
+            WHEN any(w IN aux_words WHERE w IN ['has', 'have', 'had']) THEN 'PERFECTIVE'
+            ELSE coalesce(e.aspect, 'NONE') END
+        """
+        self.graph.run(query)
+
+    def trim_determiners_from_mentions(self):
+        """Remove determiner tokens from the boundaries of Mentions.
+
+        Mentions tagged with ``boundary_policy='wider_construction'``
+        (e.g. wider APP/CONJ mentions from ENH-NAM-02) are skipped
+        because their gold extents intentionally include leading
+        determiners.
+        """
+        logger.debug("trim_determiners_from_mentions")
+        query = """
+        MATCH (m)
+        WHERE (m:EntityMention OR m:EventMention)
+          AND coalesce(m.boundary_policy, '') <> 'wider_construction'
+        MATCH (m)<-[r:IN_MENTION]-(t:TagOccurrence)
+        WHERE t.pos IN ['DT', 'PRP$', 'WDT']
+        AND (t.tok_index_doc = m.startIndex OR t.tok_index_doc = m.endIndex)
+        AND (m.headTokenIndex IS NULL OR t.tok_index_doc <> m.headTokenIndex)
+        DELETE r
+        """
+        self.graph.run(query)
+
+    def trim_punctuation_from_mentions(self):
+        """Remove trailing/leading punctuation tokens from the boundaries of Mentions.
+
+        Wider construction mentions (``boundary_policy='wider_construction'``)
+        are skipped to preserve their original extents.
+        """
+        logger.debug("trim_punctuation_from_mentions")
+        query = """
+        MATCH (m)
+        WHERE (m:EntityMention OR m:EventMention)
+          AND coalesce(m.boundary_policy, '') <> 'wider_construction'
+        MATCH (m)<-[r:IN_MENTION]-(t:TagOccurrence)
+        WHERE t.pos IN ['.', ',', ':', 'HYPH', '``', "''", '-LRB-', '-RRB-']
+           OR t.text =~ '^[\\.,;:_\\'\"?!\\[\\]()\\-]+$'
+        AND (t.tok_index_doc = m.startIndex OR t.tok_index_doc = m.endIndex)
+        AND (m.headTokenIndex IS NULL OR t.tok_index_doc <> m.headTokenIndex)
+        DELETE r
+        """
+        self.graph.run(query)
+
+    def update_mention_span_boundaries(self):
+        """Recompute the startIndex, endIndex, and string value of all Mentions."""
+        logger.debug("update_mention_span_boundaries")
+        query = """
+        MATCH (m)
+        WHERE m:EntityMention OR m:EventMention
+        MATCH (m)<-[:IN_MENTION]-(t:TagOccurrence)
+        WITH m, t ORDER BY t.tok_index_doc
+        WITH m, collect(t) AS tokens
+        WHERE size(tokens) > 0
+        WITH m, tokens, tokens[0].tok_index_doc AS newStart, tokens[-1].tok_index_doc AS newEnd
+        WHERE m.startIndex <> newStart OR m.endIndex <> newEnd OR m.span[0] <> newStart
+        SET m.startIndex = newStart,
+            m.endIndex = newEnd,
+            m.span = [x IN tokens | x.tok_index_doc],
+            m.value = reduce(s = '', x IN tokens | CASE WHEN s = '' THEN x.text ELSE s + ' ' + x.text END)
+        """
+        self.graph.run(query)
+
+    def promote_nominal_events(self):
+        """Promote nominals that act as Frame heads into EventMentions."""
+        logger.debug("promote_nominal_events")
+        query = """
+        MATCH (f:Frame)-[:IS_FRAME_OF]->(t:TagOccurrence)
+        WHERE t.pos IN ['NN', 'NNS']
+        AND NOT (t)-[:IN_MENTION]->(:EventMention)
+        WITH f, t
+        MERGE (ev:EventMention { uid: 'nom_ev_' + f.uuid })
+        ON CREATE SET
+            ev.value = t.text,
+            ev.startIndex = t.tok_index_doc,
+            ev.endIndex = t.tok_index_doc,
+            ev.span = [t.tok_index_doc],
+            ev.headTokenIndex = t.tok_index_doc,
+            ev.syntacticType = 'NOMINAL',
+            ev.doc_id = t.doc_id
+        MERGE (t)-[:IN_MENTION]->(ev)
+        MERGE (f)-[:MENTIONS]->(ev)
+        """
+        self.graph.run(query)
+
+    def coerce_role_based_types(self):
+        """Refine generic EntityMentions serving as LOC or TMP frame arguments."""
+        logger.debug("coerce_role_based_types")
+        query = """
+        MATCH (fa:FrameArgument)-[:PARTICIPATES_IN]->(m:EntityMention)
+        WHERE fa.type IN ['ARGM-LOC', 'ARGM-TMP']
+        AND NOT m:Location AND NOT m:Timex
+        WITH fa, m
+        FOREACH (ignore IN CASE WHEN fa.type = 'ARGM-LOC' THEN [1] ELSE [] END |
+            SET m:Location
+        )
+        FOREACH (ignore IN CASE WHEN fa.type = 'ARGM-TMP' THEN [1] ELSE [] END |
+            SET m:Timex
+        )
+        """
+        self.graph.run(query)
+
 
 if __name__ == '__main__':
     tp= RefinementPhase(sys.argv[1:])
@@ -2918,143 +3051,4 @@ if __name__ == '__main__':
 
 
 
-
-    # =============== NEW LINGUISTIC REFINEMENT RULES ===============
-
-    def project_event_polarity(self):
-        """Set event polarity based on dependency graph negation."""
-        logger.debug("project_event_polarity")
-        query = """
-        MATCH (e:EventMention)<-[:IN_MENTION]-(head:TagOccurrence)
-        WHERE head.tok_index_doc = e.headTokenIndex OR e.headTokenIndex IS NULL
-        MATCH (head)-[dep:IS_DEPENDENT]-(mod:TagOccurrence)
-        WHERE dep.type = 'neg'
-        SET e.polarity = "NEG"
-        """
-        self.graph.run(query)
-
-    def project_event_tense_aspect(self):
-        """Set event tense based on dependency graph auxiliaries."""
-        logger.debug("project_event_tense_aspect")
-        query = """
-        MATCH (e:EventMention)<-[:IN_MENTION]-(head:TagOccurrence)
-        WHERE head.tok_index_doc = e.headTokenIndex OR e.headTokenIndex IS NULL
-        MATCH (head)-[dep:IS_DEPENDENT]-(mod:TagOccurrence)
-        WHERE dep.type IN ['aux', 'auxpass']
-        WITH e, collect(toLower(mod.text)) as aux_words
-        SET e.tense = CASE 
-            WHEN any(w IN aux_words WHERE w IN ['was', 'were', 'had', 'did', 'been']) THEN 'PAST'
-            WHEN any(w IN aux_words WHERE w IN ['will', 'shall', 'would', 'could']) THEN 'FUTURE'
-            ELSE coalesce(e.tense, 'PRESENT') END,
-            e.aspect = CASE 
-            WHEN any(w IN aux_words WHERE w IN ['is', 'are', 'am', 'was', 'were', 'be', 'been']) AND e.value ENDS WITH 'ing' THEN 'PROGRESSIVE'
-            WHEN any(w IN aux_words WHERE w IN ['has', 'have', 'had']) THEN 'PERFECTIVE'
-            ELSE coalesce(e.aspect, 'NONE') END
-        """
-        self.graph.run(query)
-
-    def trim_determiners_from_mentions(self):
-        """Remove determiner tokens from the boundaries of Mentions.
-
-        Mentions tagged with ``boundary_policy='wider_construction'``
-        (e.g. wider APP/CONJ mentions from ENH-NAM-02) are skipped
-        because their gold extents intentionally include leading
-        determiners.
-        """
-        logger.debug("trim_determiners_from_mentions")
-        query = """
-        MATCH (m)
-        WHERE (m:EntityMention OR m:EventMention)
-          AND coalesce(m.boundary_policy, '') <> 'wider_construction'
-        MATCH (m)<-[r:IN_MENTION]-(t:TagOccurrence)
-        WHERE t.pos IN ['DT', 'PRP$', 'WDT']
-        // Only strip if it's currently at the boundaries
-        AND (t.tok_index_doc = m.startIndex OR t.tok_index_doc = m.endIndex)
-        // And ensure we don't delete the head token
-        AND (m.headTokenIndex IS NULL OR t.tok_index_doc <> m.headTokenIndex)
-        DELETE r
-        """
-        self.graph.run(query)
-
-    def trim_punctuation_from_mentions(self):
-        """Remove trailing/leading punctuation tokens from the boundaries of Mentions.
-
-        Wider construction mentions (``boundary_policy='wider_construction'``)
-        are skipped to preserve their original extents.
-        """
-        logger.debug("trim_punctuation_from_mentions")
-        query = """
-        MATCH (m)
-        WHERE (m:EntityMention OR m:EventMention)
-          AND coalesce(m.boundary_policy, '') <> 'wider_construction'
-        MATCH (m)<-[r:IN_MENTION]-(t:TagOccurrence)
-        WHERE t.pos IN ['.', ',', ':', 'HYPH', '``', "''", '-LRB-', '-RRB-']
-           OR t.text =~ '^[\\\\.,;:_\\\'\\"?!\\[\\]()\\\\-]+$'
-        AND (t.tok_index_doc = m.startIndex OR t.tok_index_doc = m.endIndex)
-        AND (m.headTokenIndex IS NULL OR t.tok_index_doc <> m.headTokenIndex)
-        DELETE r
-        """
-        self.graph.run(query)
-
-    def update_mention_span_boundaries(self):
-        """Recompute the startIndex, endIndex, and string value of all Mentions."""
-        logger.debug("update_mention_span_boundaries")
-        query = """
-        MATCH (m)
-        WHERE m:EntityMention OR m:EventMention
-        MATCH (m)<-[:IN_MENTION]-(t:TagOccurrence)
-        WITH m, t ORDER BY t.tok_index_doc
-        WITH m, collect(t) AS tokens
-        WHERE size(tokens) > 0
-        WITH m, tokens, tokens[0].tok_index_doc AS newStart, tokens[-1].tok_index_doc AS newEnd
-        WHERE m.startIndex <> newStart OR m.endIndex <> newEnd OR m.span[0] <> newStart
-        SET m.startIndex = newStart,
-            m.endIndex = newEnd,
-            m.span = [x IN tokens | x.tok_index_doc],
-            m.value = reduce(s = '', x IN tokens | CASE WHEN s = '' THEN x.text ELSE s + ' ' + x.text END)
-        """
-        self.graph.run(query)
-
-    def promote_nominal_events(self):
-        """Promote nominals that act as Frame heads into EventMentions."""
-        logger.debug("promote_nominal_events")
-        query = """
-        MATCH (f:Frame)-[:IS_FRAME_OF]->(t:TagOccurrence)
-        WHERE t.pos IN ['NN', 'NNS']
-        AND NOT (t)-[:IN_MENTION]->(:EventMention)
-        WITH f, t
-        // Create the new EventMention tied to this document
-        MERGE (ev:EventMention { uid: 'nom_ev_' + f.uuid })
-        ON CREATE SET 
-            ev.value = t.text,
-            ev.startIndex = t.tok_index_doc,
-            ev.endIndex = t.tok_index_doc,
-            ev.span = [t.tok_index_doc],
-            ev.headTokenIndex = t.tok_index_doc,
-            ev.syntacticType = 'NOMINAL',
-            ev.doc_id = t.doc_id
-        MERGE (t)-[:IN_MENTION]->(ev)
-        // Ensure the semantic frame points to this new event representation
-        MERGE (f)-[:MENTIONS]->(ev)
-        """
-        self.graph.run(query)
-
-    def coerce_role_based_types(self):
-        """Refine generic EntityMentions serving as LOC or TMP frame arguments."""
-        logger.debug("coerce_role_based_types")
-        query = """
-        MATCH (fa:FrameArgument)-[:PARTICIPATES_IN]->(m:EntityMention)
-        WHERE fa.type IN ['ARGM-LOC', 'ARGM-TMP']
-        // Only safely coerce if not already a specialized entity class
-        // (Avoiding overwriting PERSON or ORGANIZATION without care)
-        AND NOT m:Location AND NOT m:Timex
-        WITH fa, m
-        FOREACH (ignore IN CASE WHEN fa.type = 'ARGM-LOC' THEN [1] ELSE [] END |
-            SET m:Location
-        )
-        FOREACH (ignore IN CASE WHEN fa.type = 'ARGM-TMP' THEN [1] ELSE [] END |
-            SET m:Timex
-        )
-        """
-        self.graph.run(query)
 

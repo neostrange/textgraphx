@@ -24,8 +24,16 @@ class _FakeResponse:
 def _fresh_restcaller_module():
     # Some legacy wrapper tests install stub modules directly into sys.modules
     # and do not restore them. Ensure this test imports the real compatibility
-    # module from disk, not a stale fake.
+    # module from disk, not a stale fake.  Also clear the LRU cache and
+    # circuit-breaker state so each test starts from a clean slate.
     sys.modules.pop("textgraphx.util.RestCaller", None)
+    sys.modules.pop("textgraphx.adapters.rest_caller", None)
+    # Clearing from sys.modules does not remove the package attribute, so
+    # the submodule may still be returned from its parent.  Force the parent
+    # to forget it so a genuine fresh import happens.
+    adapters_pkg = sys.modules.get("textgraphx.adapters")
+    if adapters_pkg is not None:
+        adapters_pkg.__dict__.pop("rest_caller", None)
     return importlib.import_module("textgraphx.util.RestCaller")
 
 

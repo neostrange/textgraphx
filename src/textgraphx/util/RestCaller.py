@@ -11,8 +11,10 @@ import json
 
 import requests
 
-from textgraphx.infrastructure.config import get_config  # noqa: F401
 from textgraphx.adapters import rest_caller as _canonical_rest_caller
+
+sys.modules[__name__] = _canonical_rest_caller
+
 
 
 def _service_timeout() -> int:

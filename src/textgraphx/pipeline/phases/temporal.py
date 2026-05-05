@@ -551,17 +551,30 @@ class TemporalPhase:
             if not fa_id:
                 continue
             tm_id = f"srl_tm_{doc_id}_{row['min_tok']}_{row['max_tok']}"
+            tid = f"srl_tmx_{doc_id}_{row['min_tok']}_{row['max_tok']}"
             upsert_query = """
+            MERGE (t:TIMEX {tid: $tid, doc_id: toInteger($doc_id)})
+            ON CREATE SET
+                t.start_tok    = $min_tok,
+                t.end_tok      = $max_tok,
+                t.start_char   = $min_char,
+                t.end_char     = $max_char,
+                t.text         = $fa_text,
+                t.source       = 'srl_argm_tmp',
+                t.confidence   = 0.65,
+                t.needs_review = true
             MERGE (tm:TimexMention:SRLTimexCandidate {id: $tm_id, doc_id: toInteger($doc_id)})
             ON CREATE SET
                 tm.start_tok    = $min_tok,
                 tm.end_tok      = $max_tok,
                 tm.start_char   = $min_char,
                 tm.end_char     = $max_char,
+                tm.text         = $fa_text,
                 tm.source       = 'srl_argm_tmp',
                 tm.confidence   = 0.65,
                 tm.needs_review = true,
                 tm.source_fa_id = $fa_id
+            MERGE (tm)-[:REFERS_TO]->(t)
             WITH tm
             MATCH (tok:TagOccurrence)
             WHERE tok.id IN $tok_ids
@@ -573,12 +586,14 @@ class TemporalPhase:
                     upsert_query,
                     parameters={
                         "tm_id": tm_id,
+                        "tid": tid,
                         "doc_id": doc_id,
                         "min_tok": row["min_tok"],
                         "max_tok": row["max_tok"],
                         "min_char": row.get("min_char"),
                         "max_char": row.get("max_char"),
                         "fa_id": fa_id,
+                        "fa_text": row.get("fa_text"),
                         "tok_ids": row.get("tok_ids", []),
                     },
                 )
@@ -593,6 +608,68 @@ class TemporalPhase:
             doc_id, promoted,
         )
         return promoted
+
+    def anchor_srl_timex_candidates_to_events(self, doc_id):
+        """Create HAS_TIME_ANCHOR edges from canonical TEvents to their SRLTimexCandidate TIMEX (Step 10).
+
+        After ``promote_argm_tmp_to_timex_candidates`` creates ``SRLTimexCandidate``
+        nodes, those nodes are not yet connected to the owning TEvent.  This method
+        closes that gap by following the provenance chain:
+
+            FrameArgument(source_fa_id) ← PARTICIPANT ← Frame
+                → FRAME_DESCRIBES_EVENT / DESCRIBES → TEvent (non-merged)
+
+        and writing:
+
+            (TEvent)-[:HAS_TIME_ANCHOR {source:'srl_argm_tmp_anchor',
+                                         confidence:0.65,
+                                         rule_id:'anchor_srl_timex_candidates_v1'}]
+                     →(SRLTimexCandidate)
+
+        These anchors are the prerequisite for Step 11 (nominal TLINK generation):
+        a canonical TEvent must have at least one time anchor before it can serve
+        as a TLINK endpoint with a meaningful temporal reference.
+
+        Non-fatal: logs and returns 0 on query error.
+
+        Returns:
+            int — number of HAS_TIME_ANCHOR edges created.
+        """
+        logger.debug("anchor_srl_timex_candidates_to_events doc_id=%s", doc_id)
+
+        anchor_query = """
+        MATCH (tm:TimexMention:SRLTimexCandidate {doc_id: toInteger($doc_id)})
+        WHERE tm.source_fa_id IS NOT NULL
+        MATCH (fa:FrameArgument {id: tm.source_fa_id})
+        MATCH (f:Frame)-[:PARTICIPANT]->(fa)
+        WHERE coalesce(f.provisional, false) = false
+        OPTIONAL MATCH (f)-[:FRAME_DESCRIBES_EVENT]->(event_c:TEvent)
+        OPTIONAL MATCH (f)-[:DESCRIBES]->(event_l:TEvent)
+        WITH tm, coalesce(event_c, event_l) AS event
+        WHERE event IS NOT NULL
+          AND coalesce(event.merged, false) = false
+        MERGE (event)-[a:HAS_TIME_ANCHOR]->(tm)
+        ON CREATE SET
+            a.source     = 'srl_argm_tmp_anchor',
+            a.confidence = 0.65,
+            a.rule_id    = 'anchor_srl_timex_candidates_v1',
+            a.source_kind = 'rule',
+            a.created_at = datetime().epochMillis
+        RETURN count(a) AS anchored
+        """
+        try:
+            rows = self.graph.run(anchor_query, parameters={"doc_id": doc_id}).data()
+            n = rows[0].get("anchored", 0) if rows else 0
+            logger.info(
+                "anchor_srl_timex_candidates_to_events doc=%s: %d HAS_TIME_ANCHOR edges created",
+                doc_id, n,
+            )
+            return n
+        except Exception:
+            logger.exception(
+                "anchor_srl_timex_candidates_to_events: query failed for doc_id=%s", doc_id
+            )
+            return 0
 
     def reconcile_spacy_timex_candidates(self, doc_id):
         """Cross-validate SpaCy DATE/TIME candidates against HeidelTime TIMEX output.
@@ -895,6 +972,7 @@ if __name__ == '__main__':
         phase.materialize_timexes_fallback(doc_id)
         phase.reconcile_spacy_timex_candidates(doc_id)
         phase.promote_argm_tmp_to_timex_candidates(doc_id)
+        phase.anchor_srl_timex_candidates_to_events(doc_id)
         phase.materialize_glinks(doc_id)
 
     duration = _time.time() - start

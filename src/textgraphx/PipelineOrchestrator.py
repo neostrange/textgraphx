@@ -112,7 +112,7 @@ if __name__ == "__main__":
         "--model",
         "-m",
         default="en_core_web_trf",
-        help="spaCy model (en_core_web_trf/en_core_web_sm or trf/sm)",
+        help="spaCy model (default en_core_web_trf; optional explicit en_core_web_sm/en_core_web_md or trf/sm/md)",
     )
     parser.add_argument(
         "--phases",

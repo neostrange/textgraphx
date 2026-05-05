@@ -124,6 +124,7 @@ class PipelineOrchestrator:
         if cfg.features.enable_dbpedia_enrichment:
             phases.append("dbpedia_enrichment")
         phases.append("tlinks")
+        phases.append("graph_enhancements")
         return phases
 
     @staticmethod
@@ -460,6 +461,7 @@ class PipelineOrchestrator:
                     "event_enrichment": self._run_event_enrichment,
                     "dbpedia_enrichment": self._run_dbpedia_enrichment,
                     "tlinks": self._run_tlinks,
+                    "graph_enhancements": self._run_graph_enhancements,
                 }
 
                 self.summary.phase_count = len(phases)
@@ -748,6 +750,21 @@ class PipelineOrchestrator:
             return result
         except Exception as e:
             logger.error(f"Error in DBpedia enrichment phase: {e}")
+            return {"status": "error", "message": str(e)}
+
+    def _run_graph_enhancements(self) -> Dict[str, any]:
+        """Run graph enhancements phase — pure-Cypher post-processing."""
+        logger.info("Starting graph enhancements phase...")
+        try:
+            from textgraphx.pipeline.runtime.phase_wrappers import GraphEnhancementsPhaseWrapper
+            wrapper = GraphEnhancementsPhaseWrapper(
+                strict_transition_gate=self.strict_transition_gate
+            )
+            result = wrapper.execute()
+            logger.info(f"Graph enhancements phase: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error in graph enhancements phase: {e}")
             return {"status": "error", "message": str(e)}
 
     def _count_documents(self) -> int:
