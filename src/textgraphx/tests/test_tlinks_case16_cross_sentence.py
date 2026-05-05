@@ -103,9 +103,17 @@ def test_case16_has_self_loop_guard(tr_source):
 
 @pytest.mark.unit
 def test_case16_has_tense_reltype_case(tr_source):
+    """Case 16 tense-based rules were evaluated and produced 0 TPs / several FPs.
+    All rules except the SIMULTANEOUS stub are disabled via WHEN false THEN ...
+    The CASE expression must still be present (documents future re-evaluation)."""
     src = _extract_method(tr_source, "create_tlinks_case16")
-    assert "'BEFORE'" in src
+    # SIMULTANEOUS stub remains as a placeholder for future re-evaluation
     assert "'SIMULTANEOUS'" in src
+    # BEFORE tense rules are disabled (produced only FPs vs MEANTIME gold)
+    # They must NOT appear as live relType assignments
+    assert "WHEN false" in src or "false THEN" in src, (
+        "Case 16 tense rules should be disabled via WHEN false; found active BEFORE rule"
+    )
 
 
 @pytest.mark.unit

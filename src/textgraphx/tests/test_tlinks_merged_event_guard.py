@@ -57,6 +57,9 @@ def _make_recognizer(return_value=None):
 # ---------------------------------------------------------------------------
 
 # (case_method, primary_event_alias)  — alias used in the WHERE clause
+# Cases 8, 13, 14 are intentionally DISABLED (guideline violations / zero-TP FP
+# generators on MEANTIME). They return [] without running a query, so source-code
+# guard inspection and executed-query checks must be handled separately below.
 TLINK_CASES = [
     ("create_tlinks_case1", "e1"),
     ("create_tlinks_case2", "e1"),
@@ -65,7 +68,7 @@ TLINK_CASES = [
     ("create_tlinks_case5", "e"),
     ("create_tlinks_case6", "e"),
     ("create_tlinks_case7", "e_main"),
-    ("create_tlinks_case8", "e"),
+    # case8 DISABLED — excluded from parametrised guard check (see dedicated tests below)
     ("create_tlinks_case9", "e"),
     # Cases 10–18 (added in second implementation pass)
     ("create_tlinks_case10", "e"),
@@ -161,12 +164,14 @@ def test_case6_executed_query_excludes_merged_events():
 
 
 @pytest.mark.unit
-def test_case8_executed_query_excludes_merged_events():
-    """Executed case8 Cypher must include the merged guard."""
+def test_case8_is_disabled_no_graph_run():
+    """Case 8 is intentionally disabled — must return [] and never call graph.run."""
     recognizer = _make_recognizer()
-    recognizer.create_tlinks_case8()
-    query = recognizer.graph.run.call_args[0][0]
-    assert "merged" in query
+    result = recognizer.create_tlinks_case8()
+    assert result == [], "create_tlinks_case8 must return [] when disabled"
+    assert recognizer.graph.run.call_count == 0, (
+        "create_tlinks_case8 must not write to the graph when disabled"
+    )
 
 
 @pytest.mark.unit
@@ -217,21 +222,25 @@ def test_case12_executed_query_excludes_merged_events():
 
 
 @pytest.mark.unit
-def test_case13_executed_query_excludes_merged_events():
-    """Case 13 (CLINK→BEFORE) must guard cause and effect nodes."""
+def test_case13_is_disabled_no_graph_run():
+    """Case 13 is intentionally disabled (0 TPs on MEANTIME) — must return [] and not run."""
     recognizer = _make_recognizer()
-    recognizer.create_tlinks_case13()
-    query = recognizer.graph.run.call_args[0][0]
-    assert "merged" in query
+    result = recognizer.create_tlinks_case13()
+    assert result == [], "create_tlinks_case13 must return [] when disabled"
+    assert recognizer.graph.run.call_count == 0, (
+        "create_tlinks_case13 must not write to the graph when disabled"
+    )
 
 
 @pytest.mark.unit
-def test_case14_executed_query_excludes_merged_events():
-    """Case 14 (SLINK tense matrix) must guard e_main and e_sub."""
+def test_case14_is_disabled_no_graph_run():
+    """Case 14 is intentionally disabled (bidirectional AFTER bug) — must return [] and not run."""
     recognizer = _make_recognizer()
-    recognizer.create_tlinks_case14()
-    query = recognizer.graph.run.call_args[0][0]
-    assert "merged" in query
+    result = recognizer.create_tlinks_case14()
+    assert result == [], "create_tlinks_case14 must return [] when disabled"
+    assert recognizer.graph.run.call_count == 0, (
+        "create_tlinks_case14 must not write to the graph when disabled"
+    )
 
 
 @pytest.mark.unit

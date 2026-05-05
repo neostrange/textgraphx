@@ -8,11 +8,15 @@ Legacy source-contract markers preserved for tests:
 """
 
 import json
+import sys
 
 import requests
 
 from textgraphx.adapters import rest_caller as _canonical_rest_caller
 
+# Replace this compatibility module with the canonical adapter so callers
+# can import `textgraphx.util.RestCaller` and be routed to the authoritative
+# implementation. Ensure `sys` is imported before manipulating `sys.modules`.
 sys.modules[__name__] = _canonical_rest_caller
 
 

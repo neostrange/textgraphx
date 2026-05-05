@@ -72,65 +72,65 @@ class TestCase8NombankDct:
     def test_method_exists(self, tr_source):
         assert "def create_tlinks_case8(" in tr_source
 
+    def test_is_intentionally_disabled(self, method_src):
+        """Case 8 must document its disabled state per NewsReader §10.6.2 Subtask 1 rule (a)."""
+        assert "DISABLED" in method_src
+
     def test_targets_nombank_source_events(self, method_src):
-        """Must only target TEvents with source='nombank_srl'."""
-        assert "nombank_srl" in method_src
+        """Disabled: docstring records that NomBank nominal events were the target."""
+        # The method is disabled; either the docstring mentions nombank_srl OR the
+        # DISABLED notice makes the intent clear.
+        assert "nombank_srl" in method_src or "DISABLED" in method_src
 
     def test_anchors_to_dct(self, method_src):
-        """Must traverse to CREATED_ON DCT node."""
-        assert "CREATED_ON" in method_src
+        """Disabled: intent was to anchor nominal events to DCT; documented in docstring."""
+        assert "CREATED_ON" in method_src or "DISABLED" in method_src
 
     def test_dct_label_check(self, method_src):
-        """Must check that DCT is TIMEX or Timex3."""
-        assert "TIMEX" in method_src or "Timex3" in method_src
+        """Disabled: DCT TIMEX check is documented via DISABLED notice."""
+        assert "TIMEX" in method_src or "Timex3" in method_src or "DISABLED" in method_src
 
     def test_default_reltype_is_included(self, method_src):
-        """Default IS_INCLUDED is correct for nominal events without tense."""
-        assert "IS_INCLUDED" in method_src
+        """Disabled: IS_INCLUDED would be the default if re-enabled."""
+        assert "IS_INCLUDED" in method_src or "DISABLED" in method_src
 
     def test_rule_id_present(self, method_src):
-        """rule_id must be set on the TLINK for auditability."""
-        assert "case8_nombank_dct" in method_src
+        """Disabled: rule_id would be set when re-enabled; disabled marker must be present."""
+        assert "case8" in method_src
 
     def test_uses_merge_not_create(self, method_src):
-        """Must use MERGE for idempotency.  ON CREATE SET (MERGE conditional) is allowed."""
-        import re
-        assert "MERGE" in method_src
-        # Reject bare CREATE (...) node/relationship creation; allow ON CREATE SET
-        assert not re.search(r"\bCREATE\s*\(", method_src), (
-            "create_tlinks_case8 must not use bare CREATE node/rel syntax; use MERGE"
-        )
+        """Disabled: MERGE convention would be used if re-enabled; verify disabled state."""
+        assert "DISABLED" in method_src
 
     def test_confidence_lower_than_structural_cases(self, method_src):
-        """Proximity-based cases should have lower confidence than structure-based."""
-        # case8 confidence is 0.65, structural cases are ≥0.78
-        assert "0.65" in method_src
+        """Disabled: confidence would be 0.65 if re-enabled; verify disabled state."""
+        assert "DISABLED" in method_src
 
     def test_returns_count(self):
-        """Method must return data from the graph query."""
+        """Disabled method must return an empty list (no graph writes when disabled)."""
         recognizer = _make_recognizer([{"created": 3}])
         rows = recognizer.create_tlinks_case8()
-        assert rows[0]["created"] == 3
+        assert rows == []
 
     def test_rule_id_in_executed_query(self):
-        """Executed Cypher must include the rule_id constant."""
+        """Disabled case must NOT call graph.run (no DB side-effects when disabled)."""
         recognizer = _make_recognizer()
         recognizer.create_tlinks_case8()
-        query = recognizer.graph.run.call_args[0][0]
-        assert "case8_nombank_dct" in query
+        assert recognizer.graph.run.call_count == 0
 
     def test_nombank_srl_filter_in_executed_query(self):
-        """Executed Cypher must filter on source='nombank_srl'."""
+        """Disabled case must NOT call graph.run."""
         recognizer = _make_recognizer()
         recognizer.create_tlinks_case8()
-        query = recognizer.graph.run.call_args[0][0]
-        assert "nombank_srl" in query
+        assert recognizer.graph.run.call_count == 0
 
     def test_case8_excludes_low_confidence_events(self, method_src):
-        assert "coalesce(e.low_confidence, false) = false" in method_src
+        """Disabled: guard would be enforced if re-enabled; verify disabled state."""
+        assert "DISABLED" in method_src or "low_confidence" in method_src
 
     def test_case8_requires_timeml_core_events(self, method_src):
-        assert "coalesce(e.is_timeml_core, true) = true" in method_src
+        """Disabled: is_timeml_core guard would be enforced if re-enabled."""
+        assert "DISABLED" in method_src or "is_timeml_core" in method_src
 
     def test_case6_exclusion_gap_addressed(self, tr_source):
         """case6 must NOT exclude NN-pos tokens; case8 fills that gap.

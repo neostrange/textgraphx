@@ -26,6 +26,9 @@ class TestTlinksReasoningRuntime:
         assert obj._run_query.call_count == 3
 
     def test_apply_tlink_transitive_closure_query_contains_core_rules(self):
+        """Transitive closure is restricted to IDENTITY-chain compositions only.
+        BEFORE/AFTER/SIMULTANEOUS transitivity was removed because it generates
+        O(N²) spurious links across distant event pairs (precision collapse)."""
         obj = TlinksRecognizer.__new__(TlinksRecognizer)
         obj.graph = MagicMock()
         captured = {}
@@ -38,9 +41,12 @@ class TestTlinksReasoningRuntime:
         obj.apply_tlink_transitive_closure(max_rounds=1)
 
         query = captured.get("query", "")
-        assert "t1 = 'BEFORE' AND t2 = 'BEFORE'" in query
-        assert "t1 = 'AFTER'" in query and "t2 = 'AFTER'" in query
-        assert "t1 = 'IDENTITY'" in query
+        # IDENTITY-chain composition is the only active rule
+        assert "IDENTITY" in query, "Closure query must handle IDENTITY chains"
+        # BEFORE/AFTER transitivity intentionally removed to prevent precision collapse
+        assert "t1 = 'BEFORE' AND t2 = 'BEFORE'" not in query, (
+            "BEFORE+BEFORE transitivity must be absent — it generated O(N²) FPs"
+        )
 
     def test_endpoint_contract_violations_uses_contract_counter(self, monkeypatch):
         obj = TlinksRecognizer.__new__(TlinksRecognizer)

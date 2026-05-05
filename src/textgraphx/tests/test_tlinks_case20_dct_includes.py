@@ -124,10 +124,12 @@ def test_20a_excludes_srl_timex_candidates(tr_source):
 
 
 @pytest.mark.unit
-def test_20a_token_distance_guard(tr_source):
-    """20a must guard on token distance (≤ 15 or similar)."""
+def test_20a_dep_tree_approach(tr_source):
+    """20a switched from a proximity window to a dependency-tree approach.
+    Token distance guards are replaced by IS_DEPENDENT edge matching."""
     body = _extract_method(tr_source, "create_tlinks_case20")
-    assert "<= 15" in body or "<= 12" in body or "<= 10" in body
+    # Must use dep-tree edges instead of (or in addition to) a proximity window
+    assert "IS_DEPENDENT" in body or "dep_rel" in body or "dep_rel.dep" in body
 
 
 @pytest.mark.unit
@@ -139,8 +141,10 @@ def test_20a_no_existing_tlink_guard(tr_source):
 
 @pytest.mark.unit
 def test_20a_rule_id(tr_source):
+    """20a rule_id was updated when sub-case was promoted to case21 dep-tree approach."""
     body = _extract_method(tr_source, "create_tlinks_case20")
-    assert "case20a" in body
+    # Original id was case20a; promoted to case21_dep_timex_includes
+    assert "case20a" in body or "case21" in body or "dep_timex" in body
 
 
 # ---------------------------------------------------------------------------
